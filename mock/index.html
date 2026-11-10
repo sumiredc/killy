@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Killy Battle Mock</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="stage">
+  <div class="phone locked" id="phone">
+
+    <!-- Lock screen with push notification -->
+    <section class="lock" id="lock">
+      <div class="lock-time">17:00</div>
+      <div class="lock-date" data-i18n="lockDate"></div>
+      <button class="push" id="push" type="button">
+        <span class="push-icon" id="pushIcon"></span>
+        <span class="push-body">
+          <span class="push-head"><b>Killy</b><small data-i18n="now"></small></span>
+          <span class="push-text" id="pushText"></span>
+          <span class="push-killy">……！</span>
+        </span>
+      </button>
+      <p class="lock-hint" data-i18n="tapToOpen"></p>
+    </section>
+
+    <!-- Battle screen -->
+    <section class="battle" id="battle" hidden>
+
+      <div class="arena" id="arena">
+        <div class="stars" aria-hidden="true"></div>
+        <div class="moon" aria-hidden="true"></div>
+
+        <div class="info" id="info" aria-live="polite">
+          <div class="srv" id="srv"><span id="srvName"></span></div>
+          <div class="count"><span id="zCount"></span><small id="zLabel"></small></div>
+          <div class="who" id="who"></div>
+        </div>
+        <div class="empty" id="empty" hidden>
+          <b id="emptyTitle"></b>
+          <span id="emptyText"></span>
+        </div>
+        <div class="counter" id="counter" role="img"></div>
+
+        <svg class="threads" id="threads" aria-hidden="true"></svg>
+        <div class="party" id="party">
+          <div class="parent" id="parent"><div class="art" id="parentArt"></div></div>
+          <div class="zombies" id="zombies"></div>
+        </div>
+
+        <div class="killy" id="killy">
+          <div class="bubble" id="bubble"></div>
+          <div class="art" id="killyArt"></div>
+        </div>
+        <div class="ground" aria-hidden="true"></div>
+      </div>
+
+      <div class="action">
+        <button class="kill" id="killBtn" type="button">
+          <span class="kill-fill" id="killFill"></span>
+          <span class="kill-label" data-i18n="hold"></span>
+          <span class="kill-sub" id="killSub"></span>
+        </button>
+      </div>
+
+      <!-- All clear -->
+      <div class="clear" id="clear" hidden>
+        <div class="clear-card">
+          <div class="clear-killy" id="clearKilly"></div>
+          <h2 data-i18n="clearTitle"></h2>
+          <p id="clearText"></p>
+          <dl class="stats">
+            <div><dt data-i18n="statParents"></dt><dd id="statParents"></dd></div>
+            <div><dt data-i18n="statZombies"></dt><dd id="statZombies"></dd></div>
+          </dl>
+          <button class="kill again" id="closeClearBtn" type="button"><span class="kill-label" data-i18n="close"></span></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Settings screen -->
+    <section class="settings" id="settings" hidden>
+      <header class="settings-bar">
+        <h1 data-i18n="settings"></h1>
+      </header>
+
+      <div class="settings-body">
+        <h2 class="group-title" data-i18n="servers"></h2>
+        <ul class="group" id="serverList"></ul>
+        <p class="group-empty" id="noServers" data-i18n="noServers" hidden></p>
+        <button class="add-btn" id="addServerBtn" type="button"><span aria-hidden="true">＋</span><span data-i18n="addServer"></span></button>
+
+        <h2 class="group-title" data-i18n="app"></h2>
+        <div class="group">
+          <div class="row">
+            <span class="row-main"><span class="row-title" data-i18n="language"></span></span>
+            <div class="segmented" id="langSeg" role="group">
+              <button type="button" data-lang="ja">日本語</button>
+              <button type="button" data-lang="en">English</button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-main">
+              <span class="row-title" data-i18n="notifications"></span>
+              <span class="row-sub" data-i18n="notificationsHint"></span>
+            </span>
+            <button class="switch" id="appNotify" type="button" role="switch" aria-checked="true" data-i18n-label="notifications"></button>
+          </div>
+        </div>
+        <p class="version">Killy 0.1.0</p>
+      </div>
+
+    </section>
+
+    <!-- Footer tab bar -->
+    <nav class="tabbar" id="tabbar">
+      <button class="tab" id="tabBattle" type="button" aria-current="page">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3C8 3 5.5 5.8 5.5 9.6V19.5l2.1-1.6 2.2 1.6 2.2-1.6 2.2 1.6 2.2-1.6 2.1 1.6V9.6C18.5 5.8 16 3 12 3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="10" cy="10.5" r="1.2" fill="currentColor"/><circle cx="14" cy="10.5" r="1.2" fill="currentColor"/></svg>
+        <span data-i18n="tabBattle"></span>
+        <span class="tab-badge" id="tabBadge" hidden></span>
+      </button>
+      <button class="tab" id="tabSettings" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        <span data-i18n="settings"></span>
+      </button>
+    </nav>
+
+    <!-- Add server sheet -->
+    <div class="sheet-wrap" id="addSheet" hidden>
+      <div class="sheet">
+        <div class="grabber" aria-hidden="true"></div>
+        <h2 data-i18n="addTitle"></h2>
+
+        <div id="addForm">
+          <ol class="steps">
+            <li>
+              <span data-i18n="addStep1"></span>
+              <code class="cmd">killy agent pair</code>
+            </li>
+            <li><span data-i18n="addStep2"></span></li>
+          </ol>
+          <label class="field">
+            <span data-i18n="codeLabel"></span>
+            <input id="codeInput" class="code-input" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="K7Q4XP">
+          </label>
+          <button class="ghost-btn" id="scanBtn" type="button" data-i18n="scanQr"></button>
+          <label class="field">
+            <span data-i18n="nameLabel"></span>
+            <input id="nameInput" autocomplete="off" spellcheck="false" data-i18n-placeholder="namePlaceholder">
+          </label>
+          <p class="error" id="pairError" hidden></p>
+          <div class="sheet-actions">
+            <button class="text-btn" id="cancelAddBtn" type="button" data-i18n="cancel"></button>
+            <button class="kill small" id="submitAddBtn" type="button" disabled><span class="kill-label" data-i18n="addSubmit"></span></button>
+          </div>
+        </div>
+
+        <div class="pairing" id="pairing" hidden>
+          <div class="spinner" aria-hidden="true"></div>
+          <p data-i18n="pairing"></p>
+        </div>
+        <div class="pairing" id="paired" hidden>
+          <div class="paired-killy" id="pairedKilly"></div>
+          <p id="pairedText"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Server detail sheet -->
+    <div class="sheet-wrap" id="serverSheet" hidden>
+      <div class="sheet">
+        <div class="grabber" aria-hidden="true"></div>
+        <h2 data-i18n="detailTitle"></h2>
+        <label class="field">
+          <span data-i18n="nameLabelEdit"></span>
+          <input id="editName" autocomplete="off" spellcheck="false">
+        </label>
+        <div class="group">
+          <div class="row">
+            <span class="row-main"><span class="row-title" data-i18n="hostLabel"></span></span>
+            <span class="row-value" id="editHost"></span>
+          </div>
+          <div class="row check-row">
+            <span class="row-main">
+              <span class="row-title" data-i18n="connTitle"></span>
+              <span class="row-sub" id="checkResult" aria-live="polite"></span>
+            </span>
+            <button class="check-btn" id="checkBtn" type="button" data-i18n="connCheck"></button>
+          </div>
+          <div class="row">
+            <span class="row-main"><span class="row-title" data-i18n="notifyServer"></span></span>
+            <button class="switch" id="serverNotify" type="button" role="switch" aria-checked="true" data-i18n-label="notifyServer"></button>
+          </div>
+        </div>
+        <button class="danger-btn" id="removeBtn" type="button"></button>
+        <p class="hint" data-i18n="removeHint"></p>
+        <div class="sheet-actions">
+          <span></span>
+          <button class="kill small" id="doneBtn" type="button"><span class="kill-label" data-i18n="done"></span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mock-only controls, outside the phone -->
+  <aside class="mock-panel">
+    <h2 data-i18n="mockTitle"></h2>
+    <p data-i18n="mockNote"></p>
+    <button type="button" id="mSpawn" data-i18n="mockSpawn"></button>
+    <label class="mock-field"><span data-i18n="mockTarget"></span><select id="mServer"></select></label>
+    <button type="button" id="mAddParent" data-i18n="mockAddParent"></button>
+    <button type="button" id="mOffline" data-i18n="mockOffline"></button>
+    <button type="button" id="mReset" data-i18n="mockReset"></button>
+    <button type="button" id="mLock" data-i18n="mockLock"></button>
+    <label class="mock-check"><input type="checkbox" id="mFailPair"><span data-i18n="mockFailPair"></span></label>
+  </aside>
+</main>
+
+  <script src="art.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
