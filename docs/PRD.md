@@ -37,8 +37,8 @@ Killy is our entry to the **Kiroween 2026** hackathon in the **Frankenstein** ca
 
 ### Duplicates and identity
 
-- A kill request carries an ID chosen by the phone. Sending the same ID again never sends a second signal; it returns the outcome of the first.
-- If the parent is already gone when a kill arrives, no signal is sent and the outcome is "already gone".
+- A kill request carries an ID (a UUID v4) chosen by the phone. Sending the same ID again, at any later time and even after the agent restarts, never sends a second signal; it returns the outcome of the first.
+- If the parent is already gone when a kill arrives, or has already been killed and is waiting to be reaped, no signal is sent and the outcome is "already gone". Two kills of the same parent arriving together send one signal: the first is "killed", the other "already gone".
 - A pairing code can be used once and expires 10 minutes after it is shown.
 - A parent is identified by server, PID and process start time, so a reused PID is treated as a new parent.
 - The phone is notified once per parent (per server, PID and start time), not on every report, and a restart of the Killy server does not repeat it. The one exception: if the Killy server stops right after Expo Push Service accepts a push and before the server records it, that push is sent once more after the restart.
@@ -78,7 +78,7 @@ Killy is our entry to the **Kiroween 2026** hackathon in the **Frankenstein** ca
 |---|---|
 | Hackathon | Submission deadline **2026-12-04 14:00 PT**. Category: Frankenstein. Public repository under the MIT License, with `.kiro/` at the root and not git-ignored. Demo video under 3 minutes. |
 | Repository | `github.com/sumiredc/killy`: private during development, made public before submission. |
-| Agent platform | Linux only; zombies are read from `/proc`. Real machine or VM. |
+| Agent platform | Linux 5.3 or later (the agent signals through a pidfd); zombies are read from `/proc`. Real machine or VM. |
 | Languages | Backend (agent, server, summon) in Go 1.27 (toolchain go1.27.3). Mobile app in React Native with Expo. |
 | Hosting | Killy server on the team's home Kubernetes cluster at `killy.sumire.pink`, exposed through the existing Cloudflare Tunnel, one replica. The home cluster gives no uptime guarantee. |
 | Notifications | Expo Push Service (APNs and FCM credentials managed by EAS). |
@@ -120,9 +120,10 @@ The operator wants the zombies gone.
 - Alternative: new zombies of the current parent are reported during the battle → they appear on screen and the count updates.
 - Alternative: a new parent is reported during the battle → it is added to the end of the queue (it is the most recently detected).
 - Exception: the parent is already gone → outcome "already gone"; the app moves to the next parent.
-- Exception: the agent refuses (no longer a zombie parent, PID reused, protected process, not a demo process) → no signal is sent; the reason is shown; the parent stays in the queue only if it is still reported.
+- Exception: the agent refuses (no longer a zombie parent, PID reused, protected process, not a demo process, pidfd not available on the server) → no signal is sent; the reason is shown; the parent stays in the queue only if it is still reported.
 - Exception: the signal fails (e.g. permission denied) → the error is shown; the parent stays.
 - Exception: the server's agent is not connected, or no outcome arrives within 10 seconds → "unknown"; the app refreshes from the latest snapshot.
+- Exception: the phone gets no response from the Killy server → the app resends the same kill (same ID) once; if that also fails, it says so under the kill button and the button can be held again.
 - Postconditions on success: the parent process no longer exists on the server; its zombies are no longer in the process table; the server's zombie count in Settings is updated.
 - Postconditions in all cases: no process other than the shown parent received a signal.
 

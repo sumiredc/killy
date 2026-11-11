@@ -62,16 +62,18 @@ The agent sends a full snapshot every 15 s and immediately when the set of paren
 
 On a `kill` command `{id, ppid, starttime}`:
 
-1. If `id` was already handled, resend the stored outcome and stop.
-2. Re-read `/proc/<ppid>/stat`. If it is missing → outcome `already_gone`.
-3. Refuse (outcome `refused` with a reason, no signal) when any of these holds:
-   - the start time differs from `starttime` (`pid_reused`),
+1. If `id` is not a UUID v4, ignore the command. If `id` was already handled, resend the stored outcome and stop. Kills for the same `(ppid, starttime)` are handled one at a time: a kill waits until the previous one for that parent has stored its outcome.
+2. Open a pidfd for `ppid` (`pidfd_open`). If no such process exists → outcome `already_gone`. If pidfd is not available (Linux older than 5.3, or blocked by seccomp) → outcome `refused` (`pidfd_unavailable`); the agent never falls back to signalling by PID.
+3. Re-read `/proc/<ppid>/stat`. If it is missing → `already_gone`. If the start time differs from `starttime` → `refused` (`pid_reused`). If the process itself is in state `Z` (already killed, not yet reaped by its own parent) → `already_gone`.
+4. Refuse (outcome `refused` with a reason, no signal) when any of these holds:
    - the process has no zombie children any more (`not_a_zombie_parent`),
    - `ppid` is 1, the agent itself, or an ancestor of the agent (`protected`),
    - demo mode is on and the process does not carry the summon marker (`not_demo`).
-4. Send `SIGKILL`. On error → outcome `signal_failed` with the errno.
-5. Poll for up to 5 s until none of the former zombies remain → outcome `killed` with the number reaped; otherwise `zombies_remain`.
-6. Store the outcome under `id` (kept for 10 minutes) and post it.
+5. Send `SIGKILL` through the pidfd (`pidfd_send_signal`). If the PID was reused after step 2, the pidfd still refers to the old process, so the signal cannot reach the new one. On error → outcome `signal_failed` with the errno.
+6. Poll for up to 5 s until none of the former zombies remain → outcome `killed` with the number reaped; otherwise `zombies_remain`.
+7. Store the outcome under `id` in `/var/lib/killy/outcomes.jsonl` (append-only, mode 0600, never expired, so a repeated `id` is recognised even after the agent restarts) and post it.
+
+The pidfd calls are made directly through the `syscall` package: `os.Process.Signal` silently falls back to signalling by PID when pidfd is missing. At startup the agent checks that pidfd is available and logs an error if it is not.
 
 The agent needs permission to signal other users' processes and to read their environment: run it as root under systemd, or grant `CAP_KILL` and `CAP_SYS_PTRACE`.
 
@@ -102,6 +104,8 @@ For each parent in a snapshot, the server sends one push to every linked device 
 ### Commands
 
 Kill and connection check are both "send over the agent's SSE stream, wait for the agent's POST". The server answers the phone's HTTP request synchronously with the result.
+
+The kill `id` is a UUID v4 chosen by the phone; the server answers `400` to any other form. If the phone gets no HTTP response at all (network error), it resends the same request with the same `id` once; the agent's step 1 makes the resend safe.
 
 ```mermaid
 sequenceDiagram
