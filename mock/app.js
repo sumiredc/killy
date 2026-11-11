@@ -53,7 +53,7 @@ const I18N = {
     paired: '{name} を追加しました',
     pairError: 'このコードは見つからないか、有効期限（10 分）が切れています。サーバーで killy agent pair をもう一度実行してください。',
     detailTitle: 'サーバーの設定',
-    hostLabel: 'アドレス',
+    hostLabel: 'ホスト名',
     notifyServer: 'このサーバーの通知',
     connTitle: '接続',
     connCheck: '確認する',
@@ -122,7 +122,7 @@ const I18N = {
     paired: 'Added {name}',
     pairError: 'This code was not found or has expired (10 min). Run killy agent pair on the server again.',
     detailTitle: 'Server settings',
-    hostLabel: 'Address',
+    hostLabel: 'Hostname',
     notifyServer: 'Notifications for this server',
     connTitle: 'Connection',
     connCheck: 'Check',
@@ -148,14 +148,14 @@ const I18N = {
 
 // ---------- Mock data ----------
 const SEED = {
-  s1: { name: 'demo-linux-01', host: '192.168.10.21', online: true, lastSeen: 0, notify: true,
+  s1: { name: 'demo-linux-01', host: 'demo-linux-01', online: true, lastSeen: 0, notify: true,
     parents: [
       { pid: 3801, cmd: 'node evil_daemon.js', zombies: [4092, 4093, 4097] },
       { pid: 5120, cmd: 'python3 worker.py', zombies: [5133, 5140] },
     ] },
-  s2: { name: 'prod-web-02', host: '10.0.3.14', online: true, lastSeen: 0, notify: true,
+  s2: { name: 'prod-web-02', host: 'ip-10-0-3-14', online: true, lastSeen: 0, notify: true,
     parents: [{ pid: 2210, cmd: 'php-fpm: pool www', zombies: [2291] }] },
-  s3: { name: 'build-runner', host: '10.0.5.7', online: false, lastSeen: 12, notify: false,
+  s3: { name: 'build-runner', host: 'build-runner', online: false, lastSeen: 12, notify: false,
     parents: [{ pid: 9031, cmd: 'make -j8', zombies: [9044, 9045] }] },
 };
 const EXTRA_PARENTS = [
@@ -594,12 +594,13 @@ $('#submitAddBtn').addEventListener('click', async () => {
     $('#pairError').hidden = false;
     return;
   }
-  const name = $('#nameInput').value.trim() || NEW_HOSTS[addedCount % NEW_HOSTS.length];
+  const host = NEW_HOSTS[addedCount % NEW_HOSTS.length];
+  const name = $('#nameInput').value.trim() || host;
   addedCount += 1;
   servers.push({
     id: `n${Date.now()}`,
     name,
-    host: `10.0.8.${10 + Math.floor(Math.random() * 200)}`,
+    host,
     online: true,
     lastSeen: 0,
     notify: true,

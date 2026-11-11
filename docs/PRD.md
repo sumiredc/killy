@@ -164,7 +164,7 @@ The team wants a server that always has safe zombies to kill.
 
 ### UC8 App settings
 
-- Language: Japanese or English; the default follows the phone's language.
+- Language: Japanese or English; the default is Japanese on a phone set to Japanese and English on any other phone.
 - Notifications: one switch for the whole app, in addition to the per-server switch.
 
 ## Should-have
