@@ -13,7 +13,7 @@ flowchart LR
   end
   subgraph K["Home Kubernetes"]
     W["killy server<br/>1 replica"]
-    D[("data volume<br/>registrations")]
+    D[("PostgreSQL<br/>1 replica")]
   end
   M["Mobile app<br/>(Expo)"]
   E["Expo Push Service"]
@@ -30,7 +30,7 @@ Every connection is opened from the agent or the phone toward the Killy server; 
 | Component | Responsibility |
 |---|---|
 | `killy agent` | Scans `/proc` for zombies, reports them, receives commands, verifies and executes kills, answers pings. |
-| `killy server` | Relays between agents and phones: stores registrations, keeps live state in memory, fans out state over SSE, sends push notifications, routes commands and waits for their results. |
+| `killy server` | Relays between agents and phones: stores registrations in PostgreSQL, keeps live state in memory, fans out state over SSE, sends push notifications, routes commands and waits for their results. |
 | `killy summon` | Demo only: keeps creating parent processes that leave zombies. |
 | Mobile app | Pairing, settings, the battle screen, receiving notifications. |
 
@@ -75,15 +75,19 @@ The agent needs permission to signal other users' processes and to read their en
 
 | State | Where | Lost on restart? |
 |---|---|---|
-| Agents, devices, links between them, display names, notification switches | JSON file on a persistent volume, written atomically | No |
+| Agents, devices, links between them, display names, notification switches | PostgreSQL | No |
+| First-detection time per parent `(agent, ppid, starttime)` | PostgreSQL | No |
+| Notified `(parent, device)` pairs | PostgreSQL | No |
 | Pairing codes | Memory | Yes (operator re-runs `pair`) |
-| Latest snapshot per agent, first-detection time per parent, open SSE streams, pending commands, notified parent keys | Memory | Yes (rebuilt as agents reconnect and report) |
+| Latest snapshot and last snapshot time per agent, open SSE streams, pending commands | Memory | Yes (rebuilt as agents reconnect and report) |
+
+PostgreSQL is the only persistent store; the server keeps no files of its own. The schema is changed only by migrations embedded in the binary and applied when `killy server` starts. When a parent leaves an agent's snapshot, its first-detection time and notified pairs are deleted. A snapshot whose `scanned_at` is older than the last one accepted from the same agent is discarded, so a late report cannot bring back a parent that is gone.
 
 Tokens are 32 random bytes; only their SHA-256 is stored.
 
 ### Notifications
 
-When a snapshot contains a parent key `(agent, ppid, starttime)` not seen before, the server sends one push per linked device whose app switch and server switch are on. The notification text is specified in DESIGN.md ("Push notification").
+For each parent in a snapshot, the server sends one push to every linked device that has a push token, has both the app switch and the server switch on, and has not yet been notified of that parent. The `(parent, device)` pair is recorded only after Expo Push Service accepts the push; if sending fails, nothing is recorded and the next snapshot (at most 15 s later) tries again. If the server stops after Expo accepts a push but before the pair is recorded, that one push is sent again after the restart. The notification text is specified in DESIGN.md ("Push notification").
 
 ### Commands
 
@@ -174,15 +178,16 @@ No DNS record, tunnel route or certificate is added: the tunnel already sends `*
 |---|---|
 | Hostnames | `killy.sumire.pink` (production), `stg-killy.sumire.pink` (staging) |
 | Namespace | `killy` (staging: `stg-killy`) |
-| Manifests | Kustomize in this repository: `deploy/base/` (`Deployment`, `Service`, `Ingress`, `PersistentVolumeClaim`, `SealedSecret`) and `deploy/overlays/stg/`, `deploy/overlays/prd/`. Argo CD applications `stg-killy` and `killy` (AppProject `killy`) watch the overlays. Never `kubectl apply` by hand |
+| Manifests | Kustomize in this repository: `deploy/base/` (`Deployment`, `Service`, `Ingress`, PostgreSQL `StatefulSet` and `Service`, `SealedSecret`) and `deploy/overlays/stg/`, `deploy/overlays/prd/`. Argo CD applications `stg-killy` and `killy` (AppProject `killy`) watch the overlays. Never `kubectl apply` by hand |
 | Deployment | `replicas: 1`, `strategy: Recreate`, requests and limits set, node affinity that excludes control-plane nodes |
 | Ingress | `ingressClassName: nginx`; annotations `nginx.ingress.kubernetes.io/proxy-buffering: "off"`, `proxy-read-timeout: "3600"`, `proxy-send-timeout: "3600"` |
 | SSE responses | `Content-Type: text/event-stream`, `Cache-Control: no-cache`, heartbeat comment every 20 s |
-| Storage | 1Gi PVC on `local-path` (cannot be expanded later), which pins the Pod to the storage node: add its toleration and node affinity |
+| Database | PostgreSQL as a `StatefulSet` with one replica in the same namespace, run from the official image pulled through the mirror and pinned by digest. There is no shared database on the cluster. Tests run against a real PostgreSQL |
+| Storage | The PostgreSQL `StatefulSet` has a 5Gi PVC on `local-path` (cannot be expanded later), which pins its Pod to the storage node: add its toleration and node affinity. The Killy server Pod has no volume |
 | Image | `10.1.1.10:5000/killy/server:<immutable tag>`, pinned by digest in kustomize `images[]`; base images pulled through the mirror at `10.1.1.10:5001` |
 | Image build | While the repository is private: GitHub Actions on the cluster's self-hosted runner (`runs-on: arc-runner-killy`) with the shared BuildKit (`docker/setup-buildx-action` with the remote driver at `tcp://buildkitd.arc-runners.svc:1234`), pushing to the registry above. The runner image has neither Go nor Node; install them in the job (`actions/setup-go`, `actions/setup-node`). Each runner pod has 5Gi of ephemeral storage and a 4Gi `_work` directory; a job that leaves large artifacts there is evicted. The registry allows overwriting tags, so deploy only by digest. The last image before going public is built this way and its digest pinned. Once public: GitHub-hosted runners only for CI (a self-hosted runner would let fork pull requests run code inside the LAN); they cannot reach the LAN registry, so later production images are built by a `workflow_dispatch` workflow in the aidd-infra repository (created by the infrastructure owner when the repository goes public) that builds a given Killy commit, pushes it to the registry and reports the digest; Killy then updates the digest in `deploy/` by pull request |
-| Secrets | `EXPO_ACCESS_TOKEN` and similar only as `SealedSecret` (`kubeseal --controller-namespace kube-system --controller-name sealed-secrets-controller --scope strict`). No plain secrets in the repository or in chat |
-| Configuration | `KILLY_PUBLIC_URL=https://killy.sumire.pink`, `KILLY_DATA_DIR` (the PVC mount) |
+| Secrets | `EXPO_ACCESS_TOKEN`, the PostgreSQL password and similar only as `SealedSecret` (`kubeseal --controller-namespace kube-system --controller-name sealed-secrets-controller --scope strict`). No plain secrets in the repository or in chat |
+| Configuration | `KILLY_PUBLIC_URL=https://killy.sumire.pink`, `KILLY_DATABASE_URL` (from the `SealedSecret`, because it contains the PostgreSQL password) |
 | Client address | Read `CF-Connecting-IP`; the TCP peer address is the cluster's, not the client's |
 | Access control | All authorization is in the app (tokens). The cluster does not enforce NetworkPolicy; rate limiting, if needed, is set in the Cloudflare dashboard |
 | CPU | x86_64 without AVX; the static Go binary needs nothing special |

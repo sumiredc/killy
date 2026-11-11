@@ -41,7 +41,7 @@ Killy is our entry to the **Kiroween 2026** hackathon in the **Frankenstein** ca
 - If the parent is already gone when a kill arrives, no signal is sent and the outcome is "already gone".
 - A pairing code can be used once and expires 10 minutes after it is shown.
 - A parent is identified by server, PID and process start time, so a reused PID is treated as a new parent.
-- The phone is notified once per parent (per server, PID and start time), not on every report.
+- The phone is notified once per parent (per server, PID and start time), not on every report, and a restart of the Killy server does not repeat it. The one exception: if the Killy server stops right after Expo Push Service accepts a push and before the server records it, that push is sent once more after the restart.
 
 ### Consistency
 
@@ -115,7 +115,7 @@ The operator wants to know when a server has zombies, even with the app closed.
 The operator wants the zombies gone.
 
 - Preconditions: at least one connected server has a parent with zombies.
-- Main flow: parents from all connected servers are fought one at a time, oldest detection first. The battle screen shows the current parent: its server, zombie count, PID and command line. The operator holds the kill button for 1 second; `SIGKILL` is sent to that parent on that server. The zombies are released and the next parent appears. After the last one, "All clear" shows how many parents were killed and zombies released.
+- Main flow: parents from all connected servers are fought one at a time, oldest detection first (the detection time survives a Killy server restart). The battle screen shows the current parent: its server, zombie count, PID and command line. The operator holds the kill button for 1 second; `SIGKILL` is sent to that parent on that server. The zombies are released and the next parent appears. After the last one, "All clear" shows how many parents were killed and zombies released.
 - Alternative: the operator releases the button before 1 second → nothing is sent.
 - Alternative: new zombies of the current parent are reported during the battle → they appear on screen and the count updates.
 - Alternative: a new parent is reported during the battle → it is added to the end of the queue (it is the most recently detected).
