@@ -52,7 +52,7 @@ Scanning `/proc` and the kill procedure (`internal/proc` and the agent's kill co
 
 Every 5 s the agent reads `/proc/<pid>/stat` for all processes and keeps those in state `Z`. For each distinct parent PID it reads the parent's `/proc/<ppid>/stat` (start time, field 22) and `/proc/<ppid>/cmdline`.
 
-A parent is identified by `(ppid, starttime)`. A zombie whose parent is PID 1 is not reported: init reaps it and Killy may not kill PID 1.
+A parent is identified by `(ppid, starttime)`. A zombie whose parent is PID 1 is not reported: init reaps it and Killy may not kill PID 1. In demo mode (`killy agent run --demo`) the agent reports only parents in the cgroup of `killy-summon.service`, so the public demo shows nothing it cannot kill and no other command lines of the demo machine.
 
 ### Reporting
 
@@ -68,14 +68,14 @@ On a `kill` command `{id, ppid, starttime}`:
 4. Refuse (outcome `refused` with a reason, no signal) when any of these holds:
    - the process has no zombie children any more (`not_a_zombie_parent`),
    - `ppid` is 1, the agent itself, or an ancestor of the agent (`protected`),
-   - demo mode is on and the process does not carry the summon marker (`not_demo`).
+   - demo mode is on and the process is not in the cgroup of the `killy-summon.service` systemd unit, read from `/proc/<ppid>/cgroup` (`not_demo`).
 5. Send `SIGKILL` through the pidfd (`pidfd_send_signal`). If the PID was reused after step 2, the pidfd still refers to the old process, so the signal cannot reach the new one. On error → outcome `signal_failed` with the errno.
 6. Poll for up to 5 s until none of the former zombies remain → outcome `killed` with the number reaped; otherwise `zombies_remain`.
 7. Store the outcome under `id` in `/var/lib/killy/outcomes.jsonl` (append-only, mode 0600, never expired, so a repeated `id` is recognised even after the agent restarts) and post it.
 
 The pidfd calls are made directly through the `syscall` package: `os.Process.Signal` silently falls back to signalling by PID when pidfd is missing. At startup the agent checks that pidfd is available and logs an error if it is not.
 
-The agent needs permission to signal other users' processes and to read their environment: run it as root under systemd, or grant `CAP_KILL` and `CAP_SYS_PTRACE`.
+The agent needs permission to signal other users' processes: run it as root under systemd, or grant `CAP_KILL`.
 
 ### Pairing
 
@@ -145,7 +145,7 @@ All bodies are JSON. Agents authenticate with `Authorization: Bearer <agent toke
 | `POST /app/v1/devices` | Register the device: `{push_token, locale}` → device token |
 | `PATCH /app/v1/devices/me` | App-wide notification switch, push token refresh |
 | `POST /app/v1/pairings/claim` | `{code, name?}` → the added server |
-| `POST /app/v1/demo` | Add the public demo server |
+| `POST /app/v1/demo` | Add the public demo server (the agent named by `KILLY_DEMO_AGENT_ID`; fails when it is unset) |
 | `GET /app/v1/events` | SSE stream: `state` events with every linked server and its parents, each parent with its first-detection time (the app orders the battle queue by it, oldest first) |
 | `PATCH /app/v1/servers/{id}` | `{name?, notify?}` |
 | `DELETE /app/v1/servers/{id}` | Unlink this device from the server |
@@ -173,9 +173,11 @@ All bodies are JSON. Agents authenticate with `Authorization: Bearer <agent toke
 
 ## Demo environment
 
-The demo Linux machine runs `killy agent run --demo` and `killy summon`, both as systemd services. `summon` starts parent processes under varied names (e.g. `node evil_daemon.js`, `python3 worker.py`) that fork children which exit immediately and are never waited for. Each parent carries the environment variable `KILLY_SUMMONED=1`, which demo mode requires before killing. `summon` keeps at most 3 parents alive and starts a new one every 2 minutes.
+The demo Linux machine runs `killy agent run --demo` and `killy summon`, both as systemd services; summon runs as `killy-summon.service`. `summon` starts parent processes under varied names (e.g. `node evil_daemon.js`, `python3 worker.py`) that fork children which exit immediately and are never waited for. The parents inherit the service's cgroup, which demo mode requires before killing; only root can move a process into another cgroup, so the check cannot be faked by an ordinary process. `summon` keeps at most 3 parents alive, starts a new one every 2 minutes, and reaps a parent as soon as it exits (otherwise summon itself would become a parent with zombies, inside its own cgroup, and could be killed through the demo).
 
 Demo zombies must not be created by the agent itself: the agent would be their parent and is protected from kills.
+
+The Killy server offers the demo agent named by `KILLY_DEMO_AGENT_ID`. The agent ID is known only after the demo machine is paired with the server, and it is not a secret, so it is set in the overlay. When it is unset, `POST /app/v1/demo` fails and the app says the demo server is not available.
 
 ## Deployment
 
@@ -201,7 +203,7 @@ No DNS record, tunnel route or certificate is added: the tunnel already sends `*
 | Image | `10.1.1.10:5000/killy/server:<immutable tag>`, pinned by digest in kustomize `images[]`; base images pulled through the mirror at `10.1.1.10:5001` |
 | Image build | While the repository is private: GitHub Actions on the cluster's self-hosted runner (`runs-on: arc-runner-killy`) with the shared BuildKit (`docker/setup-buildx-action` with the remote driver at `tcp://buildkitd.arc-runners.svc:1234`), pushing to the registry above. The runner image has neither Go nor Node; install them in the job (`actions/setup-go`, `actions/setup-node`). Each runner pod has 5Gi of ephemeral storage and a 4Gi `_work` directory; a job that leaves large artifacts there is evicted. The registry allows overwriting tags, so deploy only by digest. The last image before going public is built this way and its digest pinned. Once public: GitHub-hosted runners only for CI (a self-hosted runner would let fork pull requests run code inside the LAN); they cannot reach the LAN registry, so later production images are built by a `workflow_dispatch` workflow in the aidd-infra repository (created by the infrastructure owner when the repository goes public) that builds a given Killy commit, pushes it to the registry and reports the digest; Killy then updates the digest in `deploy/` by pull request |
 | Secrets | `EXPO_ACCESS_TOKEN`, the PostgreSQL password and similar only as `SealedSecret` (`kubeseal --controller-namespace kube-system --controller-name sealed-secrets-controller --scope strict`). No plain secrets in the repository or in chat |
-| Configuration | `KILLY_PUBLIC_URL=https://killy.sumire.pink`, `KILLY_DATABASE_URL` (from the `SealedSecret`, because it contains the PostgreSQL password) |
+| Configuration | `KILLY_PUBLIC_URL=https://killy.sumire.pink`, `KILLY_DATABASE_URL` (from the `SealedSecret`, because it contains the PostgreSQL password), `KILLY_DEMO_AGENT_ID` (see "Demo environment") |
 | Client address | Read `CF-Connecting-IP`; the TCP peer address is the cluster's, not the client's |
 | Access control | All authorization is in the app (tokens). The cluster does not enforce NetworkPolicy; rate limiting, if needed, is set in the Cloudflare dashboard |
 | CPU | x86_64 without AVX; the static Go binary needs nothing special |

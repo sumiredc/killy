@@ -14,7 +14,7 @@ Read these before planning or writing a spec:
 Rules that are easy to get wrong:
 
 - Only `SIGKILL` exists as an action. Do not add other signals or game commands.
-- The agent re-verifies a target (same PID and start time, still a zombie parent, not PID 1 / itself / its ancestors, demo marker in demo mode) right before signalling, whatever the server says.
+- The agent re-verifies a target (same PID and start time through a pidfd, still a zombie parent, not PID 1 / itself / its ancestors, inside summon's cgroup in demo mode) right before signalling, whatever the server says.
 - There is one battle screen for all servers; do not add server switching.
 - Connection status is not shown permanently; it is checked on demand from Settings.
 - Anything listed under "Not guaranteed" in PRD.md is out of scope; do not build it.

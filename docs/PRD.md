@@ -150,6 +150,7 @@ A judge wants to try Killy without a server.
 
 - Main flow: in Add server, the judge taps "Try the demo server"; the public demo server is added without a pairing code. Demo zombies appear and can be killed.
 - Alternative: another visitor kills the same demo parent first → it disappears from everyone's screen ("already gone" for the late one).
+- Exception: no public demo server is configured → the app says the demo server is not available; nothing is added.
 - Postconditions: only parents created by `killy summon` on the demo machine are ever killed; new ones keep appearing.
 
 ### UC7 Run a demo environment
@@ -157,7 +158,7 @@ A judge wants to try Killy without a server.
 The team wants a server that always has safe zombies to kill.
 
 - Main flow: on the demo Linux machine, the agent runs in demo mode and `killy summon` keeps creating parents (with varied command names) that leave zombies, up to a limit.
-- Postconditions: there is usually at least one demo parent to kill; nothing else on the machine can be killed through Killy.
+- Postconditions: there is usually at least one demo parent to kill; nothing else on the machine can be killed through Killy or appears in the app.
 
 ### UC8 App settings
 
