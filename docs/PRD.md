@@ -92,10 +92,12 @@ Killy is our entry to the **Kiroween 2026** hackathon in the **Frankenstein** ca
 The operator wants a server to be watched.
 
 - Preconditions: the agent binary is installed on the server; the server can reach the Killy server over HTTPS.
-- Main flow: the operator runs `killy agent pair` on the server; it shows a 6-character code and a QR code. The operator opens Settings → Add server, enters the code (or scans the QR) and optionally a display name, and taps Add. The app waits for the agent and shows "Added ‹name›".
+- Main flow: the operator runs `killy agent pair` on the server; it shows a 6-character code and a QR code. The operator opens Settings → Add server, enters the code (or scans the QR) and optionally a display name, and taps Add. The app shows "Added ‹name›" as soon as the code is accepted; the agent does not have to be running at that moment.
 - Alternative: no display name is given → the server's hostname is used.
-- Alternative: the same server is paired from a second phone → both phones see it and are notified.
+- Alternative: the same server is paired from a second phone → both phones see it and are notified; each phone keeps its own display name and notification switch for it.
 - Exception: the code is unknown, already used or expired → the app shows that and asks to run `killy agent pair` again; nothing is added.
+- Exception: the QR code points to a different Killy server than the app's → the app says so; nothing is sent or added.
+- Exception: too many wrong codes from the same network → the app asks to wait and try again; nothing is added.
 - Exception: the phone cannot reach the Killy server → the app says so; nothing is added.
 - Postconditions: the server appears in Settings → Servers; its zombies, if any, join the battle queue.
 
@@ -140,7 +142,7 @@ The operator wants to know whether Killy can reach a server right now.
 
 ### UC5 Manage a server
 
-- Rename: the new display name is shown everywhere in the app. An empty name keeps the previous one.
+- Rename: the new display name is shown everywhere in the app on this phone; other phones keep their own names. An empty name keeps the previous one.
 - Mute: turning off the server's notifications stops pushes for that server only; its zombies still appear in the battle.
 - Remove: needs a second tap to confirm. The server disappears from this phone, its parents leave the battle queue, and the agent keeps running (other paired phones are unaffected).
 

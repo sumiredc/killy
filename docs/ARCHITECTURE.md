@@ -79,7 +79,24 @@ The agent needs permission to signal other users' processes: run it as root unde
 
 ### Pairing
 
-`killy agent pair --server <url>` registers with the server, stores the returned agent token in `/etc/killy/agent.json` (mode 0600), and prints a 6-character code and a QR code encoding `killy://pair?code=<code>&server=<url>`. `killy agent run` is the long-running service.
+`killy agent pair --server <url>` registers with the server and prints a 6-character code (upper-case letters and digits) and a QR code encoding `killy://pair?code=<code>&server=<url>`. `killy agent run` is the long-running service.
+
+- **First run** (no `/etc/killy/agent.json`): `POST /agent/v1/pairings` with no token, sending the hostname. Anyone may register: a new agent sees nothing and appears on no phone until a phone claims its code. The returned agent token is stored in `/etc/killy/agent.json` (mode 0600).
+- **Later runs**: the same request with the agent token creates a new code for the same agent. No code is issued for an existing agent without its token.
+- **Claim**: a claim succeeds as soon as the code is valid; it does not wait for the agent. Without a display name, the hostname sent at registration is used.
+- **Links**: the display name and the per-server notification switch belong to the link between one device and one agent, so a change on one phone does not affect another.
+- **QR**: the app connects only to the Killy server it was built for. The `server` in a QR code must match it; otherwise the app shows an error and sends nothing, so a QR code cannot make the app send its device token elsewhere.
+
+#### Rate limits
+
+Counted per client address (`CF-Connecting-IP`), in memory; a restart resets them, which is enough against short bursts.
+
+| Request | Limit | Over the limit |
+|---|---|---|
+| Failed claims (unknown, used or expired code) | 10 per 10 min | `429`; the app asks to wait and try again |
+| First-run registrations | 10 per hour | `429`; `killy agent pair` asks to wait |
+
+Attempts spread over many addresses are not stopped by this; add Cloudflare rate limiting if that happens.
 
 ## Killy server
 
@@ -91,7 +108,7 @@ The agent needs permission to signal other users' processes: run it as root unde
 | First-detection time per parent `(agent, ppid, starttime)` | PostgreSQL | No |
 | Notified `(parent, device)` pairs | PostgreSQL | No |
 | Pairing codes | Memory | Yes (operator re-runs `pair`) |
-| Latest snapshot and last snapshot time per agent, open SSE streams, pending commands | Memory | Yes (rebuilt as agents reconnect and report) |
+| Latest snapshot and last snapshot time per agent, open SSE streams, pending commands, rate-limit counters | Memory | Yes (rebuilt as agents reconnect and report) |
 
 PostgreSQL is the only persistent store; the server keeps no files of its own. The schema is changed only by migrations embedded in the binary and applied when `killy server` starts. When a parent leaves an agent's snapshot, its first-detection time and notified pairs are deleted. A snapshot whose `scanned_at` is older than the last one accepted from the same agent is discarded, so a late report cannot bring back a parent that is gone.
 
@@ -133,7 +150,7 @@ All bodies are JSON. Agents authenticate with `Authorization: Bearer <agent toke
 
 | Method and path | Purpose |
 |---|---|
-| `POST /agent/v1/pairings` | Register (first run) or create a new pairing code; returns token and code |
+| `POST /agent/v1/pairings` | `{hostname}`. With no token: register (first run) and return an agent token and a code. With the agent token: return a new code |
 | `GET /agent/v1/commands` | SSE stream of `kill` and `ping` events |
 | `POST /agent/v1/snapshots` | `{hostname, version, scanned_at, parents: [{pid, starttime, cmd, zombies: [pid]}]}` |
 | `POST /agent/v1/results` | `{id, type: kill \| pong, outcome, reaped, reason, version}` |
@@ -142,12 +159,12 @@ All bodies are JSON. Agents authenticate with `Authorization: Bearer <agent toke
 
 | Method and path | Purpose |
 |---|---|
-| `POST /app/v1/devices` | Register the device: `{push_token, locale}` → device token |
+| `POST /app/v1/devices` | Register the device: `{push_token?}` → device token. The push token is optional, so a phone without notifications can still pair and fight |
 | `PATCH /app/v1/devices/me` | App-wide notification switch, push token refresh |
 | `POST /app/v1/pairings/claim` | `{code, name?}` → the added server |
 | `POST /app/v1/demo` | Add the public demo server (the agent named by `KILLY_DEMO_AGENT_ID`; fails when it is unset) |
 | `GET /app/v1/events` | SSE stream: `state` events with every linked server and its parents, each parent with its first-detection time (the app orders the battle queue by it, oldest first) |
-| `PATCH /app/v1/servers/{id}` | `{name?, notify?}` |
+| `PATCH /app/v1/servers/{id}` | `{name?, notify?}` for this device's link only |
 | `DELETE /app/v1/servers/{id}` | Unlink this device from the server |
 | `POST /app/v1/servers/{id}/check` | Connection check (see Commands) |
 | `POST /app/v1/kills` | Kill (see Commands) |
@@ -170,6 +187,8 @@ All bodies are JSON. Agents authenticate with `Authorization: Bearer <agent toke
 | Connection check timeout | 5 s |
 | Kill result timeout | 10 s |
 | Pairing code lifetime | 10 min |
+| Failed claims per client address | 10 per 10 min |
+| First-run registrations per client address | 10 per hour |
 
 ## Demo environment
 
@@ -204,8 +223,8 @@ No DNS record, tunnel route or certificate is added: the tunnel already sends `*
 | Image build | While the repository is private: GitHub Actions on the cluster's self-hosted runner (`runs-on: arc-runner-killy`) with the shared BuildKit (`docker/setup-buildx-action` with the remote driver at `tcp://buildkitd.arc-runners.svc:1234`), pushing to the registry above. The runner image has neither Go nor Node; install them in the job (`actions/setup-go`, `actions/setup-node`). Each runner pod has 5Gi of ephemeral storage and a 4Gi `_work` directory; a job that leaves large artifacts there is evicted. The registry allows overwriting tags, so deploy only by digest. The last image before going public is built this way and its digest pinned. Once public: GitHub-hosted runners only for CI (a self-hosted runner would let fork pull requests run code inside the LAN); they cannot reach the LAN registry, so later production images are built by a `workflow_dispatch` workflow in the aidd-infra repository (created by the infrastructure owner when the repository goes public) that builds a given Killy commit, pushes it to the registry and reports the digest; Killy then updates the digest in `deploy/` by pull request |
 | Secrets | `EXPO_ACCESS_TOKEN`, the PostgreSQL password and similar only as `SealedSecret` (`kubeseal --controller-namespace kube-system --controller-name sealed-secrets-controller --scope strict`). No plain secrets in the repository or in chat |
 | Configuration | `KILLY_PUBLIC_URL=https://killy.sumire.pink`, `KILLY_DATABASE_URL` (from the `SealedSecret`, because it contains the PostgreSQL password), `KILLY_DEMO_AGENT_ID` (see "Demo environment") |
-| Client address | Read `CF-Connecting-IP`; the TCP peer address is the cluster's, not the client's |
-| Access control | All authorization is in the app (tokens). The cluster does not enforce NetworkPolicy; rate limiting, if needed, is set in the Cloudflare dashboard |
+| Client address | Read `CF-Connecting-IP`; the TCP peer address is the cluster's, not the client's. Used for the pairing rate limits |
+| Access control | All authorization is in the app (tokens). The cluster does not enforce NetworkPolicy; the pairing rate limits are in the server, and further rate limiting, if needed, is set in the Cloudflare dashboard |
 | CPU | x86_64 without AVX; the static Go binary needs nothing special |
 
 Before production:
