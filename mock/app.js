@@ -9,7 +9,7 @@ const I18N = {
   ja: {
     lockDate: '11月10日 火曜日',
     now: 'たった今',
-    pushText: 'zombie ×{n} / parent: {name} (PID {pid}) on {host}',
+    pushText: 'zombie ×{n} on {host}',
     tapToOpen: '通知をタップして開く',
     counter: '親プロセス {i} / {n}',
     zLabel: '体のゾンビプロセス',
@@ -78,7 +78,7 @@ const I18N = {
   en: {
     lockDate: 'Tuesday, November 10',
     now: 'now',
-    pushText: 'zombie ×{n} / parent: {name} (PID {pid}) on {host}',
+    pushText: 'zombie ×{n} on {host}',
     tapToOpen: 'Tap the notification to open',
     counter: 'parent process {i} of {n}',
     zLabel: 'zombie processes',
@@ -206,7 +206,7 @@ function renderPush() {
   const s = servers.find((x) => x.online && aliveParents(x).length);
   const p = s && aliveParents(s)[0];
   $('#pushText').textContent = p
-    ? t('pushText', { n: p.zombies.length, name: p.cmd.split(' ')[0], pid: p.pid, host: s.name })
+    ? t('pushText', { n: p.zombies.length, host: s.name })
     : '';
 }
 

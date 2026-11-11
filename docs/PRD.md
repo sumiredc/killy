@@ -56,7 +56,7 @@ Killy is our entry to the **Kiroween 2026** hackathon in the **Frankenstein** ca
 ### Observability
 
 - The operator can check, per server, whether a command can reach the agent and come back, and is told which part failed (see UC4).
-- Every kill ends with an outcome the operator can see: killed, already gone, refused (with the reason), failed, or unknown.
+- Every kill ends with an outcome the operator can see: killed, already gone, refused (with the reason), failed (the signal failed, or zombies remained after it, with the reason), or unknown.
 
 ## Not guaranteed
 
@@ -106,8 +106,8 @@ The operator wants a server to be watched.
 The operator wants to know when a server has zombies, even with the app closed.
 
 - Preconditions: app notifications and the server's notifications are on; the OS allows notifications.
-- Main flow: a parent with zombies appears on a server; the phone gets a push notification whose text is a system-log line (zombie count, parent command, PID, server) followed by a Killy symbol. Tapping it opens the battle screen.
-- Alternative: the app is open → no push is needed; the battle screen updates live.
+- Main flow: a parent with zombies appears on a server; the phone gets a push notification whose text is a system-log line (zombie count, server) followed by a Killy symbol. Tapping it opens the battle screen.
+- Alternative: the app is open → the push still arrives but the app does not display it; the battle screen updates live.
 - Exception: notifications are off for the app or the server → no push; the battle screen still shows the zombies when opened.
 - Exception: the same parent is reported again → no second notification.
 - Postconditions: the parent is in the battle queue.
@@ -117,7 +117,7 @@ The operator wants to know when a server has zombies, even with the app closed.
 The operator wants the zombies gone.
 
 - Preconditions: at least one connected server has a parent with zombies.
-- Main flow: parents from all connected servers are fought one at a time, oldest detection first (the detection time survives a Killy server restart). The battle screen shows the current parent: its server, zombie count, PID and command line. The operator holds the kill button for 1 second; `SIGKILL` is sent to that parent on that server. The zombies are released and the next parent appears. After the last one, "All clear" shows how many parents were killed and zombies released.
+- Main flow: parents from all connected servers are fought one at a time, oldest detection first (the detection time survives a Killy server restart). The battle screen shows the current parent: its server, zombie count, PID and command line. The operator holds the kill button for 1 second; `SIGKILL` is sent to that parent on that server. The zombies are released and the next parent appears. After the last one, "All clear" shows how many parents were killed and zombies released, counted by the app: only parents whose outcome was "killed", with the zombies shown for them when the kill started; parents that were already gone are not counted.
 - Alternative: the operator releases the button before 1 second → nothing is sent.
 - Alternative: new zombies of the current parent are reported during the battle → they appear on screen and the count updates.
 - Alternative: a new parent is reported during the battle → it is added to the end of the queue (it is the most recently detected).

@@ -53,8 +53,10 @@ The app has two tabs, Battle and Settings, in a footer tab bar. Sheets and the A
 | Line | Content |
 |---|---|
 | Title | `Killy` |
-| Body | `zombie ×3 / parent: node (PID 3801) on demo-linux-01` (monospace in the mock) |
+| Body | `zombie ×3 on demo-linux-01`: the new parent's zombie count and the server's display name on this phone (monospace in the mock) |
 | Last line | Killy symbol only: `……！` |
+
+The command line and PID are not in the notification; the battle screen shows them.
 
 ### Battle tab
 
@@ -83,7 +85,7 @@ Empty states replace the info block and hide the enemies; the kill button is dis
 
 ### All clear overlay
 
-Dimmed, blurred backdrop over everything. Card with Killy bowing (no scythe) and 🤍, title `All clear`, "すべてのサーバーのゾンビが成仏しました", two stat tiles (parents killed, zombies released), and one primary button "閉じる" / "Close".
+Dimmed, blurred backdrop over everything. Card with Killy bowing (no scythe) and 🤍, title `All clear`, "すべてのサーバーのゾンビが成仏しました", two stat tiles (parents killed, zombies released), and one primary button "閉じる" / "Close". The app counts both numbers itself: parents whose kill outcome was `killed` in this battle, and the zombies shown for them when each kill started; `already_gone` is not counted.
 
 ### Settings tab
 
@@ -173,7 +175,7 @@ Not in the mock; decided as follows.
 | Outcome | Motion and text |
 |---|---|
 | `already_gone` | Same defeat sequence, then the info line reads "PID … はすでに終了していました" / "PID … had already exited" |
-| `refused`, `signal_failed`, `zombies_remain`, `unknown` | Killy's swing lands, the necromancer flashes and recoils but stays; strings stay; the info line shows the reason in `red`; Killy bubble `……？`; the kill button is enabled again |
+| `refused`, `signal_failed`, `zombies_remain`, `unknown` | Killy's swing lands, the necromancer flashes and recoils but stays; strings stay; the info line shows the reason in `red` (`signal_failed` and `zombies_remain` are the PRD's "failed", each with its own reason); Killy bubble `……？`; the kill button is enabled again |
 
 ### Other motion
 
