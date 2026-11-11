@@ -36,11 +36,21 @@ Every connection is opened from the agent or the phone toward the Killy server; 
 
 `agent`, `server` and `summon` are subcommands of one Go binary, `killy`.
 
+### Go dependencies
+
+Scanning `/proc` and the kill procedure (`internal/proc` and the agent's kill code) use only the Go standard library, because they carry Killy's safety guarantees. Everything else may use only the external modules listed here; add a module to this list before using it.
+
+| Module | Use |
+|---|---|
+| `github.com/jackc/pgx/v5` | PostgreSQL driver |
+| `github.com/pressly/goose/v3` | Schema migrations (each runs in a transaction and rolls back on failure) |
+| `github.com/skip2/go-qrcode` | QR code printed by `killy agent pair` |
+
 ## Agent
 
 ### Scanning
 
-Every 5 s the agent reads `/proc/<pid>/stat` for all processes and keeps those in state `Z`. For each distinct parent PID it reads the parent's `/proc/<ppid>/stat` (start time, field 22) and `/proc/<ppid>/cmdline`. Only the Go standard library is used.
+Every 5 s the agent reads `/proc/<pid>/stat` for all processes and keeps those in state `Z`. For each distinct parent PID it reads the parent's `/proc/<ppid>/stat` (start time, field 22) and `/proc/<ppid>/cmdline`.
 
 A parent is identified by `(ppid, starttime)`. A zombie whose parent is PID 1 is not reported: init reaps it and Killy may not kill PID 1.
 
