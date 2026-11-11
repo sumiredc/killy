@@ -134,9 +134,9 @@ The operator wants the zombies gone.
 The operator wants to know whether Killy can reach a server right now.
 
 - Preconditions: the server is paired.
-- Main flow: in Settings → server → Connection, the operator taps Check. The app shows "Connected (round trip in ms / agent version)".
+- Main flow: in Settings → server → Connection, the operator taps Check. The app shows "Connected (agent version)".
 - Exception: the phone cannot reach the Killy server → "Check your network".
-- Exception: the agent is not connected to the Killy server → "No response from the agent. Last heard ‹n› min ago. Check that killy agent is running on the server."
+- Exception: the agent is not connected to the Killy server → "No response from the agent. Check that killy agent is running on the server."
 - Exception: the agent is connected but does not answer within 5 seconds → "Commands are not reaching the agent. Restart the agent."
 - Postconditions: nothing on the server changes.
 

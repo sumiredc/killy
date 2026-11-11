@@ -140,7 +140,7 @@ sequenceDiagram
   Note over W: no result in 10 s → {outcome: unknown, reason: timeout}
 ```
 
-The connection check is the same exchange with `ping {id}` / `pong {id, version}`, a 5 s timeout, and results `ok`, `agent_disconnected` or `no_response`. A failed request from the phone itself means the phone cannot reach the server. Checks for the same server are limited to one per 2 seconds.
+The connection check is the same exchange with `ping {id}` / `pong {id, version}`, a 5 s timeout, and results `ok` (with the agent version), `agent_disconnected` or `no_response`. It goes through the same stream as a kill, so a passing check means a kill can get through too. A failed request from the phone itself means the phone cannot reach the server. Checks for the same server are limited to one per 2 seconds: a check within 2 s of the previous one sends no ping and returns the result of the check in progress or of the last one. No round-trip time or last-heard time is measured or returned.
 
 ## Protocol
 

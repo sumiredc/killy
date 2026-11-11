@@ -112,7 +112,7 @@ States: waiting (spinner, "追加しています…" / "Adding…"), added (Kill
 
 Display name input; group with Address (mono, read-only), Connection (row title, result line, "確認する" pill button that becomes "もう一度確認"), and the server's notification switch; red outlined "このサーバーを削除" that turns solid red with "もう一度押すと削除します" on the first tap; hint "削除しても、サーバー上のエージェントは止まりません。"; "完了" button.
 
-Connection results: checking (spinner + "エージェントに問い合わせています…"), OK (`green`, ✓, round trip and agent version), failure (light red, `!`, the message for the failing part as listed in PRD UC4).
+Connection results: checking (spinner + "エージェントに問い合わせています…"), OK (`green`, ✓, agent version), failure (light red, `!`, the message for the failing part as listed in PRD UC4).
 
 ### When the Killy server cannot be reached
 

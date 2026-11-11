@@ -59,8 +59,8 @@ const I18N = {
     connCheck: '確認する',
     connRecheck: 'もう一度確認',
     connChecking: 'エージェントに問い合わせています…',
-    connOk: '接続できました（応答 {ms} ms / agent {ver}）',
-    connFail: 'エージェントから応答がありません。最後の受信は {min} 分前です。サーバーで killy agent が動いているか確認してください。',
+    connOk: '接続できました（agent {ver}）',
+    connFail: 'エージェントから応答がありません。サーバーで killy agent が動いているか確認してください。',
     remove: 'このサーバーを削除',
     removeConfirm: 'もう一度押すと削除します',
     removeHint: '削除しても、サーバー上のエージェントは止まりません。',
@@ -128,8 +128,8 @@ const I18N = {
     connCheck: 'Check',
     connRecheck: 'Check again',
     connChecking: 'Asking the agent…',
-    connOk: 'Connected ({ms} ms / agent {ver})',
-    connFail: 'No response from the agent. Last heard from {min} min ago. Check that killy agent is running on the server.',
+    connOk: 'Connected (agent {ver})',
+    connFail: 'No response from the agent. Check that killy agent is running on the server.',
     remove: 'Remove this server',
     removeConfirm: 'Tap again to remove',
     removeHint: 'Removing it does not stop the agent on the server.',
@@ -648,10 +648,10 @@ async function runCheck() {
   if (s.online) {
     s.lastSeen = 0;
     r.className = 'row-sub ok';
-    r.textContent = t('connOk', { ms: 20 + Math.floor(Math.random() * 60), ver: '0.1.0' });
+    r.textContent = t('connOk', { ver: '0.1.0' });
   } else {
     r.className = 'row-sub fail';
-    r.textContent = t('connFail', { min: s.lastSeen });
+    r.textContent = t('connFail');
   }
   $('#checkBtn').disabled = false;
   $('#checkBtn').textContent = t('connRecheck');
