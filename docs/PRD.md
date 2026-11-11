@@ -82,7 +82,7 @@ Killy is our entry to the **Kiroween 2026** hackathon in the **Frankenstein** ca
 | Languages | Backend (agent, server, summon) in Go 1.27 (toolchain go1.27.3). Mobile app in React Native with Expo. |
 | Hosting | Killy server on the team's home Kubernetes cluster at `killy.sumire.pink`, exposed through the existing Cloudflare Tunnel, one replica. The home cluster gives no uptime guarantee. |
 | Notifications | Expo Push Service (APNs and FCM credentials managed by EAS). |
-| Distribution | iOS through a TestFlight public link, Android as a directly downloaded APK. |
+| Distribution | iOS through a TestFlight public link. The Android APK and the agent binaries are downloaded from the repository's GitHub Releases. |
 | Character | Killy never speaks. See the character rules. |
 
 ## Use cases
@@ -91,7 +91,7 @@ Killy is our entry to the **Kiroween 2026** hackathon in the **Frankenstein** ca
 
 The operator wants a server to be watched.
 
-- Preconditions: the agent binary is installed on the server; the server can reach the Killy server over HTTPS.
+- Preconditions: the agent binary (from the GitHub Releases) is installed on the server; the server can reach the Killy server over HTTPS.
 - Main flow: the operator runs `killy agent pair` on the server; it shows a 6-character code and a QR code. The operator opens Settings → Add server, enters the code (or scans the QR) and optionally a display name, and taps Add. The app shows "Added ‹name›" as soon as the code is accepted; the agent does not have to be running at that moment.
 - Alternative: no display name is given → the server's hostname is used.
 - Alternative: the same server is paired from a second phone → both phones see it and are notified; each phone keeps its own display name and notification switch for it.

@@ -213,7 +213,7 @@ No DNS record, tunnel route or certificate is added: the tunnel already sends `*
 |---|---|
 | Hostnames | `killy.sumire.pink` (production), `stg-killy.sumire.pink` (staging) |
 | Namespace | `killy` (staging: `stg-killy`) |
-| Manifests | Kustomize in this repository: `deploy/base/` (`Deployment`, `Service`, `Ingress`, PostgreSQL `StatefulSet` and `Service`, `SealedSecret`) and `deploy/overlays/stg/`, `deploy/overlays/prd/`. Argo CD applications `stg-killy` and `killy` (AppProject `killy`) watch the overlays. Never `kubectl apply` by hand |
+| Manifests | Kustomize in this repository: `deploy/base/` (`Deployment`, `Service`, `Ingress`, PostgreSQL `StatefulSet` and `Service`) and `deploy/overlays/stg/`, `deploy/overlays/prd/`, each with its own `SealedSecret`. Argo CD applications `stg-killy` and `killy` (AppProject `killy`) watch the overlays. Never `kubectl apply` by hand |
 | Deployment | `replicas: 1`, `strategy: Recreate`, requests and limits set, node affinity that excludes control-plane nodes |
 | Ingress | `ingressClassName: nginx`; annotations `nginx.ingress.kubernetes.io/proxy-buffering: "off"`, `proxy-read-timeout: "3600"`, `proxy-send-timeout: "3600"` |
 | SSE responses | `Content-Type: text/event-stream`, `Cache-Control: no-cache`, heartbeat comment every 20 s |
@@ -221,7 +221,7 @@ No DNS record, tunnel route or certificate is added: the tunnel already sends `*
 | Storage | The PostgreSQL `StatefulSet` has a 5Gi PVC on `local-path` (cannot be expanded later), which pins its Pod to the storage node: add its toleration and node affinity. The Killy server Pod has no volume |
 | Image | `10.1.1.10:5000/killy/server:<immutable tag>`, pinned by digest in kustomize `images[]`; base images pulled through the mirror at `10.1.1.10:5001` |
 | Image build | While the repository is private: GitHub Actions on the cluster's self-hosted runner (`runs-on: arc-runner-killy`) with the shared BuildKit (`docker/setup-buildx-action` with the remote driver at `tcp://buildkitd.arc-runners.svc:1234`), pushing to the registry above. The runner image has neither Go nor Node; install them in the job (`actions/setup-go`, `actions/setup-node`). Each runner pod has 5Gi of ephemeral storage and a 4Gi `_work` directory; a job that leaves large artifacts there is evicted. The registry allows overwriting tags, so deploy only by digest. The last image before going public is built this way and its digest pinned. Once public: GitHub-hosted runners only for CI (a self-hosted runner would let fork pull requests run code inside the LAN); they cannot reach the LAN registry, so later production images are built by a `workflow_dispatch` workflow in the aidd-infra repository (created by the infrastructure owner when the repository goes public) that builds a given Killy commit, pushes it to the registry and reports the digest; Killy then updates the digest in `deploy/` by pull request |
-| Secrets | `EXPO_ACCESS_TOKEN`, the PostgreSQL password and similar only as `SealedSecret` (`kubeseal --controller-namespace kube-system --controller-name sealed-secrets-controller --scope strict`). No plain secrets in the repository or in chat |
+| Secrets | `EXPO_ACCESS_TOKEN`, the PostgreSQL password and similar only as `SealedSecret` (`kubeseal --controller-namespace kube-system --controller-name sealed-secrets-controller --scope strict`), one per overlay: strict scope binds the ciphertext to the Secret's name and namespace, so staging and production cannot share one, and their values differ. No plain secrets in the repository or in chat |
 | Configuration | `KILLY_PUBLIC_URL=https://killy.sumire.pink`, `KILLY_DATABASE_URL` (from the `SealedSecret`, because it contains the PostgreSQL password), `KILLY_DEMO_AGENT_ID` (see "Demo environment") |
 | Client address | Read `CF-Connecting-IP`; the TCP peer address is the cluster's, not the client's. Used for the pairing rate limits |
 | Access control | All authorization is in the app (tokens). The cluster does not enforce NetworkPolicy; the pairing rate limits are in the server, and further rate limiting, if needed, is set in the Cloudflare dashboard |
@@ -245,7 +245,17 @@ Availability: with one replica and `Recreate`, a node reboot or eviction stops t
 | Push | `expo-notifications` |
 | QR | `expo-camera` |
 | Secrets | Device token in `expo-secure-store` |
-| Builds | EAS: iOS to TestFlight (public link), Android APK |
+| Builds | EAS: iOS to TestFlight (public link), Android APK attached to the GitHub Release (see "Distribution") |
+
+## Distribution
+
+Operators and judges get everything except the iOS app from this repository's GitHub Releases. Before the repository is public, only the team can download them.
+
+| Artifact | How it is produced |
+|---|---|
+| `killy` for linux/amd64 and linux/arm64 | A workflow builds them when a version tag is pushed. It runs on the self-hosted runner while the repository is private and on GitHub-hosted runners afterwards (it does not need the LAN registry) |
+| Android APK | Built by EAS and attached to the same Release |
+| systemd units | `deploy/systemd/`: `killy-agent.service` (`killy agent run`, as root), `killy-agent-demo.service` (`killy agent run --demo`) and `killy-summon.service` (`killy summon`) |
 
 ## Repository layout
 
@@ -261,6 +271,7 @@ killy/
 │   └── protocol/     # shared request/response types
 ├── mobile/           # Expo app
 ├── deploy/           # kustomize base and overlays (stg, prd), applied by Argo CD
+│   └── systemd/      # units for the agent and summon on Linux servers
 ├── docs/             # PRD, ARCHITECTURE, DESIGN
 └── mock/             # HTML prototype of the app (reference, not shipped)
 ```
