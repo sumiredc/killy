@@ -9,7 +9,7 @@ const I18N = {
   ja: {
     lockDate: '11月10日 火曜日',
     now: 'たった今',
-    pushText: 'zombie ×{n} / parent: {name} (PID {pid}) on {host}',
+    pushText: 'zombie ×{n} on {host}',
     tapToOpen: '通知をタップして開く',
     counter: '親プロセス {i} / {n}',
     zLabel: '体のゾンビプロセス',
@@ -49,18 +49,18 @@ const I18N = {
     namePlaceholder: '省略するとサーバーのホスト名を使います',
     addSubmit: '追加する',
     cancel: 'キャンセル',
-    pairing: 'エージェントの応答を待っています…',
+    pairing: '追加しています…',
     paired: '{name} を追加しました',
     pairError: 'このコードは見つからないか、有効期限（10 分）が切れています。サーバーで killy agent pair をもう一度実行してください。',
     detailTitle: 'サーバーの設定',
-    hostLabel: 'アドレス',
+    hostLabel: 'ホスト名',
     notifyServer: 'このサーバーの通知',
     connTitle: '接続',
     connCheck: '確認する',
     connRecheck: 'もう一度確認',
     connChecking: 'エージェントに問い合わせています…',
-    connOk: '接続できました（応答 {ms} ms / agent {ver}）',
-    connFail: 'エージェントから応答がありません。最後の受信は {min} 分前です。サーバーで killy agent が動いているか確認してください。',
+    connOk: '接続できました（agent {ver}）',
+    connFail: 'エージェントから応答がありません。サーバーで killy agent が動いているか確認してください。',
     remove: 'このサーバーを削除',
     removeConfirm: 'もう一度押すと削除します',
     removeHint: '削除しても、サーバー上のエージェントは止まりません。',
@@ -78,7 +78,7 @@ const I18N = {
   en: {
     lockDate: 'Tuesday, November 10',
     now: 'now',
-    pushText: 'zombie ×{n} / parent: {name} (PID {pid}) on {host}',
+    pushText: 'zombie ×{n} on {host}',
     tapToOpen: 'Tap the notification to open',
     counter: 'parent process {i} of {n}',
     zLabel: 'zombie processes',
@@ -118,18 +118,18 @@ const I18N = {
     namePlaceholder: "Uses the server's hostname if empty",
     addSubmit: 'Add',
     cancel: 'Cancel',
-    pairing: 'Waiting for the agent…',
+    pairing: 'Adding…',
     paired: 'Added {name}',
     pairError: 'This code was not found or has expired (10 min). Run killy agent pair on the server again.',
     detailTitle: 'Server settings',
-    hostLabel: 'Address',
+    hostLabel: 'Hostname',
     notifyServer: 'Notifications for this server',
     connTitle: 'Connection',
     connCheck: 'Check',
     connRecheck: 'Check again',
     connChecking: 'Asking the agent…',
-    connOk: 'Connected ({ms} ms / agent {ver})',
-    connFail: 'No response from the agent. Last heard from {min} min ago. Check that killy agent is running on the server.',
+    connOk: 'Connected (agent {ver})',
+    connFail: 'No response from the agent. Check that killy agent is running on the server.',
     remove: 'Remove this server',
     removeConfirm: 'Tap again to remove',
     removeHint: 'Removing it does not stop the agent on the server.',
@@ -148,14 +148,14 @@ const I18N = {
 
 // ---------- Mock data ----------
 const SEED = {
-  s1: { name: 'demo-linux-01', host: '192.168.10.21', online: true, lastSeen: 0, notify: true,
+  s1: { name: 'demo-linux-01', host: 'demo-linux-01', online: true, lastSeen: 0, notify: true,
     parents: [
       { pid: 3801, cmd: 'node evil_daemon.js', zombies: [4092, 4093, 4097] },
       { pid: 5120, cmd: 'python3 worker.py', zombies: [5133, 5140] },
     ] },
-  s2: { name: 'prod-web-02', host: '10.0.3.14', online: true, lastSeen: 0, notify: true,
+  s2: { name: 'prod-web-02', host: 'ip-10-0-3-14', online: true, lastSeen: 0, notify: true,
     parents: [{ pid: 2210, cmd: 'php-fpm: pool www', zombies: [2291] }] },
-  s3: { name: 'build-runner', host: '10.0.5.7', online: false, lastSeen: 12, notify: false,
+  s3: { name: 'build-runner', host: 'build-runner', online: false, lastSeen: 12, notify: false,
     parents: [{ pid: 9031, cmd: 'make -j8', zombies: [9044, 9045] }] },
 };
 const EXTRA_PARENTS = [
@@ -206,7 +206,7 @@ function renderPush() {
   const s = servers.find((x) => x.online && aliveParents(x).length);
   const p = s && aliveParents(s)[0];
   $('#pushText').textContent = p
-    ? t('pushText', { n: p.zombies.length, name: p.cmd.split(' ')[0], pid: p.pid, host: s.name })
+    ? t('pushText', { n: p.zombies.length, host: s.name })
     : '';
 }
 
@@ -594,12 +594,13 @@ $('#submitAddBtn').addEventListener('click', async () => {
     $('#pairError').hidden = false;
     return;
   }
-  const name = $('#nameInput').value.trim() || NEW_HOSTS[addedCount % NEW_HOSTS.length];
+  const host = NEW_HOSTS[addedCount % NEW_HOSTS.length];
+  const name = $('#nameInput').value.trim() || host;
   addedCount += 1;
   servers.push({
     id: `n${Date.now()}`,
     name,
-    host: `10.0.8.${10 + Math.floor(Math.random() * 200)}`,
+    host,
     online: true,
     lastSeen: 0,
     notify: true,
@@ -648,10 +649,10 @@ async function runCheck() {
   if (s.online) {
     s.lastSeen = 0;
     r.className = 'row-sub ok';
-    r.textContent = t('connOk', { ms: 20 + Math.floor(Math.random() * 60), ver: '0.1.0' });
+    r.textContent = t('connOk', { ver: '0.1.0' });
   } else {
     r.className = 'row-sub fail';
-    r.textContent = t('connFail', { min: s.lastSeen });
+    r.textContent = t('connFail');
   }
   $('#checkBtn').disabled = false;
   $('#checkBtn').textContent = t('connRecheck');

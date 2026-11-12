@@ -53,8 +53,10 @@ The app has two tabs, Battle and Settings, in a footer tab bar. Sheets and the A
 | Line | Content |
 |---|---|
 | Title | `Killy` |
-| Body | `zombie ×3 / parent: node (PID 3801) on demo-linux-01` (monospace in the mock) |
+| Body | `zombie ×3 on demo-linux-01`: the new parent's zombie count and the server's display name on this phone (monospace in the mock) |
 | Last line | Killy symbol only: `……！` |
+
+The command line and PID are not in the notification; the battle screen shows them.
 
 ### Battle tab
 
@@ -83,7 +85,7 @@ Empty states replace the info block and hide the enemies; the kill button is dis
 
 ### All clear overlay
 
-Dimmed, blurred backdrop over everything. Card with Killy bowing (no scythe) and 🤍, title `All clear`, "すべてのサーバーのゾンビが成仏しました", two stat tiles (parents killed, zombies released), and one primary button "閉じる" / "Close".
+Dimmed, blurred backdrop over everything. Card with Killy bowing (no scythe) and 🤍, title `All clear`, "すべてのサーバーのゾンビが成仏しました", two stat tiles (parents killed, zombies released), and one primary button "閉じる" / "Close". The app counts both numbers itself: parents whose kill outcome was `killed` in this battle, and the zombies shown for them when each kill started; `already_gone` is not counted.
 
 ### Settings tab
 
@@ -104,15 +106,15 @@ When the OS blocks notifications for Killy, the app Notifications row shows "OS 
 2. Code input: 24px mono, centred, letter-spaced, upper-case letters and digits only, max 6. "QR コードを読み取る" secondary button.
 3. Display name (optional), placeholder "省略するとサーバーのホスト名を使います".
 4. Actions: "キャンセル" (text) and "追加する" (primary, enabled at 6 characters).
-5. Below the form: secondary button "デモサーバーを試す" / "Try the demo server", which adds the public demo server without a code (not in the mock).
+5. Below the form: secondary button "デモサーバーを試す" / "Try the demo server", which adds the public demo server without a code (not in the mock). When no demo server is configured, the error box shows "デモサーバーは今使えません" / "The demo server is not available right now".
 
-States: waiting (spinner, "エージェントの応答を待っています…"), added (Killy with 🤍, "‹name› を追加しました", closes after ~1.3 s), error (red box above the actions with the reason and what to do).
+States: waiting (spinner, "追加しています…" / "Adding…"), added (Killy with 🤍, "‹name› を追加しました", closes after ~1.3 s), error (red box above the actions with the reason and what to do: unknown, used or expired code; QR code for another Killy server; too many attempts, wait and try again; Killy server unreachable).
 
 ### Server sheet
 
-Display name input; group with Address (mono, read-only), Connection (row title, result line, "確認する" pill button that becomes "もう一度確認"), and the server's notification switch; red outlined "このサーバーを削除" that turns solid red with "もう一度押すと削除します" on the first tap; hint "削除しても、サーバー上のエージェントは止まりません。"; "完了" button.
+Display name input; group with Hostname (ホスト名; mono, read-only: the hostname the agent reports, so the server can be recognised after renaming), Connection (row title, result line, "確認する" pill button that becomes "もう一度確認"), and the server's notification switch; red outlined "このサーバーを削除" that turns solid red with "もう一度押すと削除します" on the first tap; hint "削除しても、サーバー上のエージェントは止まりません。"; "完了" button.
 
-Connection results: checking (spinner + "エージェントに問い合わせています…"), OK (`green`, ✓, round trip and agent version), failure (light red, `!`, the message for the failing part as listed in PRD UC4).
+Connection results: checking (spinner + "エージェントに問い合わせています…"), OK (`green`, ✓, agent version), failure (light red, `!`, the message for the failing part as listed in PRD UC4).
 
 ### When the Killy server cannot be reached
 
@@ -173,7 +175,7 @@ Not in the mock; decided as follows.
 | Outcome | Motion and text |
 |---|---|
 | `already_gone` | Same defeat sequence, then the info line reads "PID … はすでに終了していました" / "PID … had already exited" |
-| `refused`, `signal_failed`, `zombies_remain`, `unknown` | Killy's swing lands, the necromancer flashes and recoils but stays; strings stay; the info line shows the reason in `red`; Killy bubble `……？`; the kill button is enabled again |
+| `refused`, `signal_failed`, `zombies_remain`, `unknown` | Killy's swing lands, the necromancer flashes and recoils but stays; strings stay; the info line shows the reason in `red` (`signal_failed` and `zombies_remain` are the PRD's "failed", each with its own reason); Killy bubble `……？`; the kill button is enabled again |
 
 ### Other motion
 

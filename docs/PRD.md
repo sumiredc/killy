@@ -37,15 +37,15 @@ Killy is our entry to the **Kiroween 2026** hackathon in the **Frankenstein** ca
 
 ### Duplicates and identity
 
-- A kill request carries an ID chosen by the phone. Sending the same ID again never sends a second signal; it returns the outcome of the first.
-- If the parent is already gone when a kill arrives, no signal is sent and the outcome is "already gone".
+- A kill request carries an ID (a UUID v4) chosen by the phone. Sending the same ID again, at any later time and even after the agent restarts, never sends a second signal; it returns the outcome of the first.
+- If the parent is already gone when a kill arrives, or has already been killed and is waiting to be reaped, no signal is sent and the outcome is "already gone". Two kills of the same parent arriving together send one signal: the first is "killed", the other "already gone".
 - A pairing code can be used once and expires 10 minutes after it is shown.
 - A parent is identified by server, PID and process start time, so a reused PID is treated as a new parent.
-- The phone is notified once per parent (per server, PID and start time), not on every report.
+- The phone is notified once per parent (per server, PID and start time), not on every report, and a restart of the Killy server does not repeat it. The one exception: if the Killy server stops right after Expo Push Service accepts a push and before the server records it, that push is sent once more after the restart.
 
 ### Consistency
 
-- The zombies shown on the phone are the latest report from each agent. After any reconnection the phone receives a full snapshot that replaces what it had.
+- The zombies shown on the phone are the latest report from each agent. After any reconnection the phone receives a full snapshot that replaces what it had. One exception: a parent whose kill ended "killed" or "already gone" is not shown again until a report without it arrives, so a report taken just before the kill cannot bring it back.
 - When the outcome of a kill is not known within the timeout, the app says so and refreshes; it never shows an unconfirmed kill as a success.
 
 ### Timeliness
@@ -56,7 +56,7 @@ Killy is our entry to the **Kiroween 2026** hackathon in the **Frankenstein** ca
 ### Observability
 
 - The operator can check, per server, whether a command can reach the agent and come back, and is told which part failed (see UC4).
-- Every kill ends with an outcome the operator can see: killed, already gone, refused (with the reason), failed, or unknown.
+- Every kill ends with an outcome the operator can see: killed, already gone, refused (with the reason), failed (the signal failed, or zombies remained after it, with the reason), or unknown.
 
 ## Not guaranteed
 
@@ -78,11 +78,11 @@ Killy is our entry to the **Kiroween 2026** hackathon in the **Frankenstein** ca
 |---|---|
 | Hackathon | Submission deadline **2026-12-04 14:00 PT**. Category: Frankenstein. Public repository under the MIT License, with `.kiro/` at the root and not git-ignored. Demo video under 3 minutes. |
 | Repository | `github.com/sumiredc/killy`: private during development, made public before submission. |
-| Agent platform | Linux only; zombies are read from `/proc`. Real machine or VM. |
+| Agent platform | Linux 5.3 or later (the agent signals through a pidfd); zombies are read from `/proc`. Real machine or VM. |
 | Languages | Backend (agent, server, summon) in Go 1.27 (toolchain go1.27.3). Mobile app in React Native with Expo. |
 | Hosting | Killy server on the team's home Kubernetes cluster at `killy.sumire.pink`, exposed through the existing Cloudflare Tunnel, one replica. The home cluster gives no uptime guarantee. |
 | Notifications | Expo Push Service (APNs and FCM credentials managed by EAS). |
-| Distribution | iOS through a TestFlight public link, Android as a directly downloaded APK. |
+| Distribution | iOS through a TestFlight public link. The Android APK and the agent binaries are downloaded from the repository's GitHub Releases. |
 | Character | Killy never speaks. See the character rules. |
 
 ## Use cases
@@ -91,11 +91,13 @@ Killy is our entry to the **Kiroween 2026** hackathon in the **Frankenstein** ca
 
 The operator wants a server to be watched.
 
-- Preconditions: the agent binary is installed on the server; the server can reach the Killy server over HTTPS.
-- Main flow: the operator runs `killy agent pair` on the server; it shows a 6-character code and a QR code. The operator opens Settings → Add server, enters the code (or scans the QR) and optionally a display name, and taps Add. The app waits for the agent and shows "Added ‹name›".
+- Preconditions: the agent binary (from the GitHub Releases) is installed on the server; the server can reach the Killy server over HTTPS.
+- Main flow: the operator runs `killy agent pair` on the server; it shows a 6-character code and a QR code. The operator opens Settings → Add server, enters the code (or scans the QR) and optionally a display name, and taps Add. The app shows "Added ‹name›" as soon as the code is accepted; the agent does not have to be running at that moment.
 - Alternative: no display name is given → the server's hostname is used.
-- Alternative: the same server is paired from a second phone → both phones see it and are notified.
+- Alternative: the same server is paired from a second phone → both phones see it and are notified; each phone keeps its own display name and notification switch for it.
 - Exception: the code is unknown, already used or expired → the app shows that and asks to run `killy agent pair` again; nothing is added.
+- Exception: the QR code points to a different Killy server than the app's → the app says so; nothing is sent or added.
+- Exception: too many wrong codes from the same network → the app asks to wait and try again; nothing is added.
 - Exception: the phone cannot reach the Killy server → the app says so; nothing is added.
 - Postconditions: the server appears in Settings → Servers; its zombies, if any, join the battle queue.
 
@@ -104,8 +106,8 @@ The operator wants a server to be watched.
 The operator wants to know when a server has zombies, even with the app closed.
 
 - Preconditions: app notifications and the server's notifications are on; the OS allows notifications.
-- Main flow: a parent with zombies appears on a server; the phone gets a push notification whose text is a system-log line (zombie count, parent command, PID, server) followed by a Killy symbol. Tapping it opens the battle screen.
-- Alternative: the app is open → no push is needed; the battle screen updates live.
+- Main flow: a parent with zombies appears on a server; the phone gets a push notification whose text is a system-log line (zombie count, server) followed by a Killy symbol. Tapping it opens the battle screen.
+- Alternative: the app is open → the push still arrives but the app does not display it; the battle screen updates live.
 - Exception: notifications are off for the app or the server → no push; the battle screen still shows the zombies when opened.
 - Exception: the same parent is reported again → no second notification.
 - Postconditions: the parent is in the battle queue.
@@ -115,14 +117,15 @@ The operator wants to know when a server has zombies, even with the app closed.
 The operator wants the zombies gone.
 
 - Preconditions: at least one connected server has a parent with zombies.
-- Main flow: parents from all connected servers are fought one at a time, oldest detection first. The battle screen shows the current parent: its server, zombie count, PID and command line. The operator holds the kill button for 1 second; `SIGKILL` is sent to that parent on that server. The zombies are released and the next parent appears. After the last one, "All clear" shows how many parents were killed and zombies released.
+- Main flow: parents from all connected servers are fought one at a time, oldest detection first (the detection time survives a Killy server restart). The battle screen shows the current parent: its server, zombie count, PID and command line. The operator holds the kill button for 1 second; `SIGKILL` is sent to that parent on that server. The zombies are released and the next parent appears. After the last one, "All clear" shows how many parents were killed and zombies released, counted by the app: only parents whose outcome was "killed", with the zombies shown for them when the kill started; parents that were already gone are not counted.
 - Alternative: the operator releases the button before 1 second → nothing is sent.
 - Alternative: new zombies of the current parent are reported during the battle → they appear on screen and the count updates.
 - Alternative: a new parent is reported during the battle → it is added to the end of the queue (it is the most recently detected).
 - Exception: the parent is already gone → outcome "already gone"; the app moves to the next parent.
-- Exception: the agent refuses (no longer a zombie parent, PID reused, protected process, not a demo process) → no signal is sent; the reason is shown; the parent stays in the queue only if it is still reported.
+- Exception: the agent refuses (no longer a zombie parent, PID reused, protected process, not a demo process, pidfd not available on the server) → no signal is sent; the reason is shown; the parent stays in the queue only if it is still reported.
 - Exception: the signal fails (e.g. permission denied) → the error is shown; the parent stays.
 - Exception: the server's agent is not connected, or no outcome arrives within 10 seconds → "unknown"; the app refreshes from the latest snapshot.
+- Exception: the phone gets no response from the Killy server → the app resends the same kill (same ID) once; if that also fails, it says so under the kill button and the button can be held again.
 - Postconditions on success: the parent process no longer exists on the server; its zombies are no longer in the process table; the server's zombie count in Settings is updated.
 - Postconditions in all cases: no process other than the shown parent received a signal.
 
@@ -131,15 +134,15 @@ The operator wants the zombies gone.
 The operator wants to know whether Killy can reach a server right now.
 
 - Preconditions: the server is paired.
-- Main flow: in Settings → server → Connection, the operator taps Check. The app shows "Connected (round trip in ms / agent version)".
+- Main flow: in Settings → server → Connection, the operator taps Check. The app shows "Connected (agent version)".
 - Exception: the phone cannot reach the Killy server → "Check your network".
-- Exception: the agent is not connected to the Killy server → "No response from the agent. Last heard ‹n› min ago. Check that killy agent is running on the server."
+- Exception: the agent is not connected to the Killy server → "No response from the agent. Check that killy agent is running on the server."
 - Exception: the agent is connected but does not answer within 5 seconds → "Commands are not reaching the agent. Restart the agent."
 - Postconditions: nothing on the server changes.
 
 ### UC5 Manage a server
 
-- Rename: the new display name is shown everywhere in the app. An empty name keeps the previous one.
+- Rename: the new display name is shown everywhere in the app on this phone; other phones keep their own names. An empty name keeps the previous one.
 - Mute: turning off the server's notifications stops pushes for that server only; its zombies still appear in the battle.
 - Remove: needs a second tap to confirm. The server disappears from this phone, its parents leave the battle queue, and the agent keeps running (other paired phones are unaffected).
 
@@ -149,6 +152,7 @@ A judge wants to try Killy without a server.
 
 - Main flow: in Add server, the judge taps "Try the demo server"; the public demo server is added without a pairing code. Demo zombies appear and can be killed.
 - Alternative: another visitor kills the same demo parent first → it disappears from everyone's screen ("already gone" for the late one).
+- Exception: no public demo server is configured → the app says the demo server is not available; nothing is added.
 - Postconditions: only parents created by `killy summon` on the demo machine are ever killed; new ones keep appearing.
 
 ### UC7 Run a demo environment
@@ -156,11 +160,11 @@ A judge wants to try Killy without a server.
 The team wants a server that always has safe zombies to kill.
 
 - Main flow: on the demo Linux machine, the agent runs in demo mode and `killy summon` keeps creating parents (with varied command names) that leave zombies, up to a limit.
-- Postconditions: there is usually at least one demo parent to kill; nothing else on the machine can be killed through Killy.
+- Postconditions: there is usually at least one demo parent to kill; nothing else on the machine can be killed through Killy or appears in the app.
 
 ### UC8 App settings
 
-- Language: Japanese or English; the default follows the phone's language.
+- Language: Japanese or English; the default is Japanese on a phone set to Japanese and English on any other phone.
 - Notifications: one switch for the whole app, in addition to the per-server switch.
 
 ## Should-have
