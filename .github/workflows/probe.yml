@@ -1,0 +1,21 @@
+name: probe
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: arc-runner-killy
+    timeout-minutes: 5
+    steps:
+      - run: |
+          set +e
+          echo "== id"; id
+          echo "== os"; cat /etc/os-release | head -3; uname -r
+          echo "== pid1"; cat /proc/1/comm
+          echo "== sudo"; sudo -n true && echo "sudo: yes" || echo "sudo: no"
+          echo "== docker"; command -v docker && docker info --format '{{.ServerVersion}}' 2>&1 | head -2
+          echo "== apt"; command -v apt-get
+          echo "== postgres"; command -v postgres psql initdb pg_ctl; ls /usr/lib/postgresql 2>&1
+          echo "== env"; env | grep -E '^(ACTIONS_RUNNER_CONTAINER_HOOKS|ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER|DOCKER_HOST)=' 
+          echo "== disk"; df -h /home/runner/_work 2>&1 | tail -1
