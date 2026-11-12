@@ -1,6 +1,6 @@
 # Killy — アーキテクチャ（日本語訳）
 
-この文書は [ARCHITECTURE.md](ARCHITECTURE.md) の日本語訳で、正は英語版です。食い違ったときは英語版に従ってください。訳の元は commit `e30aa20` 時点の英語版です。
+この文書は [ARCHITECTURE.md](ARCHITECTURE.md) の日本語訳で、正は英語版です。食い違ったときは英語版に従ってください。訳の元は commit `7543d48` 時点の英語版です。
 
 英語版は **Killy をどう作るか** の正です。構成要素、それらの間の protocol、安全の保証をどう守るか、どうデプロイするかを書きます。
 Killy が何をしなければならないかは [PRD.md](PRD.md)、app の画面と動きは [DESIGN.md](DESIGN.md) にあります。
@@ -73,7 +73,7 @@ agent は 15 秒ごとと、親の集合が変わったときにすぐ、snapsho
    - demo mode で、そのプロセスの cgroup（`/proc/<ppid>/cgroup` の `0::` の行。cgroup v2）が `/system.slice/killy-summon.service` と完全には一致しない（`not_demo`）。一致は完全一致で比べる。利用者が自分で作った同じ名前の unit は `/user.slice/…` の下にあり、数に入らない
 5. pidfd を通して `SIGKILL` を送る（`pidfd_send_signal`）。手順 2 の後に PID が再利用されても、pidfd は元のプロセスを指したままなので、signal は新しいプロセスに届かない。手順 3 の後にプロセスが終わっていたら（`ESRCH`）→ `already_gone`。それ以外のエラーなら → `signal_failed` と errno。
 6. 元のゾンビがすべて消えるまで最大 5 秒待つ → 消えれば outcome `killed` と回収された数。消えなければ `zombies_remain`。
-7. outcome を `id` に結びつけて `/var/lib/killy/outcomes.jsonl`（追記のみ、mode 0600、期限なし。agent の再起動後も同じ `id` を見分けられる）に保存し、POST する。
+7. outcome を `id` に結びつけて `/var/lib/killy/outcomes.jsonl`（追記のみ、mode 0600、期限なし。agent の再起動後も同じ `id` を見分けられる）に保存し、POST する。書き込みに失敗したら、ログに出して outcome はそのまま POST する。書き込みは繰り返さない。outcome はメモリには残るので、agent が再起動する前に同じ `id` が届けば、二度目の signal を送らずにその outcome を返す。PRD は、書き込みに失敗した `id` と、手順 5 から 7 の間に agent が止まった `id` が、もう一度処理されうることを受け入れている。
 
 pidfd の呼び出しは `syscall` パッケージで直接行います。`os.Process.Signal` は、pidfd が無いと PID 指定の送信に黙って切り替えるためです。agent は起動時に pidfd が使えるかを確かめ、使えなければエラーを記録します。
 
@@ -115,14 +115,15 @@ kill の制限は、1 秒の長押しで届く回数よりずっと多く、公�
 | 通知済みの `(親, device)` の組 | PostgreSQL | 失わない |
 | ペアリングコード | メモリ | 失う（operator が `pair` をやり直す） |
 | agent ごとの最新の snapshot と最後に受け取った時刻、開いている SSE の stream、応答待ちの命令、回数制限のカウンタ | メモリ | 失う（agent が再接続して報告すると戻る） |
+| `(親, device)` ごとの push の失敗の回数 | メモリ | 失う（数え直しになるが、上限は再起動の後も働く） |
 
-永続データの置き場所は PostgreSQL だけで、Killy server は自分のファイルを持ちません。schema は、バイナリに埋め込んだ migration でだけ変え、`killy server` の起動時に流します。親が agent の snapshot から消えたら、その親の最初の検出時刻と通知済みの組を消します。`scanned_at` が同じ agent から最後に受け付けたものより古い snapshot は捨てます。遅れて届いた報告で、消えた親が戻らないようにするためです。
+永続データの置き場所は PostgreSQL だけで、Killy server は自分のファイルを持ちません。schema は、バイナリに埋め込んだ migration でだけ変え、`killy server` の起動時に流します。親が agent の snapshot から消えたら、その親の最初の検出時刻、通知済みの組、push の失敗の回数を消します。`scanned_at` が同じ agent から最後に受け付けたものより古い snapshot は捨てます。遅れて届いた報告で、消えた親が戻らないようにするためです。捨てた snapshot にも成功を返すので、agent はそれを送り直しません。agent の時計が戻ると、追いつくまでその報告は無視され、その間 agent は切断に見えますが、それは受け入れます。
 
 token は 32 バイトの乱数で、保存するのは SHA-256 だけです。
 
 ### 通知
 
-snapshot の中の親ごとに、紐付いた device のうち、push token があり、アプリ全体の switch とサーバーの switch が両方 on で、まだその親を通知していないものに、push を 1 つずつ送ります。親が snapshot から消えるとその親の通知済みの組を消すので、同じ親がまたゾンビを持って戻ってくると、もう一度通知します（新しい回）。組を永久に残すと、table が際限なく増えるためです。`(親, device)` の組は、Expo Push Service が push を受け付けた後にだけ記録します。送信に失敗したら何も記録せず、次の snapshot（遅くとも 15 秒後）でまた送ります。Expo が push を受け付けた後、組を記録する前に Killy server が止まると、その 1 件は再起動の後にもう一度送られます。通知の文面は DESIGN.md の「Push notification」で決めています。push は app が開いているかどうかに関わらず送ります。app が前面にある間は、app がその push を表示しません。そのため Killy server は、どの phone が app を開いているかを知らなくてよい。
+snapshot の中の親ごとに、紐付いた device のうち、push token があり、アプリ全体の switch とサーバーの switch が両方 on で、まだその親を通知していないものに、push を 1 つずつ送ります。親が snapshot から消えるとその親の通知済みの組を消すので、同じ親がまたゾンビを持って戻ってくると、もう一度通知します（新しい回）。組を永久に残すと、table が際限なく増えるためです。`(親, device)` の組は、Expo Push Service が push を受け付けた後にだけ記録します。送信に失敗したら何も記録せず、次の snapshot（遅くとも 15 秒後）でまた送ります。失敗が続いても止まらずに繰り返さないよう、送り直しには上限があります。Expo が push token をもう受け付けないと返したら（`DeviceNotRegistered`）、その device の push token を消し、app が新しい token を登録するまでその device には送りません。それ以外の失敗は、後の snapshot で最大 3 回まで送り直し、それでも失敗したら通知済みとして記録して諦めます。Expo が push を受け付けた後、組を記録する前に Killy server が止まると、その 1 件は再起動の後にもう一度送られます。通知の文面は DESIGN.md の「Push notification」で決めています。push は app が開いているかどうかに関わらず送ります。app が前面にある間は、app がその push を表示しません。そのため Killy server は、どの phone が app を開いているかを知らなくてよい。
 
 ### 命令
 
@@ -152,25 +153,27 @@ sequenceDiagram
 
 本文はすべて JSON です。agent は `Authorization: Bearer <agent token>`、phone は `Authorization: Bearer <device token>` で認証します。
 
+要求と応答の形、status、エラーの値は [openapi.yaml](openapi.yaml) で決めていて、そちらが正です。エラーの本文はすべて `{"error": "<code>"}` です。kill の outcome は、`unknown` を含めてエラーではなく `200` の応答です。下の表には、各 API が何のためにあるかを書きます。
+
 ### Agent API
 
 | メソッドとパス | 用途 |
 |---|---|
-| `POST /agent/v1/pairings` | `{hostname}`。token なし：登録し（初回）、agent token・agent の ID・コードを返す。agent token 付き：agent の ID と新しいコードを返す |
+| `POST /agent/v1/pairings` | token なし：登録し（初回）、agent token・agent の ID・コードを受け取る。agent token 付き：agent の ID と新しいコードを受け取る |
 | `GET /agent/v1/commands` | `kill` と `ping` のイベントの SSE の stream |
-| `POST /agent/v1/snapshots` | `{hostname, version, scanned_at, parents: [{pid, starttime, cmd, zombies: [pid]}]}` |
-| `POST /agent/v1/results` | `{id, type: kill \| pong, outcome, reaped, reason, version}` |
+| `POST /agent/v1/snapshots` | ゾンビを持つ親をすべて報告する |
+| `POST /agent/v1/results` | `kill` か `ping` の結果を返す |
 
 ### App API
 
 | メソッドとパス | 用途 |
 |---|---|
-| `POST /app/v1/devices` | device を登録する：`{push_token?}` → device token。push token は省略できるので、通知を使わない phone もペアリングして戦える |
+| `POST /app/v1/devices` | device を登録し、device token を受け取る。push token は省略できるので、通知を使わない phone もペアリングして戦える |
 | `PATCH /app/v1/devices/me` | アプリ全体の通知の switch、push token の更新 |
-| `POST /app/v1/pairings/claim` | `{code, name?}` → 追加したサーバー |
+| `POST /app/v1/pairings/claim` | ペアリングコードで、この device を agent と紐付ける |
 | `POST /app/v1/demo` | 公開デモのサーバーを追加する（`KILLY_DEMO_AGENT_ID` の agent。未設定なら失敗する） |
 | `GET /app/v1/events` | SSE の stream：紐付いた全サーバーとその親を載せた `state` イベント。親ごとに最初の検出時刻が付く（app はこれで battle の列を古い順に並べる） |
-| `PATCH /app/v1/servers/{id}` | `{name?, notify?}`。この device の紐付けだけを変える |
+| `PATCH /app/v1/servers/{id}` | サーバーの名前を変える、通知を止める。この device の紐付けだけを変える |
 | `DELETE /app/v1/servers/{id}` | この device とサーバーの紐付けを外す |
 | `POST /app/v1/servers/{id}/check` | 接続確認（「命令」を参照） |
 | `POST /app/v1/kills` | kill（「命令」を参照） |
@@ -280,6 +283,6 @@ killy/
 ├── mobile/           # Expo の app
 ├── deploy/           # kustomize の base と overlay（stg、prd）。Argo CD が適用する
 │   └── systemd/      # Linux サーバーで agent と summon を動かす unit
-├── docs/             # PRD、ARCHITECTURE、DESIGN
+├── docs/             # PRD、ARCHITECTURE、DESIGN、openapi.yaml
 └── mock/             # app の HTML のプロトタイプ（参考用。配布しない）
 ```
