@@ -49,12 +49,15 @@ type Killer struct {
     Store   OutcomeStore
     Clock   Clock          // 5 秒の待ちと記録の時刻
     SelfPID func() int
+    Log     *slog.Logger   // 記録できなかった outcome を出す
 }
 
-func (k *Killer) Kill(ctx context.Context, cmd protocol.KillCommand) protocol.Outcome
+func (k *Killer) Handle(cmd protocol.KillCommand) (protocol.Outcome, error) // ID が UUID v4 でなければ ErrInvalidKillID
 ```
 
-`Kill` の流れ（ARCHITECTURE の手順の番号）：
+メソッドの名前を `Kill` にしないのは、signal を送る呼び出しを探す grep（#4 の完了条件）の `\.Kill\(` に、プロセスを kill する呼び出しだけが当たるようにするため。
+
+`Handle` の流れ（ARCHITECTURE の手順の番号）：
 
 ```mermaid
 flowchart TD
@@ -84,7 +87,7 @@ flowchart TD
 
 ### `OutcomeStore`
 
-`/var/lib/killy/outcomes.jsonl` に、1 行 1 件で `{"id","outcome","reason","reaped","at"}` を追記する。`signal_failed` の errno は `reason` に名前（例 `EPERM`）で入れる（[ARCHITECTURE: Agent API](../../../docs/ARCHITECTURE.md#agent-api) の results に errno の欄は無いため）。起動時に全行を読み、最後の行が JSON として壊れていれば捨てる。ファイルが無ければ空として始める。ファイルは mode 0600 で作る。
+`/var/lib/killy/outcomes.jsonl` に、1 行 1 件で `{"id","outcome","reason","reaped","at"}` を追記する。`signal_failed` の errno は `reason` に名前（例 `EPERM`）で入れる（[ARCHITECTURE: Agent API](../../../docs/ARCHITECTURE.md#agent-api) の results に errno の欄は無いため）。起動時に全行を読み、記録として読めない行は飛ばす（書き込みの途中で落ちると、最後の行が切れて残る）。最後の行が切れていたら、次の記録は改行を足してから書き、切れた行につなげない。そのため切れた行はファイルの途中にも残りうる。ファイルが無ければ空として始める（置き場所のディレクトリも mode 0700 で作る）。ファイルは mode 0600 で作る。1 件ごとに 1 回の `Write` で追記し、`fsync` してから outcome を返す。
 
 **書き込みに失敗したとき：** 記録できなかったことをログに出し、outcome はそのまま返す。書き込みは繰り返さない（#1 の D24）。この ID と、signal を送ってから記録するまでの間に agent が落ちた ID は、再起動の後に届くと新しい ID として扱われる。PRD はこの例外を受け入れている（[PRD: Duplicates and identity](../../../docs/PRD.md#duplicates-and-identity)）。そのときも確かめ直しは働くので、signal が届くのは条件を満たし続けている親だけである。
 
@@ -102,6 +105,10 @@ flowchart TD
 |---|---|
 | `/proc` の 1 プロセスが読めない（走査中） | そのプロセスを飛ばす |
 | `/proc` 自体が読めない | `Scan` がエラーを返す。呼び出し側（`killy agent run`）が記録して次の走査を待つ |
+| kill の途中で、`pidfd_open` が `ESRCH`・`ENOSYS`・`EPERM` 以外で失敗する、または対象の `/proc` が「無い」（`ENOENT`・`ESRCH`）以外の理由で読めない | signal を送らず `signal_failed`。`reason` は errno の名前（errno でなければエラーの文）。どちらも起きにくいが、`already_gone` にすると app が親を隠したままになり、`refused` には当てはまる理由が無いため |
+| kill の `ppid` が 0 以下か、Linux の PID の上限（`PID_MAX_LIMIT`、2^22）を超える | `pidfd_open` を呼ばずに `already_gone`。そういうプロセスは存在せず、`pidfd_open` は PID を 32 bit に切り詰めるので、そのまま渡すと別のプロセスを開くため |
+| kill の途中で、agent の祖先が辿れない | 対象を保護対象として扱い `refused` / `protected`。守るべき親かどうかを確かめられないまま送らないため |
+| 回収を待つ間、ゾンビの `/proc` が「無い」以外の理由で読めない | 残っているものとして数える。確かめられないものを `killed` に数えないため |
 | 記録ファイルが読めない | 起動時に、ファイルはあるのに読めなければエラーで止める（無ければ空として始める） |
 | 記録ファイルに書けない | ログに出して outcome を返す。繰り返さない（#1 の D24） |
 
