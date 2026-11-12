@@ -95,9 +95,10 @@ Counted per client address (`CF-Connecting-IP`; when the header is missing, as w
 |---|---|---|
 | Failed claims (unknown, used or expired code) | 10 per 10 min per client address | `429` for every claim from that address, even one with a valid code, until the window passes; the app asks to wait and try again |
 | First-run registrations | 10 per hour per client address | `429`; `killy agent pair` asks to wait |
+| Device registrations (`POST /app/v1/devices`) | 10 per hour per client address | `429`; the app says so and tries again the next time it starts |
 | Kill requests (`POST /app/v1/kills`) | 30 per minute per device | `429`; nothing is sent to the agent, the app shows it under the kill button and does not resend |
 
-The kill limit is far above what holding the button for 1 s allows, and it bounds how fast anyone can grow an agent's stored outcomes (which never expire) through the public demo.
+The kill limit is far above what holding the button for 1 s allows, and it bounds how fast anyone can grow an agent's stored outcomes (which never expire) through the public demo. Device registrations are limited too, because a client could otherwise register new devices to get around the per-device kill limit.
 
 Attempts spread over many addresses are not stopped by this; add Cloudflare rate limiting if that happens.
 
@@ -192,6 +193,7 @@ All bodies are JSON. Agents authenticate with `Authorization: Bearer <agent toke
 | Pairing code lifetime | 10 min |
 | Failed claims per client address | 10 per 10 min |
 | First-run registrations per client address | 10 per hour |
+| Device registrations per client address | 10 per hour |
 | Kill requests per device | 30 per minute |
 
 ## Demo environment
