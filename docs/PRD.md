@@ -41,7 +41,7 @@ Killy is our entry to the **Kiroween 2026** hackathon in the **Frankenstein** ca
 - If the parent is already gone when a kill arrives, or has already been killed and is waiting to be reaped, no signal is sent and the outcome is "already gone". Two kills of the same parent arriving together send one signal: the first is "killed", the other "already gone".
 - A pairing code can be used once and expires 10 minutes after it is shown.
 - A parent is identified by server, PID and process start time, so a reused PID is treated as a new parent.
-- The phone is notified once per parent (per server, PID and start time), not on every report, and a restart of the Killy server does not repeat it. The one exception: if the Killy server stops right after Expo Push Service accepts a push and before the server records it, that push is sent once more after the restart.
+- The phone is notified once each time a parent starts holding zombies (per server, PID and start time), not on every report, and a restart of the Killy server does not repeat it. If the parent leaves the report (its zombies were reaped or it exited) and later holds zombies again with the same PID and start time, that is a new episode and is notified again. The one exception to "once": if the Killy server stops right after Expo Push Service accepts a push and before the server records it, that push is sent once more after the restart.
 
 ### Consistency
 
@@ -109,7 +109,7 @@ The operator wants to know when a server has zombies, even with the app closed.
 - Main flow: a parent with zombies appears on a server; the phone gets a push notification whose text is a system-log line (zombie count, server) followed by a Killy symbol. Tapping it opens the battle screen.
 - Alternative: the app is open → the push still arrives but the app does not display it; the battle screen updates live.
 - Exception: notifications are off for the app or the server → no push; the battle screen still shows the zombies when opened.
-- Exception: the same parent is reported again → no second notification.
+- Exception: the same parent is reported again while it still holds zombies → no second notification.
 - Postconditions: the parent is in the battle queue.
 
 ### UC3 Kill zombie parents (battle)
@@ -126,6 +126,7 @@ The operator wants the zombies gone.
 - Exception: the signal fails (e.g. permission denied) → the error is shown; the parent stays.
 - Exception: the server's agent is not connected, or no outcome arrives within 10 seconds → "unknown"; the app refreshes from the latest snapshot.
 - Exception: the phone gets no response from the Killy server → the app resends the same kill (same ID) once; if that also fails, it says so under the kill button and the button can be held again.
+- Exception: the phone has sent too many kills in a short time (far more than holding the button allows) → nothing is sent to the agent; the app asks to wait under the kill button.
 - Postconditions on success: the parent process no longer exists on the server; its zombies are no longer in the process table; the server's zombie count in Settings is updated.
 - Postconditions in all cases: no process other than the shown parent received a signal.
 

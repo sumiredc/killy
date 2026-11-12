@@ -79,7 +79,7 @@ The agent needs permission to signal other users' processes: run it as root unde
 
 ### Pairing
 
-`killy agent pair --server <url>` registers with the server and prints a 6-character code (upper-case letters and digits) and a QR code encoding `killy://pair?code=<code>&server=<url>`. `killy agent run` is the long-running service.
+`killy agent pair --server <url>` registers with the server and prints a 6-character code (upper-case letters and digits), a QR code encoding `killy://pair?code=<code>&server=<url>`, and the agent ID. The agent ID is not a secret; it is the same value as the server `id` in the App API and is what `KILLY_DEMO_AGENT_ID` takes (see "Demo environment"). `killy agent run` is the long-running service.
 
 - **First run** (no `/etc/killy/agent.json`): `POST /agent/v1/pairings` with no token, sending the hostname. Anyone may register: a new agent sees nothing and appears on no phone until a phone claims its code. The returned agent token is stored in `/etc/killy/agent.json` (mode 0600).
 - **Later runs**: the same request with the agent token creates a new code for the same agent. No code is issued for an existing agent without its token.
@@ -89,12 +89,16 @@ The agent needs permission to signal other users' processes: run it as root unde
 
 #### Rate limits
 
-Counted per client address (`CF-Connecting-IP`; when the header is missing, as when the server runs locally without Cloudflare, the TCP peer address), in memory; a restart resets them, which is enough against short bursts.
+Counted per client address (`CF-Connecting-IP`; when the header is missing, as when the server runs locally without Cloudflare, the TCP peer address), in memory; a restart resets them, which is enough against short bursts. Kill requests are counted per device instead, because a device token is required to send them.
 
 | Request | Limit | Over the limit |
 |---|---|---|
-| Failed claims (unknown, used or expired code) | 10 per 10 min | `429`; the app asks to wait and try again |
-| First-run registrations | 10 per hour | `429`; `killy agent pair` asks to wait |
+| Failed claims (unknown, used or expired code) | 10 per 10 min per client address | `429` for every claim from that address, even one with a valid code, until the window passes; the app asks to wait and try again |
+| First-run registrations | 10 per hour per client address | `429`; `killy agent pair` asks to wait |
+| Device registrations (`POST /app/v1/devices`) | 10 per hour per client address | `429`; the app says so and tries again the next time it starts |
+| Kill requests (`POST /app/v1/kills`) | 30 per minute per device | `429`; nothing is sent to the agent, the app shows it under the kill button and does not resend |
+
+The kill limit is far above what holding the button for 1 s allows, and it bounds how fast anyone can grow an agent's stored outcomes (which never expire) through the public demo. Device registrations are limited too, because a client could otherwise register new devices to get around the per-device kill limit.
 
 Attempts spread over many addresses are not stopped by this; add Cloudflare rate limiting if that happens.
 
@@ -116,7 +120,7 @@ Tokens are 32 random bytes; only their SHA-256 is stored.
 
 ### Notifications
 
-For each parent in a snapshot, the server sends one push to every linked device that has a push token, has both the app switch and the server switch on, and has not yet been notified of that parent. The `(parent, device)` pair is recorded only after Expo Push Service accepts the push; if sending fails, nothing is recorded and the next snapshot (at most 15 s later) tries again. If the server stops after Expo accepts a push but before the pair is recorded, that one push is sent again after the restart. The notification text is specified in DESIGN.md ("Push notification"). Pushes are sent whether or not the app is open; the app does not display them while it is in the foreground, so the server does not need to know which phones have the app open.
+For each parent in a snapshot, the server sends one push to every linked device that has a push token, has both the app switch and the server switch on, and has not yet been notified of that parent. Because the notified pairs of a parent are deleted when it leaves the snapshot, a parent that comes back with zombies is notified again (a new episode); keeping them forever would let the table grow without end. The `(parent, device)` pair is recorded only after Expo Push Service accepts the push; if sending fails, nothing is recorded and the next snapshot (at most 15 s later) tries again. If the server stops after Expo accepts a push but before the pair is recorded, that one push is sent again after the restart. The notification text is specified in DESIGN.md ("Push notification"). Pushes are sent whether or not the app is open; the app does not display them while it is in the foreground, so the server does not need to know which phones have the app open.
 
 ### Commands
 
@@ -150,7 +154,7 @@ All bodies are JSON. Agents authenticate with `Authorization: Bearer <agent toke
 
 | Method and path | Purpose |
 |---|---|
-| `POST /agent/v1/pairings` | `{hostname}`. With no token: register (first run) and return an agent token and a code. With the agent token: return a new code |
+| `POST /agent/v1/pairings` | `{hostname}`. With no token: register (first run) and return an agent token, the agent ID and a code. With the agent token: return the agent ID and a new code |
 | `GET /agent/v1/commands` | SSE stream of `kill` and `ping` events |
 | `POST /agent/v1/snapshots` | `{hostname, version, scanned_at, parents: [{pid, starttime, cmd, zombies: [pid]}]}` |
 | `POST /agent/v1/results` | `{id, type: kill \| pong, outcome, reaped, reason, version}` |
@@ -189,6 +193,8 @@ All bodies are JSON. Agents authenticate with `Authorization: Bearer <agent toke
 | Pairing code lifetime | 10 min |
 | Failed claims per client address | 10 per 10 min |
 | First-run registrations per client address | 10 per hour |
+| Device registrations per client address | 10 per hour |
+| Kill requests per device | 30 per minute |
 
 ## Demo environment
 
@@ -196,7 +202,7 @@ The demo Linux machine runs `killy agent run --demo` and `killy summon`, both as
 
 Demo zombies must not be created by the agent itself: the agent would be their parent and is protected from kills.
 
-The Killy server offers the demo agent named by `KILLY_DEMO_AGENT_ID`. The agent ID is known only after the demo machine is paired with the server, and it is not a secret, so it is set in the overlay. When it is unset, `POST /app/v1/demo` fails and the app says the demo server is not available.
+The Killy server offers the demo agent named by `KILLY_DEMO_AGENT_ID`. The agent ID is known only after the demo machine is paired with the server (`killy agent pair` prints it), and it is not a secret, so it is set in the overlay. When it is unset, `POST /app/v1/demo` fails and the app says the demo server is not available.
 
 ## Deployment
 
