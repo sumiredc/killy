@@ -16,16 +16,16 @@
   - [x] 1.6 `go vet ./...` と `go test ./...` を通し、手元で `killy server` と `killy agent pair` を 2 回動かして agent が 1 つのままであることを PR 本文に書く
     - _Requirements: 1.1, 1.2_
 
-- [ ] 2. agent が snapshot を報告し、Killy server が最新状態を持つ（#7。前提：#4、#6）
-  - [ ] 2.1 migration（first_detections）と `LiveState` のテスト（置き換え・検出時刻・再起動・消えた親・再起動中に消えた親・古い `scanned_at`・不正な token・切断の判定の前とちょうどと後・一度も送っていない agent）を書き、赤を確かめる
+- [x] 2. agent が snapshot を報告し、Killy server が最新状態を持つ（#7。前提：#4、#6）
+  - [x] 2.1 migration（first_detections）と `LiveState` のテスト（置き換え・検出時刻・再起動・消えた親・再起動中に消えた親・古い `scanned_at`・不正な token・切断の判定の前とちょうどと後・一度も送っていない agent）を書き、赤を確かめる
     - _Requirements: 2.4, 2.5, 2.6, 2.7, 2.8, 2.9_
-  - [ ] 2.2 `POST /agent/v1/snapshots` と `LiveState` を実装し、テストを緑にする
+  - [x] 2.2 `POST /agent/v1/snapshots` と `LiveState` を実装し、テストを緑にする
     - _Requirements: 2.4, 2.5, 2.6, 2.7, 2.8, 2.9_
-  - [ ] 2.3 `Reporter` のテスト（5 秒ごとの走査・変わったらすぐ・15 秒ごと）、起動時の pidfd の確認のテスト（使えないときに記録して続ける）、`agent.json` の読み込みと無いときのテストを書き、赤を確かめる
+  - [x] 2.3 `Reporter` のテスト（5 秒ごとの走査・変わったらすぐ・15 秒ごと）、起動時の pidfd の確認のテスト（使えないときに記録して続ける）、`agent.json` の読み込みと無いときのテストを書き、赤を確かめる
     - _Requirements: 2.1, 2.2, 2.3, 2.10, 2.11, 2.13, 2.14_
-  - [ ] 2.4 `killy agent run` と `Reporter` を実装し、テストを緑にする
+  - [x] 2.4 `killy agent run` と `Reporter` を実装し、テストを緑にする
     - _Requirements: 2.1, 2.2, 2.3, 2.10, 2.11, 2.13, 2.14_
-  - [ ] 2.5 `go vet ./...` と `go test ./...` を通し、Linux 上で実際のゾンビが届くことと、agent が LISTEN していないことを PR 本文に書く
+  - [x] 2.5 `go vet ./...` と `go test ./...` を通し、Linux 上で実際のゾンビが届くことと、agent が LISTEN していないことを PR 本文に書く
     - _Requirements: 2.2, 2.12_
 
 - [ ] 3. phone を登録し、コードで agent と紐付ける（#8。前提：#6）
