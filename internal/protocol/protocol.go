@@ -54,3 +54,33 @@ const (
 	ReasonNotAZombieParent = "not_a_zombie_parent"
 	ReasonProtected        = "protected"
 )
+
+// IsUUIDv4 reports whether s is a UUID v4 in lower case: 8-4-4-4-12 hex digits, version digit 4,
+// variant bits 10. The agent ignores kill commands with any other ID and the Killy server rejects them.
+func IsUUIDv4(s string) bool {
+	if len(s) != 36 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch i {
+		case 8, 13, 18, 23:
+			if c != '-' {
+				return false
+			}
+		case 14:
+			if c != '4' {
+				return false
+			}
+		case 19:
+			if c != '8' && c != '9' && c != 'a' && c != 'b' {
+				return false
+			}
+		default:
+			if !('0' <= c && c <= '9' || 'a' <= c && c <= 'f') {
+				return false
+			}
+		}
+	}
+	return true
+}
