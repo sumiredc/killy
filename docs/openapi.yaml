@@ -442,6 +442,7 @@ components:
         cmd: { type: string }
         zombies:
           type: array
+          minItems: 1
           items: { type: integer }
 
     Snapshot:
