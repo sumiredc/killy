@@ -2,16 +2,16 @@
 
 各トップレベルのタスクが 1 つの issue と 1 つの PR に当たる。テストは実装より先に書き、期待した理由で赤になることを確かめる。完了条件の正は各 issue。
 
-- [ ] 1. `/proc` からゾンビを持つ親を読み取る（#3）
-  - [ ] 1.1 `go.mod`（Go 1.27、toolchain go1.27.3）と `cmd/killy` の 3 つのサブコマンドの入口を作る
+- [x] 1. `/proc` からゾンビを持つ親を読み取る（#3）
+  - [x] 1.1 `go.mod`（Go 1.27、toolchain go1.27.3）と `cmd/killy` の 3 つのサブコマンドの入口を作る
     - _Requirements: 1.8_
-  - [ ] 1.2 `internal/protocol` に `Parent`・`Snapshot` を置く
+  - [x] 1.2 `internal/protocol` に `Parent`・`Snapshot` を置く
     - _Requirements: 1.3_
-  - [ ] 1.3 `ParseStat` と `Scanner.Scan` のテストを fixture で書き、赤を確かめる
+  - [x] 1.3 `ParseStat` と `Scanner.Scan` のテストを fixture で書き、赤を確かめる
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7_
-  - [ ] 1.4 `ParseStat` と `Scanner` を実装し、テストを緑にする
+  - [x] 1.4 `ParseStat` と `Scanner` を実装し、テストを緑にする
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8_
-  - [ ] 1.5 `go vet ./...` と `go test ./...` を通し、Linux 上で実際のゾンビが snapshot に入ることを PR 本文に書く
+  - [x] 1.5 `go vet ./...` と `go test ./...` を通し、Linux 上で実際のゾンビが snapshot に入ることを PR 本文に書く
     - _Requirements: 1.1, 1.3_
 
 - [ ] 2. kill の直前に対象を確かめ直してから SIGKILL を送る（#4）
