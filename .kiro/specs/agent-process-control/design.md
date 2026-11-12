@@ -27,7 +27,7 @@ flowchart LR
 
 | 型・関数 | 役割 |
 |---|---|
-| `Scanner{Root fs.FS}` | `/proc` に当たるディレクトリを受け取る。本番は `os.DirFS("/proc")`、テストは `testdata/` の fixture |
+| `Scanner{Root fs.FS}` | `/proc` に当たるディレクトリを受け取る。本番は `os.DirFS("/proc")`、テストは `fstest.MapFS` で組み立てた小さな `/proc` |
 | `ParseStat([]byte) (Stat, error)` | `stat` を読む。`comm` は最初の `(` と最後の `)` の間として取り、空白や `)` を含んでも残りの値を取り違えない |
 | `Scanner.Scan() ([]protocol.Parent, error)` | 全プロセスを読み、状態 `Z` を親ごとにまとめる。親が PID 1 のものは除く。読めないプロセスは飛ばす |
 | `Scanner.Stat(pid)` / `Scanner.Children(pid)` | kill の確かめ直しで使う。子は全プロセスの `stat` の ppid から求める |
@@ -108,7 +108,7 @@ flowchart TD
 ## Testing Strategy
 
 - **書く順**：各 Acceptance Criteria のテストを先に書き、最小のスタブで期待した理由の赤を確かめてから実装する（testing スキル）
-- **`internal/proc`**：`testdata/proc-*/` に小さな fixture を置き、`fs.FS` で渡す。境界（空白と `)` を含む `comm`、空の `cmdline`、途中で消えたプロセス）を 1 テスト 1 ルールで確かめる
+- **`internal/proc`**：テストごとに `fstest.MapFS` で小さな `/proc` を組み立て、`fs.FS` で渡す（`cmdline` の NUL がテストの中で読めるように）。境界（空白と `)` を含む `comm`、空の `cmdline`、途中で消えたプロセス）を 1 テスト 1 ルールで確かめる
 - **`Killer`**：`PidfdOps` の偽物で、呼び出しの回数と順番（Open → Stat → SendKill）を記録する。`refused` と `already_gone` のテストでは `SendKill` が 0 回であることを見る
 - **ミューテーション確認**：保護対象の 3 つの確認、記録を引く処理、同時の要求の待ち合わせを 1 つずつ取り除き、対応するテストが落ちることを PR 本文に書く
 - **Linux の実機**：`//go:build linux` のテストと手元の確認で、`sh -c 'sleep 1 & exec sleep 600' &` で作ったゾンビの親を実際に kill する。pidfd の呼び出しは実機でしか確かめられない
