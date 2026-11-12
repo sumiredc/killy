@@ -55,6 +55,9 @@ func TestKillKillsARealZombieParent(t *testing.T) {
 	k := &Killer{Proc: scanner, Pidfd: NewPidfdOps(), Store: newMemStore(), Clock: SystemClock{}, SelfPID: os.Getpid}
 	got := handle(t, k, protocol.KillCommand{ID: "0f8fad5b-d9cb-469f-a165-70867728950e", PPID: parent.PID, StartTime: parent.StartTime})
 	if want := (protocol.Outcome{Outcome: protocol.Killed, Reaped: 1}); got != want {
+		if got.Outcome == protocol.ZombiesRemain {
+			t.Fatalf("outcome = %+v, want %+v: nothing reaped the zombie after its parent died; run the tests where PID 1 reaps orphans (a normal init, or docker run --init)", got, want)
+		}
 		t.Fatalf("outcome = %+v, want %+v", got, want)
 	}
 
