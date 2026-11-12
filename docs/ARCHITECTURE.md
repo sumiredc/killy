@@ -150,25 +150,27 @@ The connection check is the same exchange with `ping {id}` / `pong {id, version}
 
 All bodies are JSON. Agents authenticate with `Authorization: Bearer <agent token>`, phones with `Authorization: Bearer <device token>`.
 
+The request and response shapes, status codes and error codes are specified in [openapi.yaml](openapi.yaml), which is their source of truth. Every error has the body `{"error": "<code>"}`; kill outcomes, including `unknown`, are `200` responses, not errors. The tables below say what each endpoint is for.
+
 ### Agent API
 
 | Method and path | Purpose |
 |---|---|
-| `POST /agent/v1/pairings` | `{hostname}`. With no token: register (first run) and return an agent token, the agent ID and a code. With the agent token: return the agent ID and a new code |
+| `POST /agent/v1/pairings` | With no token: register (first run) and get an agent token, the agent ID and a code. With the agent token: get the agent ID and a new code |
 | `GET /agent/v1/commands` | SSE stream of `kill` and `ping` events |
-| `POST /agent/v1/snapshots` | `{hostname, version, scanned_at, parents: [{pid, starttime, cmd, zombies: [pid]}]}` |
-| `POST /agent/v1/results` | `{id, type: kill \| pong, outcome, reaped, reason, version}` |
+| `POST /agent/v1/snapshots` | Report the full set of parents with zombies |
+| `POST /agent/v1/results` | Return the result of a `kill` or `ping` |
 
 ### App API
 
 | Method and path | Purpose |
 |---|---|
-| `POST /app/v1/devices` | Register the device: `{push_token?}` → device token. The push token is optional, so a phone without notifications can still pair and fight |
+| `POST /app/v1/devices` | Register the device and get a device token. The push token is optional, so a phone without notifications can still pair and fight |
 | `PATCH /app/v1/devices/me` | App-wide notification switch, push token refresh |
-| `POST /app/v1/pairings/claim` | `{code, name?}` → the added server |
+| `POST /app/v1/pairings/claim` | Link this device to an agent with a pairing code |
 | `POST /app/v1/demo` | Add the public demo server (the agent named by `KILLY_DEMO_AGENT_ID`; fails when it is unset) |
 | `GET /app/v1/events` | SSE stream: `state` events with every linked server and its parents, each parent with its first-detection time (the app orders the battle queue by it, oldest first) |
-| `PATCH /app/v1/servers/{id}` | `{name?, notify?}` for this device's link only |
+| `PATCH /app/v1/servers/{id}` | Rename or mute the server, for this device's link only |
 | `DELETE /app/v1/servers/{id}` | Unlink this device from the server |
 | `POST /app/v1/servers/{id}/check` | Connection check (see Commands) |
 | `POST /app/v1/kills` | Kill (see Commands) |
@@ -278,6 +280,6 @@ killy/
 ├── mobile/           # Expo app
 ├── deploy/           # kustomize base and overlays (stg, prd), applied by Argo CD
 │   └── systemd/      # units for the agent and summon on Linux servers
-├── docs/             # PRD, ARCHITECTURE, DESIGN
+├── docs/             # PRD, ARCHITECTURE, DESIGN, openapi.yaml
 └── mock/             # HTML prototype of the app (reference, not shipped)
 ```
