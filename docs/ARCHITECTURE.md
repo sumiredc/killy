@@ -68,8 +68,8 @@ On a `kill` command `{id, ppid, starttime}`:
 4. Refuse (outcome `refused` with a reason, no signal) when any of these holds:
    - the process has no zombie children any more (`not_a_zombie_parent`),
    - `ppid` is 1, the agent itself, or an ancestor of the agent (`protected`),
-   - demo mode is on and the process is not in the cgroup of the `killy-summon.service` systemd unit, read from `/proc/<ppid>/cgroup` (`not_demo`).
-5. Send `SIGKILL` through the pidfd (`pidfd_send_signal`). If the PID was reused after step 2, the pidfd still refers to the old process, so the signal cannot reach the new one. On error → outcome `signal_failed` with the errno.
+   - demo mode is on and the process's cgroup (the `0::` line of `/proc/<ppid>/cgroup`, cgroup v2) is not exactly `/system.slice/killy-summon.service` (`not_demo`). The match is exact: a user's own unit with the same name lives under `/user.slice/…` and does not count.
+5. Send `SIGKILL` through the pidfd (`pidfd_send_signal`). If the PID was reused after step 2, the pidfd still refers to the old process, so the signal cannot reach the new one. If the process has exited since step 3 (`ESRCH`) → `already_gone`; on any other error → `signal_failed` with the errno.
 6. Poll for up to 5 s until none of the former zombies remain → outcome `killed` with the number reaped; otherwise `zombies_remain`.
 7. Store the outcome under `id` in `/var/lib/killy/outcomes.jsonl` (append-only, mode 0600, never expired, so a repeated `id` is recognised even after the agent restarts) and post it.
 
