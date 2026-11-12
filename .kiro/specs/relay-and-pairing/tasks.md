@@ -2,18 +2,18 @@
 
 各トップレベルのタスクが 1 つの issue と 1 つの PR に当たる。テストは実装より先に書き、期待した理由で赤になることを確かめる。完了条件の正は各 issue。DB のテストは本物の PostgreSQL で動かし、skip されずに実行されたログを各 PR の本文に載せる。
 
-- [ ] 1. agent を登録し、ペアリングコードを発行する（#6。前提：agent-process-control の 1）
-  - [ ] 1.1 `killy server` の起動、`Store`（pgx の pool）、goose の migration（agents）と、DB のテストの土台（`KILLY_TEST_DATABASE_URL`）を作る。migration の失敗で元に戻ることと、2 回流して成功することのテストを書く
+- [x] 1. agent を登録し、ペアリングコードを発行する（#6。前提：agent-process-control の 1）
+  - [x] 1.1 `killy server` の起動、`Store`（pgx の pool）、goose の migration（agents）と、DB のテストの土台（`KILLY_TEST_DATABASE_URL`）を作る。migration の失敗で元に戻ることと、2 回流して成功することのテストを書く
     - _Requirements: 1.14, 1.15, 1.16_
-  - [ ] 1.2 `RateLimiter` と `ClientAddr` のテストを書き、実装する
+  - [x] 1.2 `RateLimiter` と `ClientAddr` のテストを書き、実装する
     - _Requirements: 1.7, 1.8_
-  - [ ] 1.3 `POST /agent/v1/pairings` と `PairingCodes` のテスト（初回・token 付き・不正な token・文字種・期限の前とちょうどと後・`429`・token の保存の形）を書き、赤を確かめる
+  - [x] 1.3 `POST /agent/v1/pairings` と `PairingCodes` のテスト（初回・token 付き・不正な token・文字種・期限の前とちょうどと後・`429`・token の保存の形）を書き、赤を確かめる
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7_
-  - [ ] 1.4 handler と `PairingCodes` を実装し、テストを緑にする
+  - [x] 1.4 handler と `PairingCodes` を実装し、テストを緑にする
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7_
-  - [ ] 1.5 `killy agent pair`（`agent.json` の中身と mode、2 回目は保存した URL に送る、`--server` の食い違い、表示、`429`）のテストを書き、実装する
+  - [x] 1.5 `killy agent pair`（`agent.json` の中身と mode、2 回目は保存した URL に送る、`--server` の食い違い、表示、`429`）のテストを書き、実装する
     - _Requirements: 1.9, 1.10, 1.11, 1.12, 1.13_
-  - [ ] 1.6 `go vet ./...` と `go test ./...` を通し、手元で `killy server` と `killy agent pair` を 2 回動かして agent が 1 つのままであることを PR 本文に書く
+  - [x] 1.6 `go vet ./...` と `go test ./...` を通し、手元で `killy server` と `killy agent pair` を 2 回動かして agent が 1 つのままであることを PR 本文に書く
     - _Requirements: 1.1, 1.2_
 
 - [ ] 2. agent が snapshot を報告し、Killy server が最新状態を持つ（#7。前提：#4、#6）

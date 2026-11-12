@@ -39,7 +39,7 @@ flowchart LR
 
 ### Store（`internal/server/store`）
 
-`pgx/v5` の pool で PostgreSQL につなぐ。migration は `goose` で、`migrations/*.sql` を `embed` してバイナリに入れ、`killy server` の起動時に流す（[ARCHITECTURE: Go dependencies](../../../docs/ARCHITECTURE.md#go-dependencies)）。
+`pgx/v5` の pool で PostgreSQL につなぐ。`killy server` は `KILLY_DATABASE_URL` で DB を、`--listen`（既定 `:8080`）で待ち受けるアドレスを受け取る。初回登録の `hostname` は前後の空白を除いて 1〜255 バイトで、それ以外は `400`。migration は `goose` で、`migrations/*.sql` を `embed` してバイナリに入れ、`killy server` の起動時に流す（[ARCHITECTURE: Go dependencies](../../../docs/ARCHITECTURE.md#go-dependencies)）。
 
 ```mermaid
 erDiagram
@@ -115,15 +115,17 @@ agent ごとに命令の stream を 1 つ持つ。`Kill(ctx, agentID, cmd)` は�
 
 接続元は `ClientAddr(r)`（`CF-Connecting-IP`、無ければ `r.RemoteAddr` のホスト）。時刻は `Clock` から取る。
 
+窓はキーの最初の要求で始まり、期間のちょうど終わりの時刻の要求は新しい窓に入る。断った要求は数えず、窓も動かさない。初回登録では、本文を確かめてから数えるので、`400` になる要求は数えない。数えた後に DB で失敗した登録（`503`）は数えたままにする（DB が落ちている間に回数制限が外れないように）。
+
 ### PairingCodes（`internal/server/pairing`）
 
-コード → `{agentID, expiresAt, used}` をメモリに持つ。`crypto/rand` で英大文字と数字の 6 文字を作り、重なれば作り直す。claim は mutex の中で「有効か」を確かめて「使用済み」にし、同じコードの同時の claim を 1 つにする。
+コード → `{agentID, expiresAt, used}` をメモリに持つ。`crypto/rand` で英大文字と数字の 6 文字を作り、まだ持っているコードと重なれば作り直す。発行からちょうど 10 分の時刻で期限切れになる。同じ agent に新しいコードを出すと、その agent の前のコードは使えなくなる（持つコードを agent ごとに 1 つにし、token を持つ agent が要求を繰り返してもメモリが増えないようにするため）。期限切れのコードは、遅れた claim に `code_expired` を返せるよう、さらに 1 時間持ってから捨てる。claim は mutex の中で「有効か」を確かめて「使用済み」にし、同じコードの同時の claim を 1 つにする。
 
 ### agent（`internal/agent`）
 
 | 部品 | 役割 |
 |---|---|
-| `pair` | `agent.json` が無ければ token なしで `--server` に送り、token と URL を mode 0600 で保存する。あれば保存した URL に token を付けて送り、`--server` が保存した URL と違えば何も送らずに止める（別の Killy server に token を送らないため）。コードと agent の ID を表示する |
+| `pair` | `agent.json`（`{"server", "token"}`、置き場所は `--config` で変えられ、既定は `/etc/killy/agent.json`）が無ければ token なしで `--server` に送り、token と URL を mode 0600 で保存する（一時ファイルに書いて rename）。URL は https か、localhost への http だけを受け付け、redirect には従わない（token を暗号化されない経路や別の宛先に流さないため）。初回は、`agent.json` を書けることを登録の前に確かめる（token は一度しか返らないので、保存できない登録は使えない agent を残し、初回登録の回数も使うため）。あれば保存した URL に token を付けて送り、`--server` が保存した URL と違えば何も送らずに止める（別の Killy server に token を送らないため）。コードと agent の ID を表示する |
 | `run` | `agent.json` から URL と token を読む（unit に `--server` は要らない）。`agent.json` が無ければ、先に `killy agent pair` を実行するよう出して止める |
 | `Reporter` | 5 秒ごとに `Scanner.Scan`。前回と親の集合が違えばすぐ、同じでも 15 秒ごとに送る |
 | `CommandClient` | 命令の stream を開き続け、切れたら `Backoff`（1・2・4・8・16・30 秒の基準値に揺らぎ）で再接続する。`kill` を `Killer` に渡し、結果を送る |
