@@ -1,0 +1,615 @@
+openapi: 3.1.0
+info:
+  title: Killy server API
+  version: 1.0.0
+  license:
+    name: MIT
+    identifier: MIT
+  description: |
+    Source of truth for the request and response shapes, status codes and
+    error codes of the Killy server. Which component calls what, the
+    timings and the safety checks are in ARCHITECTURE.md; this file only
+    fixes the wire format.
+
+    Every error response has the body `{"error": "<code>"}`. Kill outcomes,
+    including `unknown`, are not errors and are returned with `200`.
+servers:
+  - url: https://killy.sumire.pink
+    description: production
+  - url: https://stg-killy.sumire.pink
+    description: staging
+tags:
+  - name: agent
+    description: Called by `killy agent` with the agent token
+  - name: app
+    description: Called by the mobile app with the device token
+
+paths:
+  /agent/v1/pairings:
+    post:
+      operationId: createPairing
+      tags: [agent]
+      summary: Register an agent (no token) or get a new pairing code (agent token)
+      description: |
+        Without a token this registers a new agent; it is open to anyone and
+        limited to 10 first-run registrations per hour per client address.
+        With the agent token it returns a new code for the same agent and is
+        not counted against that limit.
+      security:
+        - {}
+        - agentToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PairingRequest' }
+      responses:
+        '200':
+          description: Code issued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PairingResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /agent/v1/commands:
+    get:
+      operationId: streamCommands
+      tags: [agent]
+      summary: Stream of commands for this agent (SSE)
+      description: |
+        Server-sent events. Events (data schemas in `x-sse-events`):
+        - `kill`, data `KillCommand`
+        - `ping`, data `PingCommand`
+        A comment line `: hb` is sent every 20 s.
+      security:
+        - agentToken: []
+      responses:
+        '200':
+          description: Event stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+              x-sse-events:
+                kill: { $ref: '#/components/schemas/KillCommand' }
+                ping: { $ref: '#/components/schemas/PingCommand' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /agent/v1/snapshots:
+    post:
+      operationId: postSnapshot
+      tags: [agent]
+      summary: Report the full set of parents with zombies
+      description: |
+        A full replacement, never a diff. A snapshot whose `scanned_at` is
+        older than the last accepted one from the same agent is discarded but
+        still answered with `204`, so the agent does not resend it.
+      security:
+        - agentToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Snapshot' }
+      responses:
+        '204': { description: Accepted (or discarded as late) }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /agent/v1/results:
+    post:
+      operationId: postResult
+      tags: [agent]
+      summary: Return the result of a kill or ping command
+      security:
+        - agentToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CommandResult' }
+      responses:
+        '204': { description: Delivered to the waiting request }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: No request is waiting for this `id` from this agent (`command_not_found`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /app/v1/devices:
+    post:
+      operationId: registerDevice
+      tags: [app]
+      summary: Register this phone
+      description: Open to anyone; limited to 10 registrations per hour per client address.
+      security:
+        - {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeviceRequest' }
+      responses:
+        '200':
+          description: Device registered
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /app/v1/devices/me:
+    patch:
+      operationId: updateDevice
+      tags: [app]
+      summary: Change the app-wide notification switch or refresh the push token
+      security:
+        - deviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DevicePatch' }
+      responses:
+        '204': { description: Updated }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /app/v1/pairings/claim:
+    post:
+      operationId: claimPairing
+      tags: [app]
+      summary: Link this phone to an agent with a pairing code
+      description: |
+        Succeeds as soon as the code is valid, without waiting for the agent.
+        After 10 failed claims in 10 minutes from one client address, every
+        claim from that address gets `429` until the window passes, even with
+        a valid code; `429` answers are not counted as failures.
+      security:
+        - deviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClaimRequest' }
+      responses:
+        '200':
+          description: The added server
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Server' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: No such code (`code_unknown`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: The code was already used (`code_used`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '410':
+          description: The code has expired (`code_expired`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /app/v1/demo:
+    post:
+      operationId: addDemoServer
+      tags: [app]
+      summary: Link this phone to the public demo server
+      description: Links the agent named by `KILLY_DEMO_AGENT_ID`. Calling it again keeps one link.
+      security:
+        - deviceToken: []
+      responses:
+        '200':
+          description: The demo server
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Server' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: No demo server is configured, or it names an unknown agent (`demo_not_configured`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /app/v1/events:
+    get:
+      operationId: streamEvents
+      tags: [app]
+      summary: Live state of every server linked to this phone (SSE)
+      description: |
+        Server-sent events. The first event after (re)connecting is the full
+        current state. Event `state`, data `State`, sent again whenever the
+        state of a linked server changes. A comment line `: hb` is sent every
+        20 s.
+      security:
+        - deviceToken: []
+      responses:
+        '200':
+          description: Event stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+              x-sse-events:
+                state: { $ref: '#/components/schemas/State' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /app/v1/servers/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ServerId'
+    patch:
+      operationId: updateServer
+      tags: [app]
+      summary: Rename or mute a server for this phone only
+      security:
+        - deviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ServerPatch' }
+      responses:
+        '204': { description: Updated }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ServerNotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+    delete:
+      operationId: removeServer
+      tags: [app]
+      summary: Unlink this phone from the server
+      security:
+        - deviceToken: []
+      responses:
+        '204': { description: Unlinked }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ServerNotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /app/v1/servers/{id}/check:
+    parameters:
+      - $ref: '#/components/parameters/ServerId'
+    post:
+      operationId: checkServer
+      tags: [app]
+      summary: Check that a command can reach the agent and come back
+      description: |
+        Sends a ping over the agent's command stream and waits up to 5 s. A
+        check within 2 s of the previous one for the same server sends no
+        ping and returns the result of the check in progress or of the last
+        one.
+      security:
+        - deviceToken: []
+      responses:
+        '200':
+          description: Result of the check
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ServerNotFound' }
+
+  /app/v1/kills:
+    post:
+      operationId: killParent
+      tags: [app]
+      summary: Kill a parent with zombies on a linked server
+      description: |
+        Waits for the agent's result for up to 10 s. When the agent is not
+        connected or no result arrives in time, the outcome is `unknown`.
+        Two requests with the same `id` arriving together send one command
+        and both get its result. Limited to 30 requests per minute per
+        device; every authenticated request counts, `429` answers do not.
+      security:
+        - deviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/KillRequest' }
+      responses:
+        '200':
+          description: The outcome of the kill
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KillResponse' }
+        '400':
+          description: The body is invalid (`invalid_request`) or `id` is not a lower-case UUID v4 (`invalid_id`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ServerNotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+components:
+  securitySchemes:
+    agentToken:
+      type: http
+      scheme: bearer
+      description: Agent token returned by the first `POST /agent/v1/pairings`
+    deviceToken:
+      type: http
+      scheme: bearer
+      description: Device token returned by `POST /app/v1/devices`
+
+  parameters:
+    ServerId:
+      name: id
+      in: path
+      required: true
+      description: The server id, which is the agent ID
+      schema: { type: string, format: uuid }
+
+  responses:
+    InvalidRequest:
+      description: The body is not valid (`invalid_request`)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: The token is missing or invalid (`unauthorized`)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    RateLimited:
+      description: A rate limit is in effect (`rate_limited`)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ServerNotFound:
+      description: |
+        The server is not linked to this phone (`server_not_found`). An
+        unlinked server and an unknown one are not told apart.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unavailable:
+      description: The server cannot reach its database (`unavailable`)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          enum:
+            - invalid_request
+            - unauthorized
+            - rate_limited
+            - unavailable
+            - code_unknown
+            - code_used
+            - code_expired
+            - invalid_id
+            - server_not_found
+            - command_not_found
+            - demo_not_configured
+
+    KillId:
+      type: string
+      description: Lower-case UUID v4 chosen by the phone (version digit 4, variant bits 10)
+      pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+
+    PairingRequest:
+      type: object
+      required: [hostname]
+      properties:
+        hostname: { type: string }
+
+    PairingResponse:
+      type: object
+      required: [agent_id, code]
+      properties:
+        agent_token:
+          type: string
+          description: Returned only on the first registration (no token sent)
+        agent_id: { type: string, format: uuid }
+        code:
+          type: string
+          pattern: '^[A-Z0-9]{6}$'
+          description: Valid for 10 minutes, usable once
+
+    Parent:
+      type: object
+      required: [pid, starttime, cmd, zombies]
+      properties:
+        pid: { type: integer }
+        starttime:
+          type: integer
+          format: int64
+          description: Field 22 of /proc/<pid>/stat
+        cmd: { type: string }
+        zombies:
+          type: array
+          items: { type: integer }
+
+    Snapshot:
+      type: object
+      required: [hostname, version, scanned_at, parents]
+      properties:
+        hostname: { type: string }
+        version: { type: string }
+        scanned_at: { type: string, format: date-time }
+        parents:
+          type: array
+          items: { $ref: '#/components/schemas/Parent' }
+
+    KillCommand:
+      type: object
+      description: Data of the `kill` event on the agent's command stream
+      required: [id, ppid, starttime]
+      properties:
+        id: { $ref: '#/components/schemas/KillId' }
+        ppid: { type: integer }
+        starttime: { type: integer, format: int64 }
+
+    PingCommand:
+      type: object
+      description: Data of the `ping` event on the agent's command stream
+      required: [id]
+      properties:
+        id: { type: string }
+
+    Outcome:
+      type: string
+      enum: [killed, already_gone, refused, signal_failed, zombies_remain, unknown]
+      description: |
+        `unknown` is made by the server only. The PRD's "failed" covers
+        `signal_failed` and `zombies_remain`.
+
+    CommandResult:
+      type: object
+      required: [id, type]
+      properties:
+        id: { type: string }
+        type:
+          type: string
+          enum: [kill, pong]
+        outcome: { $ref: '#/components/schemas/Outcome' }
+        reaped:
+          type: integer
+          description: Number of zombies reaped, for `killed`
+        reason:
+          type: string
+          description: |
+            For `refused`: pid_reused, not_a_zombie_parent, protected, not_demo
+            or pidfd_unavailable. For `signal_failed`: the errno name, e.g.
+            EPERM.
+        version:
+          type: string
+          description: Agent version, for `pong`
+
+    DeviceRequest:
+      type: object
+      properties:
+        push_token:
+          type: string
+          description: Optional; a phone without notifications can still pair and fight
+
+    DeviceResponse:
+      type: object
+      required: [device_token]
+      properties:
+        device_token: { type: string }
+
+    DevicePatch:
+      type: object
+      properties:
+        push_token: { type: string }
+        notify:
+          type: boolean
+          description: App-wide notification switch
+
+    ClaimRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          pattern: '^[A-Z0-9]{6}$'
+        name:
+          type: string
+          description: Display name for this phone; the hostname is used when omitted
+
+    Server:
+      type: object
+      required: [id, name, hostname, notify]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: The agent ID
+        name:
+          type: string
+          description: Display name on this phone
+        hostname: { type: string }
+        notify:
+          type: boolean
+          description: This server's notification switch on this phone
+
+    ServerState:
+      allOf:
+        - $ref: '#/components/schemas/Server'
+        - type: object
+          required: [disconnected, parents]
+          properties:
+            disconnected:
+              type: boolean
+              description: No snapshot for 60 s, or none since the server started
+            parents:
+              type: array
+              items:
+                allOf:
+                  - $ref: '#/components/schemas/Parent'
+                  - type: object
+                    required: [first_detected_at]
+                    properties:
+                      first_detected_at: { type: string, format: date-time }
+
+    State:
+      type: object
+      description: Data of the `state` event; replaces what the phone had
+      required: [servers]
+      properties:
+        servers:
+          type: array
+          items: { $ref: '#/components/schemas/ServerState' }
+
+    ServerPatch:
+      type: object
+      properties:
+        name:
+          type: string
+          description: An empty name keeps the previous one
+        notify: { type: boolean }
+
+    CheckResponse:
+      type: object
+      required: [result]
+      properties:
+        result:
+          type: string
+          enum: [ok, agent_disconnected, no_response]
+        version:
+          type: string
+          description: Agent version, for `ok`
+
+    KillRequest:
+      type: object
+      required: [id, server_id, ppid, starttime]
+      properties:
+        id: { $ref: '#/components/schemas/KillId' }
+        server_id: { type: string, format: uuid }
+        ppid: { type: integer }
+        starttime: { type: integer, format: int64 }
+
+    KillResponse:
+      type: object
+      required: [outcome]
+      properties:
+        outcome: { $ref: '#/components/schemas/Outcome' }
+        reaped: { type: integer }
+        reason:
+          type: string
+          description: As in `CommandResult`, or `agent_disconnected` / `timeout` for `unknown`

@@ -37,7 +37,7 @@ Killy is our entry to the **Kiroween 2026** hackathon in the **Frankenstein** ca
 
 ### Duplicates and identity
 
-- A kill request carries an ID (a UUID v4) chosen by the phone. Sending the same ID again, at any later time and even after the agent restarts, never sends a second signal; it returns the outcome of the first.
+- A kill request carries an ID (a UUID v4) chosen by the phone. Sending the same ID again, at any later time and even after the agent restarts, never sends a second signal; it returns the outcome of the first. The one exception: if the agent cannot record the outcome (the write fails, or the agent stops between signalling and recording), a repeated ID is handled as new; the agent still re-verifies the target, so only a parent that still qualifies can be signalled again.
 - If the parent is already gone when a kill arrives, or has already been killed and is waiting to be reaped, no signal is sent and the outcome is "already gone". Two kills of the same parent arriving together send one signal: the first is "killed", the other "already gone".
 - A pairing code can be used once and expires 10 minutes after it is shown.
 - A parent is identified by server, PID and process start time, so a reused PID is treated as a new parent.

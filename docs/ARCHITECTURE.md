@@ -71,7 +71,7 @@ On a `kill` command `{id, ppid, starttime}`:
    - demo mode is on and the process's cgroup (the `0::` line of `/proc/<ppid>/cgroup`, cgroup v2) is not exactly `/system.slice/killy-summon.service` (`not_demo`). The match is exact: a user's own unit with the same name lives under `/user.slice/…` and does not count.
 5. Send `SIGKILL` through the pidfd (`pidfd_send_signal`). If the PID was reused after step 2, the pidfd still refers to the old process, so the signal cannot reach the new one. If the process has exited since step 3 (`ESRCH`) → `already_gone`; on any other error → `signal_failed` with the errno.
 6. Poll for up to 5 s until none of the former zombies remain → outcome `killed` with the number reaped; otherwise `zombies_remain`.
-7. Store the outcome under `id` in `/var/lib/killy/outcomes.jsonl` (append-only, mode 0600, never expired, so a repeated `id` is recognised even after the agent restarts) and post it.
+7. Store the outcome under `id` in `/var/lib/killy/outcomes.jsonl` (append-only, mode 0600, never expired, so a repeated `id` is recognised even after the agent restarts) and post it. If the write fails, the agent logs it and posts the outcome anyway; it does not retry the write. The outcome is still kept in memory, so the same `id` arriving again before the agent restarts gets that outcome without a second signal. The PRD accepts that such an `id`, or one whose agent stopped between steps 5 and 7, may be handled again.
 
 The pidfd calls are made directly through the `syscall` package: `os.Process.Signal` silently falls back to signalling by PID when pidfd is missing. At startup the agent checks that pidfd is available and logs an error if it is not.
 
@@ -113,14 +113,15 @@ Attempts spread over many addresses are not stopped by this; add Cloudflare rate
 | Notified `(parent, device)` pairs | PostgreSQL | No |
 | Pairing codes | Memory | Yes (operator re-runs `pair`) |
 | Latest snapshot and last snapshot time per agent, open SSE streams, pending commands, rate-limit counters | Memory | Yes (rebuilt as agents reconnect and report) |
+| Failed push attempts per `(parent, device)` | Memory | Yes (counting starts again; the limit still applies after the restart) |
 
-PostgreSQL is the only persistent store; the server keeps no files of its own. The schema is changed only by migrations embedded in the binary and applied when `killy server` starts. When a parent leaves an agent's snapshot, its first-detection time and notified pairs are deleted. A snapshot whose `scanned_at` is older than the last one accepted from the same agent is discarded, so a late report cannot bring back a parent that is gone.
+PostgreSQL is the only persistent store; the server keeps no files of its own. The schema is changed only by migrations embedded in the binary and applied when `killy server` starts. When a parent leaves an agent's snapshot, its first-detection time, notified pairs and failed push attempts are deleted. A snapshot whose `scanned_at` is older than the last one accepted from the same agent is discarded, so a late report cannot bring back a parent that is gone. The discarded snapshot is still answered with success, so the agent does not resend it; if the agent's clock steps back, its reports are ignored until the clock catches up and the agent looks disconnected meanwhile, which is accepted.
 
 Tokens are 32 random bytes; only their SHA-256 is stored.
 
 ### Notifications
 
-For each parent in a snapshot, the server sends one push to every linked device that has a push token, has both the app switch and the server switch on, and has not yet been notified of that parent. Because the notified pairs of a parent are deleted when it leaves the snapshot, a parent that comes back with zombies is notified again (a new episode); keeping them forever would let the table grow without end. The `(parent, device)` pair is recorded only after Expo Push Service accepts the push; if sending fails, nothing is recorded and the next snapshot (at most 15 s later) tries again. If the server stops after Expo accepts a push but before the pair is recorded, that one push is sent again after the restart. The notification text is specified in DESIGN.md ("Push notification"). Pushes are sent whether or not the app is open; the app does not display them while it is in the foreground, so the server does not need to know which phones have the app open.
+For each parent in a snapshot, the server sends one push to every linked device that has a push token, has both the app switch and the server switch on, and has not yet been notified of that parent. Because the notified pairs of a parent are deleted when it leaves the snapshot, a parent that comes back with zombies is notified again (a new episode); keeping them forever would let the table grow without end. The `(parent, device)` pair is recorded only after Expo Push Service accepts the push; if sending fails, nothing is recorded and the next snapshot (at most 15 s later) tries again. Retries are bounded so a lasting failure does not loop: when Expo reports that the push token is no longer valid (`DeviceNotRegistered`), the device's push token is removed and nothing more is sent to it until the app registers a new one; any other failure is retried with at most 3 later snapshots, after which the pair is recorded as notified and the push is given up. If the server stops after Expo accepts a push but before the pair is recorded, that one push is sent again after the restart. The notification text is specified in DESIGN.md ("Push notification"). Pushes are sent whether or not the app is open; the app does not display them while it is in the foreground, so the server does not need to know which phones have the app open.
 
 ### Commands
 
@@ -150,25 +151,27 @@ The connection check is the same exchange with `ping {id}` / `pong {id, version}
 
 All bodies are JSON. Agents authenticate with `Authorization: Bearer <agent token>`, phones with `Authorization: Bearer <device token>`.
 
+The request and response shapes, status codes and error codes are specified in [openapi.yaml](openapi.yaml), which is their source of truth. Every error has the body `{"error": "<code>"}`; kill outcomes, including `unknown`, are `200` responses, not errors. The tables below say what each endpoint is for.
+
 ### Agent API
 
 | Method and path | Purpose |
 |---|---|
-| `POST /agent/v1/pairings` | `{hostname}`. With no token: register (first run) and return an agent token, the agent ID and a code. With the agent token: return the agent ID and a new code |
+| `POST /agent/v1/pairings` | With no token: register (first run) and get an agent token, the agent ID and a code. With the agent token: get the agent ID and a new code |
 | `GET /agent/v1/commands` | SSE stream of `kill` and `ping` events |
-| `POST /agent/v1/snapshots` | `{hostname, version, scanned_at, parents: [{pid, starttime, cmd, zombies: [pid]}]}` |
-| `POST /agent/v1/results` | `{id, type: kill \| pong, outcome, reaped, reason, version}` |
+| `POST /agent/v1/snapshots` | Report the full set of parents with zombies |
+| `POST /agent/v1/results` | Return the result of a `kill` or `ping` |
 
 ### App API
 
 | Method and path | Purpose |
 |---|---|
-| `POST /app/v1/devices` | Register the device: `{push_token?}` → device token. The push token is optional, so a phone without notifications can still pair and fight |
+| `POST /app/v1/devices` | Register the device and get a device token. The push token is optional, so a phone without notifications can still pair and fight |
 | `PATCH /app/v1/devices/me` | App-wide notification switch, push token refresh |
-| `POST /app/v1/pairings/claim` | `{code, name?}` → the added server |
+| `POST /app/v1/pairings/claim` | Link this device to an agent with a pairing code |
 | `POST /app/v1/demo` | Add the public demo server (the agent named by `KILLY_DEMO_AGENT_ID`; fails when it is unset) |
 | `GET /app/v1/events` | SSE stream: `state` events with every linked server and its parents, each parent with its first-detection time (the app orders the battle queue by it, oldest first) |
-| `PATCH /app/v1/servers/{id}` | `{name?, notify?}` for this device's link only |
+| `PATCH /app/v1/servers/{id}` | Rename or mute the server, for this device's link only |
 | `DELETE /app/v1/servers/{id}` | Unlink this device from the server |
 | `POST /app/v1/servers/{id}/check` | Connection check (see Commands) |
 | `POST /app/v1/kills` | Kill (see Commands) |
@@ -278,6 +281,6 @@ killy/
 ├── mobile/           # Expo app
 ├── deploy/           # kustomize base and overlays (stg, prd), applied by Argo CD
 │   └── systemd/      # units for the agent and summon on Linux servers
-├── docs/             # PRD, ARCHITECTURE, DESIGN
+├── docs/             # PRD, ARCHITECTURE, DESIGN, openapi.yaml
 └── mock/             # HTML prototype of the app (reference, not shipped)
 ```

@@ -79,7 +79,7 @@ erDiagram
 
 ### LiveState（`internal/server/live`）
 
-agent ごとに最新の snapshot、最後に受け付けた `scanned_at`、最後に受け取った時刻を持つ。snapshot を受けたら、前回との差から first_detections を足し・消す。再起動後の最初の snapshot では、DB にあって snapshot に無い親を消す。1 秒ごとの ticker で 60 秒の切断の判定をし、切断と接続の変化を `Broker` に知らせる。
+agent ごとに最新の snapshot、最後に受け付けた `scanned_at`、最後に受け取った時刻を持つ。snapshot を受けたら、前回との差から first_detections を足し・消す。`scanned_at` が前回より古い snapshot は捨てるが、`204` を返して agent に送り直させない（#1 の D25）。再起動後の最初の snapshot では、DB にあって snapshot に無い親を消す。1 秒ごとの ticker で 60 秒の切断の判定をし、切断と接続の変化を `Broker` に知らせる。
 
 ### Broker（`internal/server/sse`）
 
@@ -132,27 +132,14 @@ agent ごとに命令の stream を 1 つ持つ。`Kill(ctx, agentID, cmd)` は�
 
 | 起きたこと | 扱い |
 |---|---|
-| DB に届かない | 起動時はエラーで止める。動いている間は、その要求に `503` を返す |
+| DB に届かない | 起動時はエラーで止める。動いている間は、その要求に `503`（`unavailable`）を返す |
 | agent の stream が切れた | `CommandRouter` から外し、待っている kill は 10 秒の期限で `timeout` になる |
-| 結果の POST が、待っていない `id` | `404` を返し、何もしない |
+| 結果の POST が、待っていない `id` | `404`（`command_not_found`）を返し、何もしない |
 | SSE の書き込みが失敗 | その stream を閉じ、`Broker` から外す。phone が再接続する |
 
 ### Error responses
 
-エラーの本文は `{"error": "<code>"}` にそろえ、app はこの `code` で文言を選ぶ（mobile-battle-slice の `ClaimError`）。ARCHITECTURE には形が無いので、ここを正にする。
-
-| 要求 | 起きたこと | status | `error` |
-|---|---|---|---|
-| token が要る要求（初回登録と device の登録を除くすべて） | token が無い・不正 | `401` | `unauthorized` |
-| どれも | 回数制限 | `429` | `rate_limited` |
-| どれも | DB に届かない | `503` | `unavailable` |
-| `POST /app/v1/pairings/claim` | コードが存在しない | `404` | `code_unknown` |
-| 同上 | コードが使用済み | `409` | `code_used` |
-| 同上 | コードが期限切れ | `410` | `code_expired` |
-| `POST /app/v1/kills` | `id` が UUID v4 でない | `400` | `invalid_id` |
-| 同上 | サーバーが紐付いていない（存在しないことと区別しない） | `404` | `server_not_found` |
-
-kill の outcome（`unknown` を含む）は、エラーではなく `200` の本文 `{outcome, reaped, reason}` で返す（[ARCHITECTURE: Commands](../../../docs/ARCHITECTURE.md#commands)）。`signal_failed` の errno は `reason` に名前で入る（agent-process-control の Requirement 2.12）。
+status と `error` の値の正は [openapi.yaml](../../../docs/openapi.yaml)（#1 の D26）。handler はそこにある値だけを返し、app（mobile-battle-slice の `ClaimError`）も同じ値で文言を選ぶ。kill の outcome（`unknown` を含む）はエラーではなく `200` で返し、`signal_failed` の errno は `reason` に名前で入る（agent-process-control の Requirement 2.12）。
 
 ## Testing Strategy
 

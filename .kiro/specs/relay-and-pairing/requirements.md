@@ -52,7 +52,7 @@ Killy server が agent と phone の間を中継する部分。agent の登録�
 4. WHEN snapshot が届く THEN Killy server SHALL その agent の前の snapshot を丸ごと置き換える
 5. THE Killy server SHALL 親 `(agent, pid, starttime)` ごとに最初の検出時刻を DB に持ち、同じ親では何度報告されても変えず、再起動の後も変えない
 6. WHEN 親が snapshot から消える THEN Killy server SHALL その親の最初の検出時刻を消す。Killy server が止まっている間に消えた親も、再起動後のその agent の最初の snapshot に無ければ消す
-7. IF snapshot の `scanned_at` が同じ agent から最後に受け付けたものより古い THEN Killy server SHALL それを捨てる
+7. IF snapshot の `scanned_at` が同じ agent から最後に受け付けたものより古い THEN Killy server SHALL それを捨て、成功（`204`）を返す。agent はそれを送り直さない
 8. IF snapshot の agent token が不正である THEN Killy server SHALL `401` を返し、状態を変えない
 9. THE Killy server SHALL 最後の snapshot から 60 秒たった agent と、snapshot を一度も送っていない agent を、切断とみなす
 10. WHEN `killy agent run` が起動する THEN agent SHALL pidfd が使えるかを確かめる
@@ -71,7 +71,7 @@ Killy server が agent と phone の間を中継する部分。agent の登録�
 2. IF 同じ接続元からの device の登録が 1 時間に 10 回に達している THEN Killy server SHALL 期間が過ぎるまで `429` を返し、device を作らない。数えるのは受け付けた登録だけで、`429` で断った要求は数えない
 3. WHEN 有効なコードで `POST /app/v1/pairings/claim` `{code, name?}` が届く THEN Killy server SHALL agent を待たずに device と agent を紐付け、サーバー（`id` は agent の ID）を返す
 4. IF `name` が無い THEN Killy server SHALL 登録時の hostname を表示名にする
-5. IF コードが存在しない・使用済み・期限切れのどれかである THEN Killy server SHALL 紐付けを作らず、design の「Error responses」の表のとおり、どれかが分かるエラーを返す
+5. IF コードが存在しない・使用済み・期限切れのどれかである THEN Killy server SHALL 紐付けを作らず、[openapi.yaml](../../../docs/openapi.yaml) のとおり、どれかが分かるエラーを返す
 6. WHEN 同じコードの claim が同時に 2 つ届く THEN Killy server SHALL 紐付けを 1 つだけ作る
 7. THE Killy server SHALL 表示名とサーバーごとの通知の設定を紐付けごとに持ち、同じ agent を複数の device が紐付けられるようにする
 8. IF 同じ接続元からの claim の失敗が 10 分に 10 回に達している THEN Killy server SHALL 期間が過ぎるまで、その接続元からの claim をすべて `429` にする（正しいコードでも）。`429` で断った claim は失敗として数えない

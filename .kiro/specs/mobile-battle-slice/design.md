@@ -57,7 +57,7 @@ interface KillyClient {
 }
 ```
 
-- エラーは本文の `error` で見分ける。値と status は relay-and-pairing の design の「Error responses」を正にする
+- エラーは本文の `error` で見分ける。値と status の正は [openapi.yaml](../../../docs/openapi.yaml)
 - SSE の受信は `react-native-sse` か `expo/fetch` の streaming のどちらかで作り、選んだ理由を #12 の PR 本文に書く
 - 再接続の待ち時間は `backoff(n, rand)` の純粋な関数にする（1・2・4・8・16・30・30 秒の基準値に揺らぎ）
 - `kill` は応答が得られないときだけ同じ `id` で 1 回送り直す。`429` やほかの応答では送り直さない
