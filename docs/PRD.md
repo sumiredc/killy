@@ -126,6 +126,7 @@ The operator wants the zombies gone.
 - Exception: the signal fails (e.g. permission denied) → the error is shown; the parent stays.
 - Exception: the server's agent is not connected, or no outcome arrives within 10 seconds → "unknown"; the app refreshes from the latest snapshot.
 - Exception: the phone gets no response from the Killy server → the app resends the same kill (same ID) once; if that also fails, it says so under the kill button and the button can be held again.
+- Exception: the phone has sent too many kills in a short time (far more than holding the button allows) → nothing is sent to the agent; the app asks to wait under the kill button.
 - Postconditions on success: the parent process no longer exists on the server; its zombies are no longer in the process table; the server's zombie count in Settings is updated.
 - Postconditions in all cases: no process other than the shown parent received a signal.
 

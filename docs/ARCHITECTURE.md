@@ -89,12 +89,15 @@ The agent needs permission to signal other users' processes: run it as root unde
 
 #### Rate limits
 
-Counted per client address (`CF-Connecting-IP`; when the header is missing, as when the server runs locally without Cloudflare, the TCP peer address), in memory; a restart resets them, which is enough against short bursts.
+Counted per client address (`CF-Connecting-IP`; when the header is missing, as when the server runs locally without Cloudflare, the TCP peer address), in memory; a restart resets them, which is enough against short bursts. Kill requests are counted per device instead, because a device token is required to send them.
 
 | Request | Limit | Over the limit |
 |---|---|---|
-| Failed claims (unknown, used or expired code) | 10 per 10 min | `429`; the app asks to wait and try again |
-| First-run registrations | 10 per hour | `429`; `killy agent pair` asks to wait |
+| Failed claims (unknown, used or expired code) | 10 per 10 min per client address | `429` for every claim from that address, even one with a valid code, until the window passes; the app asks to wait and try again |
+| First-run registrations | 10 per hour per client address | `429`; `killy agent pair` asks to wait |
+| Kill requests (`POST /app/v1/kills`) | 30 per minute per device | `429`; nothing is sent to the agent, the app shows it under the kill button and does not resend |
+
+The kill limit is far above what holding the button for 1 s allows, and it bounds how fast anyone can grow an agent's stored outcomes (which never expire) through the public demo.
 
 Attempts spread over many addresses are not stopped by this; add Cloudflare rate limiting if that happens.
 
@@ -189,6 +192,7 @@ All bodies are JSON. Agents authenticate with `Authorization: Bearer <agent toke
 | Pairing code lifetime | 10 min |
 | Failed claims per client address | 10 per 10 min |
 | First-run registrations per client address | 10 per hour |
+| Kill requests per device | 30 per minute |
 
 ## Demo environment
 
