@@ -91,6 +91,31 @@ func (s *Scanner) Scan() ([]protocol.Parent, error) {
 	return parents, nil
 }
 
+// Stat reads /proc/<pid>/stat. When the process does not exist the error matches fs.ErrNotExist.
+func (s *Scanner) Stat(pid int) (Stat, error) {
+	b, err := fs.ReadFile(s.Root, strconv.Itoa(pid)+"/stat")
+	if err != nil {
+		return Stat{}, err
+	}
+	return ParseStat(b)
+}
+
+// Children returns the processes whose parent is pid, ordered by PID, in any state.
+func (s *Scanner) Children(pid int) ([]Stat, error) {
+	stats, err := s.readAll()
+	if err != nil {
+		return nil, err
+	}
+	var children []Stat
+	for _, st := range stats {
+		if st.PPID == pid {
+			children = append(children, st)
+		}
+	}
+	slices.SortFunc(children, func(a, b Stat) int { return a.PID - b.PID })
+	return children, nil
+}
+
 func (s *Scanner) readAll() (map[int]Stat, error) {
 	entries, err := fs.ReadDir(s.Root, ".")
 	if err != nil {
