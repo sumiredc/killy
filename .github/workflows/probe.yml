@@ -6,16 +6,18 @@ permissions:
 jobs:
   probe:
     runs-on: arc-runner-killy
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - run: |
-          set +e
-          echo "== id"; id
-          echo "== os"; cat /etc/os-release | head -3; uname -r
-          echo "== pid1"; cat /proc/1/comm
-          echo "== sudo"; sudo -n true && echo "sudo: yes" || echo "sudo: no"
-          echo "== docker"; command -v docker && docker info --format '{{.ServerVersion}}' 2>&1 | head -2
-          echo "== apt"; command -v apt-get
-          echo "== postgres"; command -v postgres psql initdb pg_ctl; ls /usr/lib/postgresql 2>&1
-          echo "== env"; env | grep -E '^(ACTIONS_RUNNER_CONTAINER_HOOKS|ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER|DOCKER_HOST)=' 
-          echo "== disk"; df -h /home/runner/_work 2>&1 | tail -1
+          start=$(date +%s)
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends postgresql >/dev/null
+          echo "install seconds: $(( $(date +%s) - start ))"
+          ls /usr/lib/postgresql
+          v=$(ls /usr/lib/postgresql | sort -n | tail -1)
+          export PATH=/usr/lib/postgresql/$v/bin:$PATH
+          initdb -D "$RUNNER_TEMP/pg" -U postgres --auth=trust >/dev/null
+          pg_ctl -D "$RUNNER_TEMP/pg" -o "-c listen_addresses=127.0.0.1 -k $RUNNER_TEMP" -l "$RUNNER_TEMP/pg.log" -w start
+          psql -h 127.0.0.1 -U postgres -c 'select version()'
+          echo "total seconds: $(( $(date +%s) - start ))"
+          du -sh "$RUNNER_TEMP/pg"
