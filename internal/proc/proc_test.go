@@ -1,6 +1,7 @@
 package proc
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"reflect"
@@ -208,5 +209,44 @@ func (unreadableFS) Open(string) (fs.File, error) { return nil, fs.ErrPermission
 func TestScanFailsWhenRootCannotBeListed(t *testing.T) {
 	if _, err := (&Scanner{Root: unreadableFS{}}).Scan(); err == nil {
 		t.Error("Scan succeeded on a root that cannot be listed")
+	}
+}
+
+func TestStatReadsTheGivenProcess(t *testing.T) {
+	root := fakeRoot(fakeProc{pid: 100, comm: "parent", state: 'S', ppid: 1, starttime: 5000})
+	got, err := (&Scanner{Root: root}).Stat(100)
+	if err != nil {
+		t.Fatalf("Stat: %v", err)
+	}
+	if want := (Stat{PID: 100, Comm: "parent", State: 'S', PPID: 1, StartTime: 5000}); got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+}
+
+func TestStatOfAMissingProcessIsNotExist(t *testing.T) {
+	_, err := (&Scanner{Root: fakeRoot()}).Stat(100)
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("err = %v, want fs.ErrNotExist", err)
+	}
+}
+
+func TestChildrenReturnsOnlyDirectChildrenInAnyState(t *testing.T) {
+	root := fakeRoot(
+		fakeProc{pid: 100, comm: "parent", state: 'S', ppid: 1, starttime: 5000},
+		fakeProc{pid: 101, comm: "zombie", state: 'Z', ppid: 100, starttime: 5001},
+		fakeProc{pid: 102, comm: "running", state: 'R', ppid: 100, starttime: 5002},
+		fakeProc{pid: 103, comm: "grandchild", state: 'Z', ppid: 102, starttime: 5003},
+		fakeProc{pid: 200, comm: "other", state: 'Z', ppid: 1, starttime: 6000},
+	)
+	got, err := (&Scanner{Root: root}).Children(100)
+	if err != nil {
+		t.Fatalf("Children: %v", err)
+	}
+	want := []Stat{
+		{PID: 101, Comm: "zombie", State: 'Z', PPID: 100, StartTime: 5001},
+		{PID: 102, Comm: "running", State: 'R', PPID: 100, StartTime: 5002},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
 	}
 }
