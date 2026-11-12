@@ -52,8 +52,8 @@ func TestKillKillsARealZombieParent(t *testing.T) {
 		}
 	}
 
-	k := &Killer{Proc: scanner, Pidfd: NewPidfdOps(), Clock: SystemClock{}, SelfPID: os.Getpid}
-	got := k.Handle(protocol.KillCommand{ID: "0f8fad5b-d9cb-469f-a165-70867728950e", PPID: parent.PID, StartTime: parent.StartTime})
+	k := &Killer{Proc: scanner, Pidfd: NewPidfdOps(), Store: newMemStore(), Clock: SystemClock{}, SelfPID: os.Getpid}
+	got := handle(t, k, protocol.KillCommand{ID: "0f8fad5b-d9cb-469f-a165-70867728950e", PPID: parent.PID, StartTime: parent.StartTime})
 	if want := (protocol.Outcome{Outcome: protocol.Killed, Reaped: 1}); got != want {
 		t.Fatalf("outcome = %+v, want %+v", got, want)
 	}

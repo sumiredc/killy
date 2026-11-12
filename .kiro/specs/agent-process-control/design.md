@@ -49,9 +49,10 @@ type Killer struct {
     Store   OutcomeStore
     Clock   Clock          // 5 秒の待ちと記録の時刻
     SelfPID func() int
+    Log     *slog.Logger   // 記録できなかった outcome を出す
 }
 
-func (k *Killer) Handle(cmd protocol.KillCommand) protocol.Outcome
+func (k *Killer) Handle(cmd protocol.KillCommand) (protocol.Outcome, error) // ID が UUID v4 でなければ ErrInvalidKillID
 ```
 
 メソッドの名前を `Kill` にしないのは、signal を送る呼び出しを探す grep（#4 の完了条件）の `\.Kill\(` に、プロセスを kill する呼び出しだけが当たるようにするため。
@@ -86,7 +87,7 @@ flowchart TD
 
 ### `OutcomeStore`
 
-`/var/lib/killy/outcomes.jsonl` に、1 行 1 件で `{"id","outcome","reason","reaped","at"}` を追記する。`signal_failed` の errno は `reason` に名前（例 `EPERM`）で入れる（[ARCHITECTURE: Agent API](../../../docs/ARCHITECTURE.md#agent-api) の results に errno の欄は無いため）。起動時に全行を読み、最後の行が JSON として壊れていれば捨てる。ファイルが無ければ空として始める。ファイルは mode 0600 で作る。
+`/var/lib/killy/outcomes.jsonl` に、1 行 1 件で `{"id","outcome","reason","reaped","at"}` を追記する。`signal_failed` の errno は `reason` に名前（例 `EPERM`）で入れる（[ARCHITECTURE: Agent API](../../../docs/ARCHITECTURE.md#agent-api) の results に errno の欄は無いため）。起動時に全行を読み、記録として読めない行は飛ばす（書き込みの途中で落ちると、最後の行が切れて残る）。最後の行が切れていたら、次の記録は改行を足してから書き、切れた行につなげない。そのため切れた行はファイルの途中にも残りうる。ファイルが無ければ空として始める（置き場所のディレクトリも mode 0700 で作る）。ファイルは mode 0600 で作る。1 件ごとに 1 回の `Write` で追記し、`fsync` してから outcome を返す。
 
 **書き込みに失敗したとき：** 記録できなかったことをログに出し、outcome はそのまま返す。書き込みは繰り返さない（#1 の D24）。この ID と、signal を送ってから記録するまでの間に agent が落ちた ID は、再起動の後に届くと新しい ID として扱われる。PRD はこの例外を受け入れている（[PRD: Duplicates and identity](../../../docs/PRD.md#duplicates-and-identity)）。そのときも確かめ直しは働くので、signal が届くのは条件を満たし続けている親だけである。
 

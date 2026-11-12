@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/sumiredc/killy/internal/proc"
+	"github.com/sumiredc/killy/internal/protocol"
 )
 
 // world is a fake Linux: a process table that serves /proc as an fs.FS and pidfds as PidfdOps.
@@ -221,4 +222,26 @@ func (c *fakeClock) Sleep(d time.Duration) {
 	if c.onSleep != nil {
 		c.onSleep(elapsed)
 	}
+}
+
+// memStore is an OutcomeStore that only keeps records in memory, for tests about other rules.
+type memStore struct {
+	mu sync.Mutex
+	m  map[string]protocol.Outcome
+}
+
+func newMemStore() *memStore { return &memStore{m: map[string]protocol.Outcome{}} }
+
+func (s *memStore) Lookup(id string) (protocol.Outcome, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	o, ok := s.m[id]
+	return o, ok
+}
+
+func (s *memStore) Save(id string, o protocol.Outcome, _ time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.m[id] = o
+	return nil
 }
