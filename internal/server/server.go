@@ -2,6 +2,7 @@
 package server
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -31,8 +32,15 @@ const (
 	tokenRandomSize = 32
 )
 
+// AgentStore keeps registered agents; *store.Store (PostgreSQL) in production.
+type AgentStore interface {
+	CreateAgent(ctx context.Context, tokenSHA256 []byte, hostname string) (store.Agent, error)
+	// AgentByToken returns store.ErrNotFound when no agent has that token.
+	AgentByToken(ctx context.Context, tokenSHA256 []byte) (store.Agent, error)
+}
+
 type Server struct {
-	Store *store.Store
+	Store AgentStore
 	Codes *pairing.Codes
 	// FirstRuns counts first-run registrations per client address.
 	FirstRuns *ratelimit.Limiter

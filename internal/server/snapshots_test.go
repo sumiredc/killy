@@ -1,14 +1,11 @@
 package server
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func (s *testServer) postSnapshot(t *testing.T, token, body string) (int, string) {
@@ -44,7 +41,7 @@ func (s *testServer) reportedPIDs(t *testing.T, agentID string) []int {
 }
 
 func TestASnapshotIsAcceptedAndBecomesTheAgentsState(t *testing.T) {
-	s := migratedServer(t)
+	s := newTestServer(t)
 	agent := s.register(t)
 	status, body := s.postSnapshot(t, *agent.AgentToken, snapshotJSON(t0, parent100))
 	if status != http.StatusNoContent {
@@ -64,7 +61,7 @@ func TestASnapshotIsAcceptedAndBecomesTheAgentsState(t *testing.T) {
 }
 
 func TestAnOlderSnapshotGets204ButChangesNothing(t *testing.T) {
-	s := migratedServer(t)
+	s := newTestServer(t)
 	agent := s.register(t)
 	s.postSnapshot(t, *agent.AgentToken, snapshotJSON(t0.Add(10*time.Second), parent200))
 	status, _ := s.postSnapshot(t, *agent.AgentToken, snapshotJSON(t0, parent100))
@@ -77,7 +74,7 @@ func TestAnOlderSnapshotGets204ButChangesNothing(t *testing.T) {
 }
 
 func TestASnapshotWithAnInvalidTokenIsRefusedAndChangesNothing(t *testing.T) {
-	s := migratedServer(t)
+	s := newTestServer(t)
 	agent := s.register(t)
 	s.postSnapshot(t, *agent.AgentToken, snapshotJSON(t0, parent200))
 	for name, token := range map[string]string{"no token": "", "unknown token": "bm90LWEtcmVhbC10b2tlbg"} {
@@ -94,7 +91,7 @@ func TestASnapshotWithAnInvalidTokenIsRefusedAndChangesNothing(t *testing.T) {
 }
 
 func TestAnInvalidSnapshotIsAnInvalidRequest(t *testing.T) {
-	s := migratedServer(t)
+	s := newTestServer(t)
 	agent := s.register(t)
 	for name, body := range map[string]string{
 		"not JSON":          "parents",
@@ -124,12 +121,8 @@ func TestAnInvalidSnapshotIsAnInvalidRequest(t *testing.T) {
 }
 
 func TestASnapshotIsUnavailableWhenTheDatabaseCannotBeReached(t *testing.T) {
-	pool, err := pgxpool.New(context.Background(), "postgres://killy@127.0.0.1:1/killy?sslmode=disable&connect_timeout=2")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(pool.Close)
-	s := newTestServer(t, pool)
+	s := newTestServer(t)
+	s.unreachableDB()
 	status, body := s.postSnapshot(t, "c29tZS10b2tlbg", snapshotJSON(t0, parent100))
 	if status != http.StatusServiceUnavailable || !strings.Contains(body, `"unavailable"`) {
 		t.Errorf("got %d %s, want 503 unavailable", status, body)
@@ -137,7 +130,7 @@ func TestASnapshotIsUnavailableWhenTheDatabaseCannotBeReached(t *testing.T) {
 }
 
 func TestAStartTimeOfZeroIsAccepted(t *testing.T) {
-	s := migratedServer(t)
+	s := newTestServer(t)
 	agent := s.register(t)
 	status, body := s.postSnapshot(t, *agent.AgentToken, snapshotJSON(t0, `{"pid":100,"starttime":0,"cmd":"x","zombies":[101]}`))
 	if status != http.StatusNoContent {
