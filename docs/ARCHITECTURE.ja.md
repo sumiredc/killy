@@ -1,6 +1,6 @@
 # Killy — アーキテクチャ（日本語訳）
 
-この文書は [ARCHITECTURE.md](ARCHITECTURE.md) の日本語訳で、正は英語版です。食い違ったときは英語版に従ってください。訳の元は commit `392248b` 時点の英語版です。
+この文書は [ARCHITECTURE.md](ARCHITECTURE.md) の日本語訳で、正は英語版です。食い違ったときは英語版に従ってください。訳の元は commit `8f025b7` 時点の英語版です。
 
 英語版は **Killy をどう作るか** の正です。構成要素、それらの間の protocol、安全の保証をどう守るか、どうデプロイするかを書きます。
 Killy が何をしなければならないかは [PRD.md](PRD.md)、app の画面と動きは [DESIGN.md](DESIGN.md) にあります。
