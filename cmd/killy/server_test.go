@@ -57,3 +57,22 @@ func TestServeMigratesBeforeListening(t *testing.T) {
 		t.Errorf("steps %v, want migrate then listen", steps)
 	}
 }
+
+func TestEveryTicksAtOnceAndThenEveryInterval(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	start := time.Now()
+	ticks := every(ctx, 50*time.Millisecond)
+	var at []time.Duration
+	for range 3 {
+		select {
+		case <-ticks:
+			at = append(at, time.Since(start))
+		case <-time.After(2 * time.Second):
+			t.Fatal("no tick")
+		}
+	}
+	if at[0] > 40*time.Millisecond || at[1] < 40*time.Millisecond || at[2] < 90*time.Millisecond {
+		t.Errorf("ticks at %v, want one at once, then about every 50 ms", at)
+	}
+}
