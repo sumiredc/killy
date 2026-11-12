@@ -71,7 +71,7 @@ On a `kill` command `{id, ppid, starttime}`:
    - demo mode is on and the process's cgroup (the `0::` line of `/proc/<ppid>/cgroup`, cgroup v2) is not exactly `/system.slice/killy-summon.service` (`not_demo`). The match is exact: a user's own unit with the same name lives under `/user.slice/…` and does not count.
 5. Send `SIGKILL` through the pidfd (`pidfd_send_signal`). If the PID was reused after step 2, the pidfd still refers to the old process, so the signal cannot reach the new one. If the process has exited since step 3 (`ESRCH`) → `already_gone`; on any other error → `signal_failed` with the errno.
 6. Poll for up to 5 s until none of the former zombies remain → outcome `killed` with the number reaped; otherwise `zombies_remain`.
-7. Store the outcome under `id` in `/var/lib/killy/outcomes.jsonl` (append-only, mode 0600, never expired, so a repeated `id` is recognised even after the agent restarts) and post it. If the write fails, the agent logs it and posts the outcome anyway; it does not retry the write. The PRD accepts that such an `id`, or one whose agent stopped between steps 5 and 7, may be handled again.
+7. Store the outcome under `id` in `/var/lib/killy/outcomes.jsonl` (append-only, mode 0600, never expired, so a repeated `id` is recognised even after the agent restarts) and post it. If the write fails, the agent logs it and posts the outcome anyway; it does not retry the write. The outcome is still kept in memory, so the same `id` arriving again before the agent restarts gets that outcome without a second signal. The PRD accepts that such an `id`, or one whose agent stopped between steps 5 and 7, may be handled again.
 
 The pidfd calls are made directly through the `syscall` package: `os.Process.Signal` silently falls back to signalling by PID when pidfd is missing. At startup the agent checks that pidfd is available and logs an error if it is not.
 
@@ -113,8 +113,9 @@ Attempts spread over many addresses are not stopped by this; add Cloudflare rate
 | Notified `(parent, device)` pairs | PostgreSQL | No |
 | Pairing codes | Memory | Yes (operator re-runs `pair`) |
 | Latest snapshot and last snapshot time per agent, open SSE streams, pending commands, rate-limit counters | Memory | Yes (rebuilt as agents reconnect and report) |
+| Failed push attempts per `(parent, device)` | Memory | Yes (counting starts again; the limit still applies after the restart) |
 
-PostgreSQL is the only persistent store; the server keeps no files of its own. The schema is changed only by migrations embedded in the binary and applied when `killy server` starts. When a parent leaves an agent's snapshot, its first-detection time and notified pairs are deleted. A snapshot whose `scanned_at` is older than the last one accepted from the same agent is discarded, so a late report cannot bring back a parent that is gone. The discarded snapshot is still answered with success, so the agent does not resend it; if the agent's clock steps back, its reports are ignored until the clock catches up and the agent looks disconnected meanwhile, which is accepted.
+PostgreSQL is the only persistent store; the server keeps no files of its own. The schema is changed only by migrations embedded in the binary and applied when `killy server` starts. When a parent leaves an agent's snapshot, its first-detection time, notified pairs and failed push attempts are deleted. A snapshot whose `scanned_at` is older than the last one accepted from the same agent is discarded, so a late report cannot bring back a parent that is gone. The discarded snapshot is still answered with success, so the agent does not resend it; if the agent's clock steps back, its reports are ignored until the clock catches up and the agent looks disconnected meanwhile, which is accepted.
 
 Tokens are 32 random bytes; only their SHA-256 is stored.
 
