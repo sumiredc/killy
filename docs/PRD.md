@@ -45,7 +45,7 @@ Killy is our entry to the **Kiroween 2026** hackathon in the **Frankenstein** ca
 
 ### Consistency
 
-- The zombies shown on the phone are the latest report from each agent. After any reconnection the phone receives a full snapshot that replaces what it had.
+- The zombies shown on the phone are the latest report from each agent. After any reconnection the phone receives a full snapshot that replaces what it had. One exception: a parent whose kill ended "killed" or "already gone" is not shown again until a report without it arrives, so a report taken just before the kill cannot bring it back.
 - When the outcome of a kill is not known within the timeout, the app says so and refreshes; it never shows an unconfirmed kill as a success.
 
 ### Timeliness

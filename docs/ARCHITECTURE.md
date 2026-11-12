@@ -89,7 +89,7 @@ The agent needs permission to signal other users' processes: run it as root unde
 
 #### Rate limits
 
-Counted per client address (`CF-Connecting-IP`), in memory; a restart resets them, which is enough against short bursts.
+Counted per client address (`CF-Connecting-IP`; when the header is missing, as when the server runs locally without Cloudflare, the TCP peer address), in memory; a restart resets them, which is enough against short bursts.
 
 | Request | Limit | Over the limit |
 |---|---|---|
@@ -122,7 +122,7 @@ For each parent in a snapshot, the server sends one push to every linked device 
 
 Kill and connection check are both "send over the agent's SSE stream, wait for the agent's POST". The server answers the phone's HTTP request synchronously with the result.
 
-The kill `id` is a UUID v4 chosen by the phone; the server answers `400` to any other form. If the phone gets no HTTP response at all (network error), it resends the same request with the same `id` once; the agent's step 1 makes the resend safe.
+The kill `id` is a UUID v4 chosen by the phone; the server answers `400` to any other form. If the phone gets no HTTP response at all (network error), it resends the same request with the same `id` once; the agent's step 1 makes the resend safe. The server only relays: it accepts a result only from the agent the command was sent to, and when two requests with the same `id` arrive together it sends one command and answers both with its result. Deciding that an `id` was already handled stays with the agent.
 
 ```mermaid
 sequenceDiagram
