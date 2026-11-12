@@ -8,9 +8,15 @@ import (
 	"io/fs"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/sumiredc/killy/internal/protocol"
 )
+
+// MaxCmdBytes bounds the command line reported for a parent. /proc/<pid>/cmdline can be as long
+// as the kernel's argument limit (megabytes); the app shows only the start, and every snapshot
+// carries it.
+const MaxCmdBytes = 4096
 
 // Stat holds the fields of /proc/<pid>/stat that Killy uses.
 type Stat struct {
@@ -148,5 +154,10 @@ func (s *Scanner) cmd(st Stat) string {
 	if err != nil || len(b) == 0 {
 		return st.Comm
 	}
-	return string(bytes.ReplaceAll(b, []byte{0}, []byte{' '}))
+	cmd := string(bytes.ReplaceAll(b, []byte{0}, []byte{' '}))
+	if len(cmd) > MaxCmdBytes {
+		// Cutting at a byte count can split a multi-byte character; drop the broken tail.
+		cmd = strings.ToValidUTF8(cmd[:MaxCmdBytes], "")
+	}
+	return cmd
 }

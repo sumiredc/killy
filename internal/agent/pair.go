@@ -112,11 +112,7 @@ func requestCode(ctx context.Context, opts PairOptions, server, token string) (p
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
-	// A redirect would resend the Authorization header to wherever it points, including plain
-	// http on the same host, so redirects are not followed.
-	client := *opts.Client
-	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	res, err := client.Do(req)
+	res, err := noRedirects(opts.Client).Do(req)
 	if err != nil {
 		return pairingResponse{}, fmt.Errorf("reach the Killy server: %w", err)
 	}

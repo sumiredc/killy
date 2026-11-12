@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io/fs"
 	"reflect"
+	"strings"
 	"testing"
 	"testing/fstest"
+	"unicode/utf8"
 
 	"github.com/sumiredc/killy/internal/protocol"
 )
@@ -248,5 +250,21 @@ func TestChildrenReturnsOnlyDirectChildrenInAnyState(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v, want %+v", got, want)
+	}
+}
+
+func TestScanShortensAVeryLongCommandLine(t *testing.T) {
+	long := strings.Repeat("a", 3000) + "\x00" + strings.Repeat("é", 2000) + "\x00"
+	root := fakeRoot(
+		fakeProc{pid: 100, comm: "big", state: 'S', ppid: 1, starttime: 5000, cmdline: long},
+		fakeProc{pid: 101, comm: "z", state: 'Z', ppid: 100, starttime: 5001},
+	)
+	parents := scan(t, root)
+	if len(parents) != 1 {
+		t.Fatalf("got %d parents, want 1", len(parents))
+	}
+	cmd := parents[0].Cmd
+	if len(cmd) > MaxCmdBytes || !utf8.ValidString(cmd) || !strings.HasPrefix(cmd, strings.Repeat("a", 3000)+" é") {
+		t.Errorf("cmd of %d bytes (valid UTF-8: %v), want at most %d bytes of valid UTF-8 keeping the start", len(cmd), utf8.ValidString(cmd), MaxCmdBytes)
 	}
 }

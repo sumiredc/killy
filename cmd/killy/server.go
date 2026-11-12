@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sumiredc/killy/internal/clock"
 	"github.com/sumiredc/killy/internal/server"
+	"github.com/sumiredc/killy/internal/server/live"
 	"github.com/sumiredc/killy/internal/server/pairing"
 	"github.com/sumiredc/killy/internal/server/ratelimit"
 	"github.com/sumiredc/killy/internal/server/store"
@@ -46,10 +47,12 @@ func runServer(args []string, stderr io.Writer) int {
 	defer pool.Close()
 
 	c := clock.System{}
+	st := store.New(pool)
 	srv := &server.Server{
-		Store:     store.New(pool),
+		Store:     st,
 		Codes:     pairing.New(c),
 		FirstRuns: ratelimit.New(server.FirstRunLimit, server.FirstRunPeriod, c),
+		Live:      live.New(c, st),
 		Log:       log,
 	}
 	err = serve(ctx, log,

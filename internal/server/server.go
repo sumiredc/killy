@@ -7,11 +7,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/sumiredc/killy/internal/server/live"
 	"github.com/sumiredc/killy/internal/server/pairing"
 	"github.com/sumiredc/killy/internal/server/ratelimit"
 	"github.com/sumiredc/killy/internal/server/store"
@@ -34,12 +36,15 @@ type Server struct {
 	Codes *pairing.Codes
 	// FirstRuns counts first-run registrations per client address.
 	FirstRuns *ratelimit.Limiter
-	Log       *slog.Logger
+	// Live holds every agent's latest snapshot.
+	Live *live.State
+	Log  *slog.Logger
 }
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /agent/v1/pairings", s.createPairing)
+	mux.HandleFunc("POST /agent/v1/snapshots", s.postSnapshot)
 	return mux
 }
 
@@ -94,19 +99,8 @@ func (s *Server) createPairing(w http.ResponseWriter, r *http.Request) {
 // issueCodeForKnownAgent gives a new code to the agent the bearer token belongs to. A request that
 // sends an Authorization header never registers a new agent, even when the token is wrong.
 func (s *Server) issueCodeForKnownAgent(w http.ResponseWriter, r *http.Request) {
-	token, ok := bearerToken(r)
+	agent, ok := s.authAgent(w, r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "unauthorized")
-		return
-	}
-	agent, err := s.Store.AgentByToken(r.Context(), hashToken(token))
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusUnauthorized, "unauthorized")
-		return
-	}
-	if err != nil {
-		s.Log.Error("find agent by token", "err", err)
-		writeError(w, http.StatusServiceUnavailable, "unavailable")
 		return
 	}
 	s.respondWithCode(w, agent.ID, "")
@@ -145,8 +139,19 @@ func bearerToken(r *http.Request) (string, bool) {
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, v any) error {
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes))
-	return dec.Decode(v)
+	return decodeJSONLimit(w, r, v, maxBodyBytes)
+}
+
+func decodeJSONLimit(w http.ResponseWriter, r *http.Request, v any, limit int64) error {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, limit))
+	if err := dec.Decode(v); err != nil {
+		return err
+	}
+	// Anything after the JSON value, such as padding past the size limit, makes the body invalid.
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		return errors.New("trailing data after the JSON body")
+	}
+	return nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

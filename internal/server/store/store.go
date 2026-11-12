@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"time"
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
@@ -79,4 +80,60 @@ func (s *Store) AgentByToken(ctx context.Context, tokenSHA256 []byte) (Agent, er
 		return Agent{}, fmt.Errorf("find agent: %w", err)
 	}
 	return a, nil
+}
+
+// ParentKey identifies a parent on one agent: a reused PID has another start time.
+type ParentKey struct {
+	PID       int
+	StartTime int64
+}
+
+// SyncFirstDetections makes the agent's first-detection rows match parents: rows for parents not
+// in the list are deleted, parents without a row get now, and existing rows keep their time. It
+// returns the first-detection time of every parent in the list.
+func (s *Store) SyncFirstDetections(ctx context.Context, agentID string, parents []ParentKey, now time.Time) (map[ParentKey]time.Time, error) {
+	pids := make([]int32, len(parents))
+	starts := make([]int64, len(parents))
+	for i, p := range parents {
+		pids[i], starts[i] = int32(p.PID), p.StartTime
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("sync first detections: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM first_detections d
+		WHERE d.agent_id = $1
+		  AND (d.pid, d.starttime) NOT IN (SELECT * FROM unnest($2::integer[], $3::bigint[]))`,
+		agentID, pids, starts); err != nil {
+		return nil, fmt.Errorf("delete gone parents: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO first_detections (agent_id, pid, starttime, detected_at)
+		SELECT $1, p.pid, p.starttime, $4 FROM unnest($2::integer[], $3::bigint[]) AS p(pid, starttime)
+		ON CONFLICT DO NOTHING`,
+		agentID, pids, starts, now); err != nil {
+		return nil, fmt.Errorf("insert new parents: %w", err)
+	}
+	rows, err := tx.Query(ctx, "SELECT pid, starttime, detected_at FROM first_detections WHERE agent_id = $1", agentID)
+	if err != nil {
+		return nil, fmt.Errorf("read first detections: %w", err)
+	}
+	got := make(map[ParentKey]time.Time, len(parents))
+	for rows.Next() {
+		var k ParentKey
+		var at time.Time
+		if err := rows.Scan(&k.PID, &k.StartTime, &at); err != nil {
+			return nil, err
+		}
+		got[k] = at
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("sync first detections: %w", err)
+	}
+	return got, nil
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/sumiredc/killy/internal/clock"
 	"github.com/sumiredc/killy/internal/protocol"
 	"github.com/sumiredc/killy/internal/server/dbtest"
+	"github.com/sumiredc/killy/internal/server/live"
 	"github.com/sumiredc/killy/internal/server/pairing"
 	"github.com/sumiredc/killy/internal/server/ratelimit"
 	"github.com/sumiredc/killy/internal/server/store"
@@ -39,6 +40,7 @@ func newTestServer(t *testing.T, pool *pgxpool.Pool) *testServer {
 			Store:     store.New(pool),
 			Codes:     pairing.New(c),
 			FirstRuns: ratelimit.New(FirstRunLimit, FirstRunPeriod, c),
+			Live:      live.New(c, store.New(pool)),
 			Log:       slog.New(slog.NewTextHandler(io.Discard, nil)),
 		},
 		pool:  pool,

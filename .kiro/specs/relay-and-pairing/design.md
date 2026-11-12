@@ -79,7 +79,9 @@ erDiagram
 
 ### LiveState（`internal/server/live`）
 
-agent ごとに最新の snapshot、最後に受け付けた `scanned_at`、最後に受け取った時刻を持つ。snapshot を受けたら、前回との差から first_detections を足し・消す。`scanned_at` が前回より古い snapshot は捨てるが、`204` を返して agent に送り直させない（#1 の D25）。再起動後の最初の snapshot では、DB にあって snapshot に無い親を消す。1 秒ごとの ticker で 60 秒の切断の判定をし、切断と接続の変化を `Broker` に知らせる。
+agent ごとに最新の snapshot、最後に受け付けた `scanned_at`、最後に受け取った時刻を持つ。snapshot を受けたら、DB の first_detections をその snapshot の親の集合に合わせる（無い親を消し、新しい親を足す）。`scanned_at` が前回より古い snapshot は捨てるが、`204` を返して agent に送り直させない（#1 の D25）。再起動後の最初の snapshot では、DB にあって snapshot に無い親を消す。1 秒ごとの ticker で 60 秒の切断の判定をし、切断と接続の変化を `Broker` に知らせる（ticker と `Broker` への通知は #9 で足す。#7 では `Connected` を問い合わせの時に判定する）。
+
+`scanned_at` が前回と同じ snapshot は受け付ける（古いものだけを捨てる）。最後に受け付けた snapshot からちょうど 60 秒の時刻で切断になる。受け付けた時刻は Killy server の時計で取り、捨てた snapshot では更新しない。first_detections は snapshot ごとに 1 つの transaction で、snapshot に無い親の行を消し、新しい親に今の時刻を入れる。snapshot の本文は 8 MiB まで（agent は `cmd` を 4096 バイトで切る）。openapi.yaml の required の欄が無いもの、PID とゾンビの PID が 1〜2^22 の外のもの、`zombies` が空の親は `400`。最新の snapshot を読む側（`Agent`・`Connected`）は、DB の処理を待たない。
 
 ### Broker（`internal/server/sse`）
 
@@ -127,7 +129,7 @@ agent ごとに命令の stream を 1 つ持つ。`Kill(ctx, agentID, cmd)` は�
 |---|---|
 | `pair` | `agent.json`（`{"server", "token"}`、置き場所は `--config` で変えられ、既定は `/etc/killy/agent.json`）が無ければ token なしで `--server` に送り、token と URL を mode 0600 で保存する（一時ファイルに書いて rename）。URL は https か、localhost への http だけを受け付け、redirect には従わない（token を暗号化されない経路や別の宛先に流さないため）。初回は、`agent.json` を書けることを登録の前に確かめる（token は一度しか返らないので、保存できない登録は使えない agent を残し、初回登録の回数も使うため）。あれば保存した URL に token を付けて送り、`--server` が保存した URL と違えば何も送らずに止める（別の Killy server に token を送らないため）。コードと agent の ID を表示する |
 | `run` | `agent.json` から URL と token を読む（unit に `--server` は要らない）。`agent.json` が無ければ、先に `killy agent pair` を実行するよう出して止める |
-| `Reporter` | 5 秒ごとに `Scanner.Scan`。前回と親の集合が違えばすぐ、同じでも 15 秒ごとに送る |
+| `Reporter` | 5 秒ごとに `Scanner.Scan`。最後に送れた snapshot と親の集合（`(pid, starttime)` の集合）が違えばすぐ、同じでも 15 秒ごとに送る（ticker の遅れで 3 回の走査が 15 秒に少し足りなくても 3 回目で送るよう、走査の間隔の半分の余裕をとる）。同じ親のゾンビが増えただけなら次の 15 秒を待つ。送れなかったときは送れたことにしないので、次の走査でまた送る。`version` はビルド時に `-ldflags` で入れる（既定は `dev`） |
 | `CommandClient` | 命令の stream を開き続け、切れたら `Backoff`（1・2・4・8・16・30 秒の基準値に揺らぎ）で再接続する。`kill` を `Killer` に渡し、結果を送る |
 
 ## Error Handling

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sumiredc/killy/internal/protocol"
@@ -124,5 +125,81 @@ func TestAgentByTokenOfAnUnknownTokenIsNotFound(t *testing.T) {
 	h := sha256.Sum256([]byte("nobody"))
 	if _, err := s.AgentByToken(context.Background(), h[:]); !errors.Is(err, ErrNotFound) {
 		t.Errorf("err = %v, want ErrNotFound", err)
+	}
+}
+
+func newAgent(t *testing.T, s *Store, name string) string {
+	t.Helper()
+	h := sha256.Sum256([]byte(name))
+	a, err := s.CreateAgent(context.Background(), h[:], name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return a.ID
+}
+
+func sync(t *testing.T, s *Store, agentID string, now time.Time, keys ...ParentKey) map[ParentKey]time.Time {
+	t.Helper()
+	got, err := s.SyncFirstDetections(context.Background(), agentID, keys, now)
+	if err != nil {
+		t.Fatalf("SyncFirstDetections: %v", err)
+	}
+	return got
+}
+
+var (
+	day   = time.Date(2026, 11, 13, 9, 0, 0, 0, time.UTC)
+	p100  = ParentKey{PID: 100, StartTime: 5000}
+	p200  = ParentKey{PID: 200, StartTime: 7000}
+	p100b = ParentKey{PID: 100, StartTime: 9000}
+)
+
+func TestSyncGivesNewParentsTheCurrentTimeAndKeepsKnownOnes(t *testing.T) {
+	s, _ := migrated(t)
+	a := newAgent(t, s, "a")
+	sync(t, s, a, day, p100)
+	got := sync(t, s, a, day.Add(time.Minute), p100, p200)
+	if !got[p100].Equal(day) || !got[p200].Equal(day.Add(time.Minute)) || len(got) != 2 {
+		t.Errorf("got %v, want 100 at %v and 200 at %v", got, day, day.Add(time.Minute))
+	}
+}
+
+func TestSyncTreatsAnotherStartTimeAsANewParent(t *testing.T) {
+	s, _ := migrated(t)
+	a := newAgent(t, s, "a")
+	sync(t, s, a, day, p100)
+	got := sync(t, s, a, day.Add(time.Minute), p100b)
+	if !got[p100b].Equal(day.Add(time.Minute)) {
+		t.Errorf("PID 100 with start time 9000 detected at %v, want %v", got[p100b], day.Add(time.Minute))
+	}
+}
+
+func TestSyncDeletesParentsThatAreNoLongerReported(t *testing.T) {
+	s, pool := migrated(t)
+	a := newAgent(t, s, "a")
+	sync(t, s, a, day, p100, p200)
+	sync(t, s, a, day.Add(time.Minute), p200)
+	var n int
+	if err := pool.QueryRow(context.Background(), "SELECT count(*) FROM first_detections WHERE agent_id = $1 AND pid = 100", a).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Errorf("%d rows left for PID 100, want 0", n)
+	}
+	// Back with zombies later: a new episode, with a new time.
+	got := sync(t, s, a, day.Add(2*time.Minute), p100, p200)
+	if !got[p100].Equal(day.Add(2 * time.Minute)) {
+		t.Errorf("PID 100 back at %v, want %v", got[p100], day.Add(2*time.Minute))
+	}
+}
+
+func TestSyncLeavesOtherAgentsAlone(t *testing.T) {
+	s, _ := migrated(t)
+	a, b := newAgent(t, s, "a"), newAgent(t, s, "b")
+	sync(t, s, a, day, p100)
+	sync(t, s, b, day.Add(time.Minute))
+	got := sync(t, s, a, day.Add(2*time.Minute), p100)
+	if !got[p100].Equal(day) {
+		t.Errorf("agent a's PID 100 detected at %v, want %v", got[p100], day)
 	}
 }
