@@ -5,6 +5,7 @@ package kill
 import (
 	"errors"
 	"io/fs"
+	"log/slog"
 	"strconv"
 	"sync"
 	"syscall"
@@ -36,13 +37,21 @@ type SystemClock struct{}
 func (SystemClock) Now() time.Time        { return time.Now() }
 func (SystemClock) Sleep(d time.Duration) { time.Sleep(d) }
 
-// Killer runs the kill procedure of docs/ARCHITECTURE.md ("Kill procedure"), steps 2 to 6.
+// ErrInvalidKillID is returned for a command whose ID is not a UUID v4. Such a command is ignored:
+// nothing is signalled, stored or reported.
+var ErrInvalidKillID = errors.New("kill ID is not a UUID v4")
+
+// Killer runs the kill procedure of docs/ARCHITECTURE.md ("Kill procedure").
 type Killer struct {
 	Proc    *proc.Scanner
 	Pidfd   PidfdOps
+	Store   OutcomeStore
 	Clock   Clock
 	SelfPID func() int
+	// Log receives the outcomes that could not be stored. Nil means slog.Default().
+	Log *slog.Logger
 
+	ids     keyedMutex[string]
 	parents keyedMutex[parentKey]
 }
 
@@ -51,9 +60,38 @@ type parentKey struct {
 	starttime int64
 }
 
-// Handle is safe to call from several goroutines. Kills of the same parent run one at a time, so
-// the later one sees what the earlier one did.
-func (k *Killer) Handle(cmd protocol.KillCommand) protocol.Outcome {
+// Handle runs a kill command and returns its outcome. A command whose ID was handled before gets
+// the first outcome again without touching any process. Handle is safe to call from several
+// goroutines.
+func (k *Killer) Handle(cmd protocol.KillCommand) (protocol.Outcome, error) {
+	if !protocol.IsUUIDv4(cmd.ID) {
+		return protocol.Outcome{}, ErrInvalidKillID
+	}
+	// A second request with the same ID waits here for the first to store its outcome, then
+	// finds it. Without the wait it would find no record yet and run the kill again.
+	unlock := k.ids.lock(cmd.ID)
+	defer unlock()
+	if o, ok := k.Store.Lookup(cmd.ID); ok {
+		return o, nil
+	}
+	o := k.kill(cmd)
+	if err := k.Store.Save(cmd.ID, o, k.Clock.Now()); err != nil {
+		k.logger().Error("could not store the kill outcome; a repeat of this ID after a restart will be handled as new",
+			"id", cmd.ID, "outcome", o.Outcome, "err", err)
+	}
+	return o, nil
+}
+
+func (k *Killer) logger() *slog.Logger {
+	if k.Log != nil {
+		return k.Log
+	}
+	return slog.Default()
+}
+
+// kill runs steps 2 to 6. Kills of the same parent run one at a time, so the later one sees what
+// the earlier one did.
+func (k *Killer) kill(cmd protocol.KillCommand) protocol.Outcome {
 	// No process can have such a PID. Checked before pidfd_open, which truncates the PID to 32 bits
 	// and would open a different process.
 	if cmd.PPID <= 0 || cmd.PPID > maxPID {

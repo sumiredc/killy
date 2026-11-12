@@ -89,8 +89,8 @@ func TestKillWithoutPidfdIsRefusedAndSendsNoSignal(t *testing.T) {
 		t.Run(errno.Error(), func(t *testing.T) {
 			w := standardWorld()
 			sys := &fakeSys{openErrno: errno}
-			k := &Killer{Proc: &proc.Scanner{Root: w}, Pidfd: sys.ops(), Clock: newFakeClock(), SelfPID: func() int { return agentPID }}
-			got := k.Handle(killCmd(parentPID, parentTime))
+			k := &Killer{Proc: &proc.Scanner{Root: w}, Pidfd: sys.ops(), Store: newMemStore(), Clock: newFakeClock(), SelfPID: func() int { return agentPID }}
+			got := handle(t, k, killCmd(parentPID, parentTime))
 			assertOutcome(t, got, protocol.Outcome{Outcome: protocol.Refused, Reason: protocol.ReasonPidfdUnavailable})
 			if sys.sends != 0 {
 				t.Errorf("pidfd_send_signal called %d times, want 0", sys.sends)
