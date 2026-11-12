@@ -21,7 +21,20 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      # The runner has no Docker daemon, so services: cannot start PostgreSQL. It is installed and
+      # run inside the job instead, for the tests only (trust authentication on 127.0.0.1).
+      - name: Start PostgreSQL
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends postgresql >/dev/null
+          bin=$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1)
+          "$bin/initdb" -D "$RUNNER_TEMP/pg" -U postgres --auth=trust >/dev/null
+          "$bin/pg_ctl" -D "$RUNNER_TEMP/pg" -o "-c listen_addresses=127.0.0.1 -k $RUNNER_TEMP" -l "$RUNNER_TEMP/pg.log" -w start
+          "$bin/postgres" --version
       - run: go version
       - run: go vet ./...
       # -count=1: the Linux tests check the runner itself (pidfd, reaping), so a cached pass proves nothing.
+      # With CI set, a database test fails instead of skipping when KILLY_TEST_DATABASE_URL is missing.
       - run: go test -race -count=1 ./...
+        env:
+          KILLY_TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/postgres?sslmode=disable
