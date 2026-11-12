@@ -14,20 +14,20 @@
   - [x] 1.5 `go vet ./...` と `go test ./...` を通し、Linux 上で実際のゾンビが snapshot に入ることを PR 本文に書く
     - _Requirements: 1.1, 1.3_
 
-- [ ] 2. kill の直前に対象を確かめ直してから SIGKILL を送る（#4）
-  - [ ] 2.1 `PidfdOps` の interface と偽物、`Killer` の最小のスタブを置く
+- [x] 2. kill の直前に対象を確かめ直してから SIGKILL を送る（#4）
+  - [x] 2.1 `PidfdOps` の interface と偽物、`Killer` の最小のスタブを置く
     - _Requirements: 2.1_
-  - [ ] 2.2 outcome の表の各行のテスト（`SendKill` の回数と、Open → Stat → SendKill の順を含む）を書き、赤を確かめる
+  - [x] 2.2 outcome の表の各行のテスト（`SendKill` の回数と、Open → Stat → SendKill の順を含む）を書き、赤を確かめる
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 2.11, 2.12, 2.13, 2.14_
-  - [ ] 2.3 確かめ直しの手順を実装し、テストを緑にする
+  - [x] 2.3 確かめ直しの手順を実装し、テストを緑にする
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 2.11, 2.12, 2.13, 2.14_
-  - [ ] 2.4 同じ親への同時の kill のテストを書き、親ごとの lock を実装する
+  - [x] 2.4 同じ親への同時の kill のテストを書き、親ごとの lock を実装する
     - _Requirements: 2.15_
-  - [ ] 2.5 `syscall` で `pidfd_open` と `pidfd_send_signal` を呼ぶ本番の `PidfdOps` と、`Available()` を作る
+  - [x] 2.5 `syscall` で `pidfd_open` と `pidfd_send_signal` を呼ぶ本番の `PidfdOps` と、`Available()` を作る
     - _Requirements: 2.1, 2.2, 2.17_
-  - [ ] 2.6 保護対象の 3 つの確認を 1 つずつ取り除いてテストが落ちることと、signal の呼び出しが 1 か所であること（grep）を確かめ、PR 本文に書く
+  - [x] 2.6 保護対象の 3 つの確認を 1 つずつ取り除いてテストが落ちることと、signal の呼び出しが 1 か所であること（grep）を確かめ、PR 本文に書く
     - _Requirements: 2.8, 2.9, 2.10, 2.16_
-  - [ ] 2.7 `go vet ./...` と `go test -race ./...` を通し、Linux 上で実際のゾンビの親を kill して `killed` になることを PR 本文に書く
+  - [x] 2.7 `go vet ./...` と `go test -race ./...` を通し、Linux 上で実際のゾンビの親を kill して `killed` になることを PR 本文に書く
     - _Requirements: 2.13_
 
 - [ ] 3. 同じ kill ID で二度 signal を送らない（#5）
