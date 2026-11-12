@@ -86,7 +86,7 @@ flowchart TD
 
 `/var/lib/killy/outcomes.jsonl` に、1 行 1 件で `{"id","outcome","reason","reaped","at"}` を追記する。`signal_failed` の errno は `reason` に名前（例 `EPERM`）で入れる（[ARCHITECTURE: Agent API](../../../docs/ARCHITECTURE.md#agent-api) の results に errno の欄は無いため）。起動時に全行を読み、最後の行が JSON として壊れていれば捨てる。ファイルが無ければ空として始める。ファイルは mode 0600 で作る。
 
-**未決（#1 の D24 で決める）：** 記録の書き込みに失敗したとき、また signal を送ってから記録するまでの間に agent が落ちたときの扱い。どちらの場合も、再起動の後に同じ ID が届くと記録が無いので確かめ直しからやり直し、最初が `zombies_remain` などだと 2 回目の signal を送ってしまう（[PRD: Duplicates and identity](../../../docs/PRD.md#duplicates-and-identity) に反する）。D24 が決まるまで、タスク 3 には着手しない。
+**書き込みに失敗したとき：** 記録できなかったことをログに出し、outcome はそのまま返す。書き込みは繰り返さない（#1 の D24）。この ID と、signal を送ってから記録するまでの間に agent が落ちた ID は、再起動の後に届くと新しい ID として扱われる。PRD はこの例外を受け入れている（[PRD: Duplicates and identity](../../../docs/PRD.md#duplicates-and-identity)）。そのときも確かめ直しは働くので、signal が届くのは条件を満たし続けている親だけである。
 
 ### `internal/protocol`
 
@@ -103,7 +103,7 @@ flowchart TD
 | `/proc` の 1 プロセスが読めない（走査中） | そのプロセスを飛ばす |
 | `/proc` 自体が読めない | `Scan` がエラーを返す。呼び出し側（`killy agent run`）が記録して次の走査を待つ |
 | 記録ファイルが読めない | 起動時に、ファイルはあるのに読めなければエラーで止める（無ければ空として始める） |
-| 記録ファイルに書けない | #1 の D24 で決める |
+| 記録ファイルに書けない | ログに出して outcome を返す。繰り返さない（#1 の D24） |
 
 ## Testing Strategy
 

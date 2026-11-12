@@ -67,4 +67,5 @@ agent が Linux サーバーのゾンビとその親を `/proc` から読み取�
 4. THE agent SHALL 最初の outcome を `/var/lib/killy/outcomes.jsonl`（追記のみ、mode 0600）に期限なしで保存する
 5. WHEN agent が起動する THEN agent SHALL 記録ファイルを読み込み、再起動の前に処理した ID にも 2 を当てはめる。ファイルが無ければ空として始める
 6. IF 記録ファイルの最後の行が途中で切れている THEN agent SHALL それより前の記録を読み込んで動き続ける
-7. THE system SHALL UUID v4 の判定を `internal/protocol` の `IsUUIDv4` の 1 つの関数で行い、Killy server（relay-and-pairing の Requirement 5.3）と同じ規則にする
+7. IF 記録の書き込みに失敗した THEN agent SHALL ログに出し、書き込みを繰り返さずに outcome を返す
+8. THE system SHALL UUID v4 の判定を `internal/protocol` の `IsUUIDv4` の 1 つの関数で行い、Killy server（relay-and-pairing の Requirement 5.3）と同じ規則にする

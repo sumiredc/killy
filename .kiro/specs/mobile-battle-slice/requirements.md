@@ -4,7 +4,7 @@
 
 phone の app の最小の一本道。app の土台を作り、コードでサーバーを追加して状態を受け取り、battle 画面で最も古く検出された親から長押しで kill する。これで M1 の目的（Linux 上の実際のゾンビを phone から片付けられる）を満たす。アートと動きは M3（#26・#27・#28）で付けるので、ここでは文言と最小限の表示で作る。
 
-流れの正は [PRD: UC1](../../../docs/PRD.md#uc1-add-a-server)・[UC3](../../../docs/PRD.md#uc3-kill-zombie-parents-battle)・[UC8](../../../docs/PRD.md#uc8-app-settings)、画面の正は [DESIGN](../../../docs/DESIGN.md)、通信の正は [ARCHITECTURE: App API](../../../docs/ARCHITECTURE.md#app-api) と [Commands](../../../docs/ARCHITECTURE.md#commands)、エラーの形は relay-and-pairing の design の「Error responses」。ここには確かめる基準だけを書く。
+流れの正は [PRD: UC1](../../../docs/PRD.md#uc1-add-a-server)・[UC3](../../../docs/PRD.md#uc3-kill-zombie-parents-battle)・[UC8](../../../docs/PRD.md#uc8-app-settings)、画面の正は [DESIGN](../../../docs/DESIGN.md)、通信の正は [ARCHITECTURE: App API](../../../docs/ARCHITECTURE.md#app-api) と [Commands](../../../docs/ARCHITECTURE.md#commands)、エラーの形は [openapi.yaml](../../../docs/openapi.yaml)。ここには確かめる基準だけを書く。
 
 対応する issue：#11（Requirement 1）、#12（Requirement 2）、#13（Requirement 3）。
 
@@ -76,7 +76,7 @@ phone の app の最小の一本道。app の土台を作り、コードでサ�
    | `unknown` | 結果が分からないこと。kill の成功を表す表示は出さない | 最新の状態で表示し直す |
 
 9. IF 要求の応答が得られない THEN app SHALL 同じ kill ID で 1 回だけ送り直す
-10. IF 送り直しの応答も得られない、または kill の応答が Error responses の表のエラー（`429` を除く）である THEN app SHALL ボタンの下に赤い行を出し、ボタンを押せるようにする
+10. IF 送り直しの応答も得られない、または kill の応答が [openapi.yaml](../../../docs/openapi.yaml) のエラー（`429` を除く）である THEN app SHALL ボタンの下に赤い行を出し、ボタンを押せるようにする
 11. IF `429` が返る THEN app SHALL 送り直さず、ボタンの下にしばらく待つよう出し、ボタンを押せるようにする
 12. WHEN 親の outcome が `killed` か `already_gone` だった THEN app SHALL その親（サーバー・pid・starttime の組）を、その親を含まない `state` が届くまで列に戻さない。別のサーバーの同じ `(pid, starttime)` は隠さない
 13. WHEN `killed` か `already_gone` の直後に列が空になった THEN app SHALL All clear を出す。数は、この battle で `killed` だった親の数と、それらの親について kill を始めた時点で出ていたゾンビの数の合計で、`already_gone` は数えない。battle の区切りは design のとおり
