@@ -1,13 +1,16 @@
 import { BlurView } from 'expo-blur';
-import { Tabs } from 'expo-router';
+import { Tabs, usePathname } from 'expo-router';
 import { StyleSheet } from 'react-native';
 
 import { useI18n } from '@/i18n/context';
+import { useBattle } from '@/killy/battle-context';
 import { colors, fontFor } from '@/theme/tokens';
 
 export default function TabsLayout() {
   const { t } = useI18n();
-  const battle = t('tabBattle');
+  const battle = useBattle();
+  const onSettings = usePathname() === '/settings';
+  const battleLabel = t('tabBattle');
   const settings = t('settings');
   return (
     <Tabs
@@ -25,11 +28,26 @@ export default function TabsLayout() {
       }}>
       <Tabs.Screen
         name="index"
-        options={{ title: battle, tabBarAccessibilityLabel: battle, tabBarLabelStyle: { fontFamily: fontFor(battle, 'mono'), fontSize: 12 } }}
+        options={{
+          title: battleLabel,
+          tabBarAccessibilityLabel: battleLabel,
+          tabBarLabelStyle: { fontFamily: fontFor(battleLabel, 'mono'), fontSize: 12 },
+          // While Settings is open, how many zombie processes are waiting (DESIGN: Settings tab).
+          tabBarBadge: onSettings && battle.waiting > 0 ? battle.waiting : undefined,
+          tabBarBadgeStyle: { backgroundColor: colors.purple, color: '#FFFFFF' },
+        }}
       />
       <Tabs.Screen
         name="settings"
         options={{ title: settings, tabBarAccessibilityLabel: settings, tabBarLabelStyle: { fontFamily: fontFor(settings, 'mono'), fontSize: 12 } }}
+        listeners={{
+          // Not while a kill is in flight: its outcome belongs on the battle screen.
+          tabPress: (e) => {
+            if (battle.busy) {
+              e.preventDefault();
+            }
+          },
+        }}
       />
     </Tabs>
   );

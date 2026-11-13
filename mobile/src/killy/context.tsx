@@ -17,6 +17,7 @@ type Killy = {
   registration: Registration;
   /** The latest state from the Killy server, or null before the first one arrives. */
   state: State | null;
+  randomBytes: (n: number) => Uint8Array;
 };
 
 const KillyContext = createContext<Killy | null>(null);
@@ -73,7 +74,7 @@ export function KillyProvider({ children }: { children: ReactNode }) {
     return client.events(setState);
   }, [client, registration]);
 
-  return <KillyContext.Provider value={{ client, registration, state }}>{children}</KillyContext.Provider>;
+  return <KillyContext.Provider value={{ client, registration, state, randomBytes: deps.randomBytes }}>{children}</KillyContext.Provider>;
 }
 
 export function useKilly(): Killy {

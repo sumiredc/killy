@@ -12,6 +12,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { buildServerURL, ConfigError } from '@/config';
 import { ServerURLProvider } from '@/config-context';
 import { I18nProvider } from '@/i18n/context';
+import { BattleProvider } from '@/killy/battle-context';
 import { KillyProvider } from '@/killy/context';
 import { colors, fonts } from '@/theme/tokens';
 
@@ -46,7 +47,9 @@ export default function RootLayout() {
         <ServerURLProvider url={config.url}>
           <I18nProvider>
             <KillyProvider>
-              <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+              <BattleProvider>
+                <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+              </BattleProvider>
             </KillyProvider>
           </I18nProvider>
         </ServerURLProvider>

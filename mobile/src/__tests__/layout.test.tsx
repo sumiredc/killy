@@ -30,7 +30,7 @@ async function startApp(languageCode = 'en', url: string | null = 'https://killy
   const server = new FakeServer();
   server.respond('POST /app/v1/devices', 200, { device_token: 'tok' });
   server.stream();
-  jest.spyOn(deps, 'makeDeps').mockReturnValue({ fetch: server.fetch, tokens: { get: async () => null, set: async () => {} }, random: () => 0 });
+  jest.spyOn(deps, 'makeDeps').mockReturnValue({ fetch: server.fetch, tokens: { get: async () => null, set: async () => {} }, random: () => 0, randomBytes: (n) => new Uint8Array(n) });
   await renderRouter(routes, { initialUrl: '/' });
   await act(settle);
   return server;

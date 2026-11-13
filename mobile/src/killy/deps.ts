@@ -1,3 +1,4 @@
+import { getRandomBytes } from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 
 import type { FetchLike } from './client';
@@ -13,6 +14,8 @@ export type Deps = {
   fetch: FetchLike;
   tokens: TokenStore;
   random: () => number;
+  /** Cryptographically random bytes, for kill IDs. */
+  randomBytes: (n: number) => Uint8Array;
 };
 
 const tokenKey = 'device_token';
@@ -29,5 +32,6 @@ export function makeDeps(): Deps {
       set: (token) => SecureStore.setItemAsync(tokenKey, token),
     },
     random: Math.random,
+    randomBytes: getRandomBytes,
   };
 }
