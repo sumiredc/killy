@@ -3,13 +3,13 @@
 各トップレベルのタスクが 1 つの issue と 1 つの PR に当たる。テストは実装より先に書き、期待した理由で赤になることを確かめる。完了条件の正は各 issue。各 PR で `cd mobile && npm run typecheck && npm run lint && npm test` を通す。
 
 - [ ] 1. Expo app の土台を作る（#11）
-  - [ ] 1.1 `mobile/` に Expo（TypeScript、`expo-router` の tabs）を作り、型検査・lint・テストのコマンドをそろえる
+  - [x] 1.1 `mobile/` に Expo（TypeScript、`expo-router` の tabs）を作り、型検査・lint・テストのコマンドをそろえる
     - _Requirements: 1.1, 1.2_
-  - [ ] 1.2 翻訳のテスト（2 言語のキーの一致、除外するキーを除いた `I18N` のキーを含む、端末の言語ごとの初期値）を書き、赤を確かめる
+  - [x] 1.2 翻訳のテスト（2 言語のキーの一致、除外するキーを除いた `I18N` のキーを含む、端末の言語ごとの初期値）を書き、赤を確かめる
     - _Requirements: 1.3, 1.4, 1.5_
-  - [ ] 1.3 `I18N` を `ja.json`・`en.json` に移し、`t()` と初期の言語の処理を実装する
+  - [x] 1.3 `I18N` を `ja.json`・`en.json` に移し、`t()` と初期の言語の処理を実装する
     - _Requirements: 1.3, 1.4, 1.5_
-  - [ ] 1.4 接続先の設定を読む処理と、無いときのエラーのテストを書き、実装する
+  - [x] 1.4 接続先の設定を読む処理と、無いときのエラーのテストを書き、実装する
     - _Requirements: 1.6, 1.7_
   - [ ] 1.5 Design tokens とフォント、2 タブを置き、iOS と Android の development build で起動したスクリーンショットを PR 本文に載せる
     - _Requirements: 1.1, 1.2, 1.8_
