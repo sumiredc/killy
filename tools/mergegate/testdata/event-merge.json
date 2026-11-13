@@ -1,0 +1,1 @@
+{"session_id":"sess_f5c20a46-ee34-422d-9a6c-1e34ae86a583","hook_event_name":"PreToolUse","cwd":"/Users/sumire/repositories/killy","tool_name":"execute_bash","tool_input":{"command":"gh pr merge 62 --merge","description":"Merge PR 62","cwd":null,"run_in_background":false,"timeout":null}}

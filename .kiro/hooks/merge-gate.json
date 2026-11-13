@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Block merges before CI succeeds",
+      "trigger": "PreToolUse",
+      "description": "Blocks `gh pr merge` unless every check on the PR's head succeeded and --match-head-commit pins that head (#60). Code and tests: tools/mergegate/.",
+      "matcher": "^execute_bash$",
+      "action": {
+        "type": "command",
+        "command": "sh tools/mergegate/hook.sh || exit 2",
+        "timeout": 30
+      }
+    }
+  ]
+}

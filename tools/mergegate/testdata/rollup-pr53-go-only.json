@@ -1,0 +1,1 @@
+{"headRefOid":"1745bd812e7e953efaf3e888e0d8620148bb8d92","statusCheckRollup":[{"__typename":"CheckRun","completedAt":"2026-11-13T02:41:37Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/sumiredc/killy/actions/runs/43353740758/job/131650697137","name":"go","startedAt":"2026-11-13T02:40:13Z","status":"COMPLETED","workflowName":"ci"}]}
