@@ -14,7 +14,7 @@ import (
 // DisconnectedAfter is how long after its last snapshot an agent counts as disconnected.
 const DisconnectedAfter = 60 * time.Second
 
-// Detections keeps first-detection times; *store.Store in production.
+// Detections keeps first-detection times; *store.Store (PostgreSQL) in production.
 type Detections interface {
 	SyncFirstDetections(ctx context.Context, agentID string, parents []store.ParentKey, now time.Time) (map[store.ParentKey]time.Time, error)
 }

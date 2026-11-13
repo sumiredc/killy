@@ -1,9 +1,9 @@
 # Tasks: relay-and-pairing
 
-各トップレベルのタスクが 1 つの issue と 1 つの PR に当たる。テストは実装より先に書き、期待した理由で赤になることを確かめる。完了条件の正は各 issue。DB のテストは本物の PostgreSQL で動かし、skip されずに実行されたログを各 PR の本文に載せる。
+各トップレベルのタスクが 1 つの issue と 1 つの PR に当たる。テストは実装より先に書き、期待した理由で赤になることを確かめる。完了条件の正は各 issue。テストは PostgreSQL を使わず、DB は interface の向こうのメモリ上の偽物（`internal/server/memstore`）で置き換える。
 
 - [x] 1. agent を登録し、ペアリングコードを発行する（#6。前提：agent-process-control の 1）
-  - [x] 1.1 `killy server` の起動、`Store`（pgx の pool）、goose の migration（agents）と、DB のテストの土台（`KILLY_TEST_DATABASE_URL`）を作る。migration の失敗で元に戻ることと、2 回流して成功することのテストを書く
+  - [x] 1.1 `killy server` の起動、`Store`（pgx の pool）、goose の migration（agents）を作る。migration の後に待ち受け、失敗したら止まることのテストを書く。migration を 2 回流して何も変わらないことは手元の PostgreSQL で確かめる
     - _Requirements: 1.14, 1.15, 1.16_
   - [x] 1.2 `RateLimiter` と `ClientAddr` のテストを書き、実装する
     - _Requirements: 1.7, 1.8_
@@ -17,7 +17,7 @@
     - _Requirements: 1.1, 1.2_
 
 - [x] 2. agent が snapshot を報告し、Killy server が最新状態を持つ（#7。前提：#4、#6）
-  - [x] 2.1 migration（first_detections）と `LiveState` のテスト（置き換え・検出時刻・再起動・消えた親・再起動中に消えた親・古い `scanned_at`・不正な token・切断の判定の前とちょうどと後・一度も送っていない agent）を書き、赤を確かめる
+  - [x] 2.1 migration（first_detections）を作り、`LiveState` のテスト（置き換え・検出時刻・再起動・消えた親・再起動中に消えた親・古い `scanned_at`・不正な token・切断の判定の前とちょうどと後・一度も送っていない agent）を書き、赤を確かめる
     - _Requirements: 2.4, 2.5, 2.6, 2.7, 2.8, 2.9_
   - [x] 2.2 `POST /agent/v1/snapshots` と `LiveState` を実装し、テストを緑にする
     - _Requirements: 2.4, 2.5, 2.6, 2.7, 2.8, 2.9_

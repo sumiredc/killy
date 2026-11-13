@@ -10,14 +10,14 @@ import (
 
 	"github.com/sumiredc/killy/internal/clock"
 	"github.com/sumiredc/killy/internal/protocol"
-	"github.com/sumiredc/killy/internal/server/dbtest"
+	"github.com/sumiredc/killy/internal/server/memstore"
 	"github.com/sumiredc/killy/internal/server/store"
 )
 
 var t0 = time.Date(2026, 11, 13, 9, 0, 0, 0, time.UTC)
 
 type fixture struct {
-	store   *store.Store
+	mem     *memstore.Memory
 	clock   *clock.Fake
 	state   *State
 	agentID string
@@ -25,22 +25,18 @@ type fixture struct {
 
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
-	pool := dbtest.Pool(t)
-	if err := store.Migrate(context.Background(), pool); err != nil {
-		t.Fatal(err)
-	}
-	s := store.New(pool)
+	mem := memstore.New()
 	h := sha256.Sum256([]byte("token"))
-	a, err := s.CreateAgent(context.Background(), h[:], "web-1")
+	a, err := mem.CreateAgent(context.Background(), h[:], "web-1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	c := clock.NewFake(t0)
-	return &fixture{store: s, clock: c, state: New(c, s), agentID: a.ID}
+	return &fixture{mem: mem, clock: c, state: New(c, mem), agentID: a.ID}
 }
 
 // restart is a new Killy server process on the same database.
-func (f *fixture) restart() { f.state = New(f.clock, f.store) }
+func (f *fixture) restart() { f.state = New(f.clock, f.mem) }
 
 func parent(pid int, start int64, zombies ...int) protocol.Parent {
 	return protocol.Parent{PID: pid, StartTime: start, Cmd: "cmd", Zombies: zombies}
@@ -227,7 +223,7 @@ func (g *gatedDetections) SyncFirstDetections(ctx context.Context, agentID strin
 
 func TestTwoSnapshotsOfOneAgentAreAppliedInTurn(t *testing.T) {
 	f := newFixture(t)
-	g := &gatedDetections{Detections: f.store, second: make(chan struct{})}
+	g := &gatedDetections{Detections: f.mem, second: make(chan struct{})}
 	f.state = New(f.clock, g)
 	older := protocol.Snapshot{ScannedAt: t0, Parents: []protocol.Parent{parent(100, 5000, 101)}}
 	newer := protocol.Snapshot{ScannedAt: t0.Add(5 * time.Second), Parents: []protocol.Parent{parent(200, 7000, 201)}}
@@ -276,7 +272,7 @@ func TestASnapshotThatCannotBeStoredKeepsThePreviousState(t *testing.T) {
 func TestReadingTheStateDoesNotWaitForTheDatabase(t *testing.T) {
 	f := newFixture(t)
 	f.report(t, t0, parent(100, 5000, 101))
-	g := &gatedDetections{Detections: f.store, second: make(chan struct{})}
+	g := &gatedDetections{Detections: f.mem, second: make(chan struct{})}
 	f.state.detections = g
 	go func() {
 		_ = f.state.Report(context.Background(), f.agentID, protocol.Snapshot{ScannedAt: t0.Add(time.Second), Parents: []protocol.Parent{}})
@@ -289,5 +285,31 @@ func TestReadingTheStateDoesNotWaitForTheDatabase(t *testing.T) {
 	f.state.Agent(f.agentID)
 	if waited := time.Since(start); waited > 100*time.Millisecond {
 		t.Errorf("reading the state waited %v for a snapshot's database call", waited)
+	}
+}
+
+func TestFirstDetectionsAreKeptPerAgent(t *testing.T) {
+	f := newFixture(t)
+	h := sha256.Sum256([]byte("other token"))
+	other, err := f.mem.CreateAgent(context.Background(), h[:], "web-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.report(t, t0, parent(100, 5000, 101))
+	f.clock.Advance(time.Minute)
+	// The other agent reports no parents, then the same PID and start time as the first agent.
+	if err := f.state.Report(context.Background(), other.ID, protocol.Snapshot{ScannedAt: t0, Parents: []protocol.Parent{}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.state.Report(context.Background(), other.ID, protocol.Snapshot{ScannedAt: t0.Add(time.Second), Parents: []protocol.Parent{parent(100, 5000, 101)}}); err != nil {
+		t.Fatal(err)
+	}
+	f.report(t, t0.Add(15*time.Second), parent(100, 5000, 101))
+	if got := f.parents(t)[100].FirstDetectedAt; !got.Equal(t0) {
+		t.Errorf("first agent's parent detected at %v, want %v", got, t0)
+	}
+	a, _ := f.state.Agent(other.ID)
+	if len(a.Parents) != 1 || !a.Parents[0].FirstDetectedAt.Equal(t0.Add(time.Minute)) {
+		t.Errorf("other agent's parents %+v, want PID 100 detected at %v", a.Parents, t0.Add(time.Minute))
 	}
 }

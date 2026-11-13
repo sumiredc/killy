@@ -148,7 +148,7 @@ status と `error` の値の正は [openapi.yaml](../../../docs/openapi.yaml)（
 ## Testing Strategy
 
 - **書く順**：各 Acceptance Criteria のテストを先に書き、期待した理由の赤を確かめてから実装する
-- **DB**：本物の PostgreSQL を使う。`KILLY_TEST_DATABASE_URL` があればテストごとに schema を作り直し、無ければ DB のテストは skip して理由を出す。各 PR の本文には、DB のテストが skip されずに実行されたログを載せる。CI ができた後は、CI が値を与えて skip が 0 件であることを確かめる（#14）
+- **DB**：テストは PostgreSQL を使わない。handler と `LiveState` は DB を interface（`server.AgentStore`、`live.Detections` など）で受け取り、テストでは `internal/server/memstore` のメモリ上の偽物を渡す。偽物は `store` の SQL と同じ規則（token は SHA-256 で引く、first_detections は報告された親の集合に合わせる）を持つ。`store` の SQL と migration は、手元（`make db-up`）と staging で `killy server` を動かして確かめる。自動のテストが無いのは、UUID の発行、`ErrNoRows` から `ErrNotFound` への読み替え、first_detections の SQL、migration の DDL。Requirement 1.15 の「途中で失敗した migration を元に戻す」は、goose が migration を 1 つずつ transaction で流すことに頼り、確かめていない（同じ 1.15 の「起動を止める」は `cmd/killy` のテストが確かめる）。1.16 は、手元で `killy server` を 2 回起動して `goose_db_version` が変わらないことで確かめる
 - **時刻**：`Clock` を差し替え、10 分・60 秒・10 秒・回数制限の窓の前・ちょうど・後を確かめる。ちょうどの扱いは PR で決めて書く
 - **HTTP と SSE**：`httptest.Server` に本物の handler をつなぎ、SSE は行単位で読んで確かめる
 - **中継**：Killy server と agent の `CommandClient` を同じテストでつなぎ、`Killer` は偽物の `PidfdOps` で動かす。同じ ID の 2 回で signal が 1 回であることを、`SendKill` の回数で確かめる

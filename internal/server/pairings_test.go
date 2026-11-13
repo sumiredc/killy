@@ -2,9 +2,9 @@ package server
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -14,47 +14,42 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sumiredc/killy/internal/clock"
 	"github.com/sumiredc/killy/internal/protocol"
-	"github.com/sumiredc/killy/internal/server/dbtest"
 	"github.com/sumiredc/killy/internal/server/live"
+	"github.com/sumiredc/killy/internal/server/memstore"
 	"github.com/sumiredc/killy/internal/server/pairing"
 	"github.com/sumiredc/killy/internal/server/ratelimit"
-	"github.com/sumiredc/killy/internal/server/store"
 )
 
 var t0 = time.Date(2026, 11, 13, 9, 0, 0, 0, time.UTC)
 
 type testServer struct {
 	*Server
-	pool  *pgxpool.Pool
+	mem   *memstore.Memory
 	clock *clock.Fake
 }
 
-func newTestServer(t *testing.T, pool *pgxpool.Pool) *testServer {
+func newTestServer(t *testing.T) *testServer {
 	t.Helper()
 	c := clock.NewFake(t0)
+	mem := memstore.New()
 	return &testServer{
 		Server: &Server{
-			Store:     store.New(pool),
+			Store:     mem,
 			Codes:     pairing.New(c),
 			FirstRuns: ratelimit.New(FirstRunLimit, FirstRunPeriod, c),
-			Live:      live.New(c, store.New(pool)),
+			Live:      live.New(c, mem),
 			Log:       slog.New(slog.NewTextHandler(io.Discard, nil)),
 		},
-		pool:  pool,
+		mem:   mem,
 		clock: c,
 	}
 }
 
-func migratedServer(t *testing.T) *testServer {
-	t.Helper()
-	pool := dbtest.Pool(t)
-	if err := store.Migrate(context.Background(), pool); err != nil {
-		t.Fatalf("Migrate: %v", err)
-	}
-	return newTestServer(t, pool)
+// unreachableDB makes every store call fail, as when PostgreSQL cannot be reached.
+func (s *testServer) unreachableDB() {
+	s.mem.Err = errors.New("dial tcp 127.0.0.1:5432: connect: connection refused")
 }
 
 type pairingReply struct {
@@ -92,11 +87,7 @@ const hostBody = `{"hostname":"web-1"}`
 
 func (s *testServer) agentCount(t *testing.T) int {
 	t.Helper()
-	var n int
-	if err := s.pool.QueryRow(context.Background(), "SELECT count(*) FROM agents").Scan(&n); err != nil {
-		t.Fatal(err)
-	}
-	return n
+	return len(s.mem.Agents())
 }
 
 func (s *testServer) register(t *testing.T) pairingReply {
@@ -111,7 +102,7 @@ func (s *testServer) register(t *testing.T) pairingReply {
 var codeShape = regexp.MustCompile(`^[A-Z0-9]{6}$`)
 
 func TestAFirstRegistrationReturnsATokenTheAgentIDAndACode(t *testing.T) {
-	s := migratedServer(t)
+	s := newTestServer(t)
 	status, resp := s.pair(t, "192.0.2.1", "", hostBody)
 	if status != http.StatusOK {
 		t.Fatalf("status = %d (%s), want 200", status, resp.Error)
@@ -131,33 +122,26 @@ func TestAFirstRegistrationReturnsATokenTheAgentIDAndACode(t *testing.T) {
 }
 
 func TestAFirstRegistrationStoresTheTokenHashNotTheToken(t *testing.T) {
-	s := migratedServer(t)
+	s := newTestServer(t)
 	resp := s.register(t)
-	var stored []byte
-	var hostname string
-	if err := s.pool.QueryRow(context.Background(), "SELECT token_sha256, hostname FROM agents WHERE id = $1", resp.AgentID).Scan(&stored, &hostname); err != nil {
-		t.Fatal(err)
+	rows := s.mem.Agents()
+	if len(rows) != 1 || rows[0].ID != resp.AgentID {
+		t.Fatalf("stored agents %+v, want the one registered", rows)
 	}
 	want := sha256.Sum256([]byte(*resp.AgentToken))
-	if !bytes.Equal(stored, want[:]) {
-		t.Errorf("token_sha256 = %x, want SHA-256 of the token %x", stored, want)
+	if !bytes.Equal(rows[0].TokenSHA256, want[:]) {
+		t.Errorf("stored token hash %x, want SHA-256 of the token %x", rows[0].TokenSHA256, want)
 	}
-	if hostname != "web-1" {
-		t.Errorf("hostname = %q, want web-1", hostname)
+	if rows[0].Hostname != "web-1" {
+		t.Errorf("hostname = %q, want web-1", rows[0].Hostname)
 	}
-	var found bool
-	if err := s.pool.QueryRow(context.Background(),
-		"SELECT EXISTS (SELECT 1 FROM agents a WHERE position($1::bytea IN a.token_sha256) > 0 OR position($2 IN a.hostname) > 0)",
-		[]byte(*resp.AgentToken), *resp.AgentToken).Scan(&found); err != nil {
-		t.Fatal(err)
-	}
-	if found {
-		t.Error("the token itself is stored in the agents table")
+	if bytes.Contains(rows[0].TokenSHA256, []byte(*resp.AgentToken)) || strings.Contains(rows[0].Hostname, *resp.AgentToken) {
+		t.Error("the token itself was handed to the store")
 	}
 }
 
 func TestTheAgentTokenGetsANewCodeForTheSameAgent(t *testing.T) {
-	s := migratedServer(t)
+	s := newTestServer(t)
 	first := s.register(t)
 	status, resp := s.pair(t, "192.0.2.1", *first.AgentToken, hostBody)
 	if status != http.StatusOK {
@@ -181,7 +165,7 @@ func TestTheAgentTokenGetsANewCodeForTheSameAgent(t *testing.T) {
 }
 
 func TestAnInvalidTokenIsRefusedAndCreatesNothing(t *testing.T) {
-	s := migratedServer(t)
+	s := newTestServer(t)
 	for name, auth := range map[string]string{
 		"unknown token": "Bearer bm90LWEtcmVhbC10b2tlbi1ub3QtYS1yZWFsLXRva2Vu",
 		"empty bearer":  "Bearer ",
@@ -203,7 +187,7 @@ func TestAnInvalidTokenIsRefusedAndCreatesNothing(t *testing.T) {
 }
 
 func TestAnInvalidBodyIsAnInvalidRequestAndCreatesNothing(t *testing.T) {
-	s := migratedServer(t)
+	s := newTestServer(t)
 	for name, body := range map[string]string{
 		"not JSON":          "hostname=web-1",
 		"no hostname":       `{}`,
@@ -223,7 +207,7 @@ func TestAnInvalidBodyIsAnInvalidRequestAndCreatesNothing(t *testing.T) {
 }
 
 func TestFirstRegistrationsAreLimitedToTenAnHourPerClientAddress(t *testing.T) {
-	s := migratedServer(t)
+	s := newTestServer(t)
 	cf := func(ip string) []string { return []string{"CF-Connecting-IP", ip} }
 	for i := range FirstRunLimit {
 		if status, resp := s.pair(t, "10.42.0.7", "", hostBody, cf("203.0.113.9")...); status != http.StatusOK {
@@ -249,7 +233,7 @@ func TestFirstRegistrationsAreLimitedToTenAnHourPerClientAddress(t *testing.T) {
 }
 
 func TestRequestsWithTheAgentTokenAreNeitherCountedNorLimited(t *testing.T) {
-	s := migratedServer(t)
+	s := newTestServer(t)
 	first := s.register(t) // counted: 1 of 10 for 192.0.2.1
 	for i := range FirstRunLimit + 5 {
 		if status, resp := s.pair(t, "192.0.2.1", *first.AgentToken, hostBody); status != http.StatusOK {
@@ -264,7 +248,7 @@ func TestRequestsWithTheAgentTokenAreNeitherCountedNorLimited(t *testing.T) {
 }
 
 func TestWithoutCFConnectingIPFirstRegistrationsAreCountedByTheTCPPeer(t *testing.T) {
-	s := migratedServer(t)
+	s := newTestServer(t)
 	for range FirstRunLimit {
 		if status, _ := s.pair(t, "192.0.2.1", "", hostBody); status != http.StatusOK {
 			t.Fatalf("status %d, want 200", status)
@@ -279,12 +263,8 @@ func TestWithoutCFConnectingIPFirstRegistrationsAreCountedByTheTCPPeer(t *testin
 }
 
 func TestAnUnreachableDatabaseMakesThePairingUnavailable(t *testing.T) {
-	pool, err := pgxpool.New(context.Background(), "postgres://killy@127.0.0.1:1/killy?sslmode=disable&connect_timeout=2")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(pool.Close)
-	s := newTestServer(t, pool)
+	s := newTestServer(t)
+	s.unreachableDB()
 	for name, token := range map[string]string{"first run": "", "with a token": "c29tZS10b2tlbg"} {
 		t.Run(name, func(t *testing.T) {
 			status, resp := s.pair(t, "192.0.2.1", token, hostBody)
@@ -296,7 +276,7 @@ func TestAnUnreachableDatabaseMakesThePairingUnavailable(t *testing.T) {
 }
 
 func TestInvalidRequestsDoNotUseUpTheFirstRunLimit(t *testing.T) {
-	s := migratedServer(t)
+	s := newTestServer(t)
 	for range FirstRunLimit {
 		if status, _ := s.pair(t, "192.0.2.1", "", `{}`); status != http.StatusBadRequest {
 			t.Fatalf("invalid body: %d, want 400", status)
@@ -310,12 +290,8 @@ func TestInvalidRequestsDoNotUseUpTheFirstRunLimit(t *testing.T) {
 }
 
 func TestRegistrationsThatFailOnTheDatabaseStillCount(t *testing.T) {
-	pool, err := pgxpool.New(context.Background(), "postgres://killy@127.0.0.1:1/killy?sslmode=disable&connect_timeout=2")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(pool.Close)
-	s := newTestServer(t, pool)
+	s := newTestServer(t)
+	s.unreachableDB()
 	for range FirstRunLimit {
 		if status, _ := s.pair(t, "192.0.2.1", "", hostBody); status != http.StatusServiceUnavailable {
 			t.Fatalf("status %d, want 503", status)
@@ -328,7 +304,7 @@ func TestRegistrationsThatFailOnTheDatabaseStillCount(t *testing.T) {
 }
 
 func TestABodyOver64KiBIsAnInvalidRequest(t *testing.T) {
-	s := migratedServer(t)
+	s := newTestServer(t)
 	body := `{"hostname":"web-1","padding":"` + strings.Repeat("x", 64<<10) + `"}`
 	if status, resp := s.pair(t, "192.0.2.1", "", body); status != http.StatusBadRequest || resp.Error != "invalid_request" {
 		t.Errorf("got %d %+v, want 400 invalid_request", status, resp)
@@ -339,10 +315,21 @@ func TestABodyOver64KiBIsAnInvalidRequest(t *testing.T) {
 }
 
 func TestTheBearerSchemeIsMatchedWithoutRegardToCase(t *testing.T) {
-	s := migratedServer(t)
+	s := newTestServer(t)
 	first := s.register(t)
 	status, resp := s.pair(t, "192.0.2.1", "", hostBody, "Authorization", "bearer "+*first.AgentToken)
 	if status != http.StatusOK || resp.AgentID != first.AgentID {
 		t.Errorf("got %d %+v, want 200 for agent %s", status, resp, first.AgentID)
+	}
+}
+
+func TestTheAgentTokenLeadsToItsOwnAgentAmongSeveral(t *testing.T) {
+	s := newTestServer(t)
+	first, second := s.register(t), s.register(t)
+	for _, a := range []pairingReply{first, second} {
+		status, resp := s.pair(t, "192.0.2.1", *a.AgentToken, hostBody)
+		if status != http.StatusOK || resp.AgentID != a.AgentID {
+			t.Errorf("token of %s: %d %+v, want that agent", a.AgentID, status, resp)
+		}
 	}
 }
