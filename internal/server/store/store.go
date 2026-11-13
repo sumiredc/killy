@@ -204,3 +204,51 @@ func (s *Store) LinkDevice(ctx context.Context, deviceID, agentID string, name *
 	}
 	return l, nil
 }
+
+// LinkedServer is an agent as one device sees it.
+type LinkedServer struct {
+	AgentID  string
+	Name     string
+	Notify   bool
+	Hostname string
+}
+
+// LinksOfDevice returns the agents linked to the device, in the order they were linked.
+func (s *Store) LinksOfDevice(ctx context.Context, deviceID string) ([]LinkedServer, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT l.agent_id::text, l.name, l.notify, a.hostname
+		FROM links l JOIN agents a ON a.id = l.agent_id
+		WHERE l.device_id = $1
+		ORDER BY l.created_at, l.agent_id`, deviceID)
+	if err != nil {
+		return nil, fmt.Errorf("list links of device: %w", err)
+	}
+	defer rows.Close()
+	servers := []LinkedServer{}
+	for rows.Next() {
+		var l LinkedServer
+		if err := rows.Scan(&l.AgentID, &l.Name, &l.Notify, &l.Hostname); err != nil {
+			return nil, err
+		}
+		servers = append(servers, l)
+	}
+	return servers, rows.Err()
+}
+
+// DevicesOfAgent returns the IDs of the devices linked to the agent.
+func (s *Store) DevicesOfAgent(ctx context.Context, agentID string) ([]string, error) {
+	rows, err := s.pool.Query(ctx, "SELECT device_id::text FROM links WHERE agent_id = $1", agentID)
+	if err != nil {
+		return nil, fmt.Errorf("list devices of agent: %w", err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}

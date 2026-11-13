@@ -22,7 +22,7 @@ func TestServeDoesNotListenWhenTheMigrationFails(t *testing.T) {
 	err := serve(ctx, quiet,
 		func(context.Context) error { return errors.New("migration 2 failed") },
 		func() (net.Listener, error) { listened = true; return net.Listen("tcp", "127.0.0.1:0") },
-		http.NotFoundHandler())
+		http.NotFoundHandler(), func() {})
 	if err == nil {
 		t.Error("serve returned nil after a failed migration")
 	}
@@ -43,7 +43,7 @@ func TestServeMigratesBeforeListening(t *testing.T) {
 				cancel()
 				return net.Listen("tcp", "127.0.0.1:0")
 			},
-			http.NotFoundHandler())
+			http.NotFoundHandler(), func() {})
 	}()
 	select {
 	case err := <-done:
@@ -74,5 +74,53 @@ func TestEveryTicksAtOnceAndThenEveryInterval(t *testing.T) {
 	}
 	if at[0] > 40*time.Millisecond || at[1] < 40*time.Millisecond || at[2] < 90*time.Millisecond {
 		t.Errorf("ticks at %v, want one at once, then about every 50 ms", at)
+	}
+}
+
+func TestServeShutsDownPromptlyWithAStreamOpen(t *testing.T) {
+	stop := make(chan struct{})
+	opened := make(chan struct{})
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.(http.Flusher).Flush()
+		close(opened)
+		select {
+		case <-stop:
+		case <-r.Context().Done():
+		}
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	addr := make(chan string, 1)
+	done := make(chan error, 1)
+	go func() {
+		done <- serve(ctx, quiet,
+			func(context.Context) error { return nil },
+			func() (net.Listener, error) {
+				ln, err := net.Listen("tcp", "127.0.0.1:0")
+				if err == nil {
+					addr <- ln.Addr().String()
+				}
+				return ln, err
+			},
+			h, func() { close(stop) })
+	}()
+	res, err := http.Get("http://" + <-addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	<-opened
+	start := time.Now()
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("serve: %v, want a clean stop", err)
+		}
+		if d := time.Since(start); d > 2*time.Second {
+			t.Errorf("shutdown took %v, want well under the 10 s limit", d)
+		}
+	case <-time.After(15 * time.Second):
+		t.Fatal("serve did not return")
 	}
 }
