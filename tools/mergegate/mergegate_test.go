@@ -8,8 +8,9 @@ import (
 	"time"
 )
 
-// Recorded with `gh pr view <n> --json headRefOid,statusCheckRollup` (#60), except
-// rollup-in-progress.json, which follows the same shape with the checks still running.
+// Recorded with `gh pr view <n> --json headRefOid,statusCheckRollup` (#60): PR 62 after CI
+// succeeded, PR 61 after it failed, PR 53 (the go job only), and PR 63 while its CI was queued
+// and then running.
 func rollup(t *testing.T, name string) []byte {
 	t.Helper()
 	b, err := os.ReadFile("testdata/" + name + ".json")
@@ -22,6 +23,7 @@ func rollup(t *testing.T, name string) []byte {
 const (
 	head62 = "0c74441b728bb86d29c4f7713c9999c44c64086f"
 	head61 = "1444db8bde741376f735c0254b74e39e52e04ec1"
+	head63 = "b1d261f94abf2ac7366de3a824319e8d706c1878"
 )
 
 // A fake gh: returns out for any call and records the arguments.
@@ -80,10 +82,12 @@ func TestAMergeInsideAChainOfCommandsIsChecked(t *testing.T) {
 }
 
 func TestChecksStillRunningBlock(t *testing.T) {
-	gh := &fakeGH{out: rollup(t, "rollup-in-progress")}
-	d := decide(event(t, "gh pr merge 62 --match-head-commit "+head62), gh.view)
-	mustBlock(t, d, "go: IN_PROGRESS")
-	mustBlock(t, d, "app: QUEUED")
+	queued := decide(event(t, "gh pr merge 63 --match-head-commit "+head63), (&fakeGH{out: rollup(t, "rollup-pr63-queued")}).view)
+	mustBlock(t, queued, "go: QUEUED")
+	mustBlock(t, queued, "app: QUEUED")
+	running := decide(event(t, "gh pr merge 63 --match-head-commit "+head63), (&fakeGH{out: rollup(t, "rollup-pr63-in-progress")}).view)
+	mustBlock(t, running, "go: IN_PROGRESS")
+	mustBlock(t, running, "app: IN_PROGRESS")
 }
 
 func TestFailedChecksBlock(t *testing.T) {
