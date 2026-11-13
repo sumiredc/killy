@@ -69,6 +69,12 @@ func runOnce(t *testing.T, opts RunOptions) (string, error) {
 	if opts.PidfdAvailable == nil {
 		opts.PidfdAvailable = func() bool { return true }
 	}
+	if opts.Killer == nil {
+		opts.Killer = &fakeKiller{}
+	}
+	opts.StreamClient = http.DefaultClient
+	opts.Rand = func() float64 { return 0 }
+	opts.Sleep = SleepContext
 	done := make(chan error, 1)
 	go func() { done <- Run(ctx, opts) }()
 	time.Sleep(200 * time.Millisecond)
@@ -128,5 +134,37 @@ func TestSendSnapshotReportsARefusal(t *testing.T) {
 		protocol.Snapshot{ScannedAt: t0, Parents: []protocol.Parent{}})
 	if err == nil || !strings.Contains(err.Error(), "401") {
 		t.Errorf("err = %v, want an error naming the 401", err)
+	}
+}
+
+func TestRunAlsoOpensTheCommandStream(t *testing.T) {
+	server := newCommandServer(t)
+	path := configPath(t)
+	writeConfig(t, path, Config{Server: server.URL, Token: issuedToken})
+	var logs bytes.Buffer
+	ticks := make(chan time.Time)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- Run(ctx, RunOptions{ConfigPath: path, Client: http.DefaultClient, Log: slog.New(slog.NewTextHandler(&logs, nil)),
+			Scanner: &fakeScanner{}, PidfdAvailable: func() bool { return true }, Ticks: ticks,
+			Killer: &fakeKiller{out: protocol.Outcome{Outcome: protocol.AlreadyGone}}, StreamClient: http.DefaultClient,
+			Rand: func() float64 { return 0 }, Sleep: SleepContext})
+	}()
+	waitConnections(t, server, 1)
+	server.commands <- killEvent("16fd2706-8baf-433b-82eb-8c7fada847da")
+	select {
+	case r := <-server.got:
+		if r.Outcome != protocol.AlreadyGone {
+			t.Errorf("result %+v, want already_gone", r)
+		}
+	case <-time.After(3 * time.Second):
+		t.Error("no result")
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run did not return after cancel")
 	}
 }
