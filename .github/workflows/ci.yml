@@ -25,3 +25,26 @@ jobs:
       - run: go vet ./...
       # -count=1: the Linux tests check the runner itself (pidfd, reaping), so a cached pass proves nothing.
       - run: go test -race -count=1 ./...
+
+  app:
+    # Every job runs on the self-hosted runner while the repository is private. Write the runner
+    # name literally on the runs-on line, so the switch to GitHub-hosted runners finds every job by grep.
+    runs-on: arc-runner-killy
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: mobile/.nvmrc
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: node --version
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test -- --ci
