@@ -252,7 +252,7 @@ production の前に:
 | Framework | Expo（最新の SDK）、TypeScript、development build（Expo Go は push を受け取れない） |
 | 描画 | `react-native-svg`（アートは `mock/art.js` から移す） |
 | 動き | `react-native-reanimated` |
-| SSE | `react-native-sse` か `expo/fetch` の streaming |
+| SSE | `expo/fetch` の streaming（Expo が global の `fetch` に入れている）を、app の小さな parser で event に分ける |
 | Push | `expo-notifications` |
 | QR | `expo-camera` |
 | 秘密情報 | device token は `expo-secure-store` に置く |

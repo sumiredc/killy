@@ -1,4 +1,4 @@
-import { fireEvent, renderRouter, screen } from 'expo-router/testing-library';
+import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library';
 import * as Localization from 'expo-localization';
 
 import * as config from '../config';
@@ -6,6 +6,8 @@ import RootLayout from '../app/_layout';
 import TabsLayout from '../app/(tabs)/_layout';
 import BattleScreen from '../app/(tabs)/index';
 import SettingsScreen from '../app/(tabs)/settings';
+import * as deps from '../killy/deps';
+import { FakeServer, settle } from '../testing/fake-server';
 
 jest.mock('expo-localization', () => ({ getLocales: jest.fn(() => [{ languageCode: 'en' }]) }));
 
@@ -25,7 +27,13 @@ afterEach(() => {
 async function startApp(languageCode = 'en', url: string | null = 'https://killy.example') {
   jest.spyOn(config, 'buildServerURL').mockImplementation(() => config.serverURL(url ?? undefined));
   jest.mocked(Localization.getLocales).mockReturnValue([{ languageCode } as Localization.Locale]);
+  const server = new FakeServer();
+  server.respond('POST /app/v1/devices', 200, { device_token: 'tok' });
+  server.stream();
+  jest.spyOn(deps, 'makeDeps').mockReturnValue({ fetch: server.fetch, tokens: { get: async () => null, set: async () => {} }, random: () => 0 });
   await renderRouter(routes, { initialUrl: '/' });
+  await act(settle);
+  return server;
 }
 
 test('the app opens on the Battle tab and switches between the two tabs', async () => {
@@ -50,12 +58,13 @@ test('a phone set to French shows the app in English', async () => {
   expect(screen.getByText('No servers yet')).toBeOnTheScreen();
 });
 
-test('without a Killy server for the build the app shows an error and no tabs', async () => {
-  await startApp('en', null);
+test('without a Killy server for the build the app shows an error, no tabs, and sends nothing', async () => {
+  const server = await startApp('en', null);
   expect(await screen.findByTestId('config-error')).toBeOnTheScreen();
   expect(screen.getByText(/EXPO_PUBLIC_KILLY_SERVER_URL/)).toBeOnTheScreen();
   expect(screen.queryByTestId('battle-screen')).toBeNull();
   expect(screen.queryByLabelText('Battle')).toBeNull();
+  expect(server.requests).toEqual([]);
 });
 
 test('Japanese text is drawn in the Japanese font', async () => {

@@ -12,6 +12,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { buildServerURL, ConfigError } from '@/config';
 import { ServerURLProvider } from '@/config-context';
 import { I18nProvider } from '@/i18n/context';
+import { KillyProvider } from '@/killy/context';
 import { colors, fonts } from '@/theme/tokens';
 
 SplashScreen.preventAutoHideAsync();
@@ -44,7 +45,9 @@ export default function RootLayout() {
       ) : (
         <ServerURLProvider url={config.url}>
           <I18nProvider>
-            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+            <KillyProvider>
+              <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+            </KillyProvider>
           </I18nProvider>
         </ServerURLProvider>
       )}
