@@ -79,13 +79,13 @@ erDiagram
 
 ### LiveState（`internal/server/live`）
 
-agent ごとに最新の snapshot、最後に受け付けた `scanned_at`、最後に受け取った時刻を持つ。snapshot を受けたら、DB の first_detections をその snapshot の親の集合に合わせる（無い親を消し、新しい親を足す）。`scanned_at` が前回より古い snapshot は捨てるが、`204` を返して agent に送り直させない（#1 の D25）。再起動後の最初の snapshot では、DB にあって snapshot に無い親を消す。1 秒ごとの ticker で 60 秒の切断の判定をし、切断と接続の変化を `Broker` に知らせる（ticker と `Broker` への通知は #9 で足す。#7 では `Connected` を問い合わせの時に判定する）。
+agent ごとに最新の snapshot、最後に受け付けた `scanned_at`、最後に受け取った時刻を持つ。snapshot を受けたら、DB の first_detections をその snapshot の親の集合に合わせる（無い親を消し、新しい親を足す）。`scanned_at` が前回より古い snapshot は捨てるが、`204` を返して agent に送り直させない（#1 の D25）。再起動後の最初の snapshot では、DB にあって snapshot に無い親を消す。`killy server` は 1 秒ごとに `ConnectionChanges` を呼び、60 秒報告の無かった agent を `Broker` に知らせる。接続に戻るのは snapshot が届いたときで、そのときは snapshot を受け付けたことが知らせになるので、`ConnectionChanges` は切断への変化だけを返す（最初の snapshot も含め、二重に知らせない）。`Report` は snapshot を反映したかを返し、捨てた snapshot では知らせない。切断の知らせは、紐付いた device を DB から引けたときにだけ「知らせ済み」にし、引けなければ次の 1 秒でまた試す。snapshot を受けた後の知らせは、agent が切っても取り消さない。
 
 `scanned_at` が前回と同じ snapshot は受け付ける（古いものだけを捨てる）。最後に受け付けた snapshot からちょうど 60 秒の時刻で切断になる。受け付けた時刻は Killy server の時計で取り、捨てた snapshot では更新しない。first_detections は snapshot ごとに 1 つの transaction で、snapshot に無い親の行を消し、新しい親に今の時刻を入れる。snapshot の本文は 8 MiB まで（agent は `cmd` を 4096 バイトで切る）。openapi.yaml の required の欄が無いもの、PID とゾンビの PID が 1〜2^22 の外のもの、`zombies` が空の親は `400`。最新の snapshot を読む側（`Agent`・`Connected`）は、DB の処理を待たない。
 
 ### Broker（`internal/server/sse`）
 
-device ごとに開いている stream の一覧を持つ。`Notify(deviceIDs)` で、それぞれの device の `state` を作り直して送る。heartbeat、`http.ResponseController` による書き込み期限の解除、flush は、命令の stream と共通の `sse.Writer` にまとめる。
+device ごとに開いている stream の一覧を持つ。`Notify(deviceIDs)` は、それぞれの stream に「作り直して送る」合図を送るだけで、`state` は stream の側が `LinksOfDevice` と `LiveState` から作り直す。合図は 1 つまで溜め、溜まっていれば捨てる（どうせ丸ごと送るので、遅い phone が `Notify` を止めない）。stream は最初の `state` を作る前に合図を受け取り始めるので、その間の変化を取りこぼさない。サーバーは紐付けた順に並べる。`killy server` の停止が始まったら（`http.Server.RegisterOnShutdown`）、開いている stream をすべて閉じる（`Shutdown` は handler が終わるのを待つので、閉じないと 10 秒の待ちを使い切る）。phone は再接続する。切断している agent にも、最後の snapshot の親を入れたまま `disconnected: true` を付ける（どう扱うかは app が決める）。heartbeat、`http.ResponseController` による書き込み期限の解除、flush は、命令の stream と共通の `sse.Writer` にまとめる。
 
 `state` の JSON：
 
