@@ -36,11 +36,13 @@ func newTestServer(t *testing.T) *testServer {
 	mem := memstore.New()
 	return &testServer{
 		Server: &Server{
-			Store:     mem,
-			Codes:     pairing.New(c),
-			FirstRuns: ratelimit.New(FirstRunLimit, FirstRunPeriod, c),
-			Live:      live.New(c, mem),
-			Log:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+			Store:               mem,
+			Codes:               pairing.New(c),
+			FirstRuns:           ratelimit.New(FirstRunLimit, FirstRunPeriod, c),
+			DeviceRegistrations: ratelimit.New(DeviceRegistrationLimit, DeviceRegistrationPeriod, c),
+			FailedClaims:        ratelimit.New(FailedClaimLimit, FailedClaimPeriod, c),
+			Live:                live.New(c, mem),
+			Log:                 slog.New(slog.NewTextHandler(io.Discard, nil)),
 		},
 		mem:   mem,
 		clock: c,

@@ -28,12 +28,12 @@
   - [x] 2.5 `go vet ./...` と `go test ./...` を通し、Linux 上で実際のゾンビが届くことと、agent が LISTEN していないことを PR 本文に書く
     - _Requirements: 2.2, 2.12_
 
-- [ ] 3. phone を登録し、コードで agent と紐付ける（#8。前提：#6）
-  - [ ] 3.1 migration（devices・links）と、device の登録のテスト（push token なし・回数制限・token の保存の形・不正な token）を書き、赤を確かめる
+- [x] 3. phone を登録し、コードで agent と紐付ける（#8。前提：#6）
+  - [x] 3.1 migration（devices・links）と、device の登録のテスト（push token なし・回数制限・token の保存の形・不正な token）を書き、赤を確かめる
     - _Requirements: 3.1, 3.2, 3.9, 3.10_
-  - [ ] 3.2 claim のテスト（agent を待たない・hostname・3 種類のエラーの status と `error`・同時の claim・2 台の device と別々の表示名・claim の失敗の制限）を書き、赤を確かめる
+  - [x] 3.2 claim のテスト（agent を待たない・hostname・3 種類のエラーの status と `error`・同時の claim・2 台の device と別々の表示名・claim の失敗の制限）を書き、赤を確かめる
     - _Requirements: 3.3, 3.4, 3.5, 3.6, 3.7, 3.8_
-  - [ ] 3.3 `POST /app/v1/devices` と `POST /app/v1/pairings/claim` を実装し、`go vet ./...` と `go test -race ./...` を通す
+  - [x] 3.3 `POST /app/v1/devices` と `POST /app/v1/pairings/claim` を実装し、`go vet ./...` と `go test -race ./...` を通す
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10_
 
 - [ ] 4. phone に状態を SSE で配る（#9。前提：#7、#8）

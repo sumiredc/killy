@@ -17,6 +17,7 @@ const Lifetime = 10 * time.Minute
 var (
 	ErrUnknown = errors.New("pairing code is unknown")
 	ErrExpired = errors.New("pairing code has expired")
+	ErrUsed    = errors.New("pairing code was already used")
 )
 
 // Codes keeps the codes in memory; a restart drops them and the operator runs killy agent pair again.
@@ -37,6 +38,7 @@ type Codes struct {
 type entry struct {
 	agentID string
 	expires time.Time
+	used    bool
 }
 
 func New(c clock.Clock) *Codes {
@@ -111,4 +113,34 @@ func (c *Codes) Lookup(code string) (string, error) {
 		return "", ErrExpired
 	}
 	return e.agentID, nil
+}
+
+// Claim uses a code once. It returns the agent the code was issued for and a release function that
+// makes the code usable again, for when linking the device fails afterwards. Of two claims of the
+// same code, only one succeeds; the other gets ErrUsed. A used code is reported as used even after
+// it expires.
+func (c *Codes) Claim(code string) (agentID string, release func(), err error) {
+	now := c.clock.Now()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	e, ok := c.codes[code]
+	switch {
+	case !ok:
+		return "", nil, ErrUnknown
+	case e.used:
+		return "", nil, ErrUsed
+	case !now.Before(e.expires):
+		return "", nil, ErrExpired
+	}
+	e.used = true
+	c.codes[code] = e
+	release = func() {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if e, ok := c.codes[code]; ok {
+			e.used = false
+			c.codes[code] = e
+		}
+	}
+	return e.agentID, release, nil
 }

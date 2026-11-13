@@ -49,11 +49,13 @@ func runServer(args []string, stderr io.Writer) int {
 	c := clock.System{}
 	st := store.New(pool)
 	srv := &server.Server{
-		Store:     st,
-		Codes:     pairing.New(c),
-		FirstRuns: ratelimit.New(server.FirstRunLimit, server.FirstRunPeriod, c),
-		Live:      live.New(c, st),
-		Log:       log,
+		Store:               st,
+		Codes:               pairing.New(c),
+		FirstRuns:           ratelimit.New(server.FirstRunLimit, server.FirstRunPeriod, c),
+		DeviceRegistrations: ratelimit.New(server.DeviceRegistrationLimit, server.DeviceRegistrationPeriod, c),
+		FailedClaims:        ratelimit.New(server.FailedClaimLimit, server.FailedClaimPeriod, c),
+		Live:                live.New(c, st),
+		Log:                 log,
 	}
 	err = serve(ctx, log,
 		func(ctx context.Context) error { return store.Migrate(ctx, pool) },

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"sync"
 	"testing"
 	"time"
 
@@ -149,5 +150,94 @@ func TestANewCodeReplacesTheAgentsPreviousCode(t *testing.T) {
 	}
 	if _, err := c.Lookup(other); err != nil {
 		t.Errorf("another agent's code: %v, want still valid", err)
+	}
+}
+
+func claim(t *testing.T, c *Codes, code string) (string, error) {
+	t.Helper()
+	agent, _, err := c.Claim(code)
+	return agent, err
+}
+
+func TestClaimReturnsTheAgentOfAValidCode(t *testing.T) {
+	c := New(clock.NewFake(t0))
+	code := issue(t, c, agentID)
+	if got, err := claim(t, c, code); err != nil || got != agentID {
+		t.Errorf("Claim = %q, %v; want %s", got, err, agentID)
+	}
+}
+
+func TestACodeCanBeClaimedOnce(t *testing.T) {
+	c := New(clock.NewFake(t0))
+	code := issue(t, c, agentID)
+	claim(t, c, code)
+	if _, err := claim(t, c, code); !errors.Is(err, ErrUsed) {
+		t.Errorf("second Claim: %v, want ErrUsed", err)
+	}
+}
+
+func TestAUsedCodeStaysUsedAfterItExpires(t *testing.T) {
+	f := clock.NewFake(t0)
+	c := New(f)
+	code := issue(t, c, agentID)
+	claim(t, c, code)
+	f.Advance(Lifetime)
+	if _, err := claim(t, c, code); !errors.Is(err, ErrUsed) {
+		t.Errorf("Claim after 10 min: %v, want ErrUsed", err)
+	}
+}
+
+func TestClaimOfAnExpiredOrUnknownCodeFails(t *testing.T) {
+	f := clock.NewFake(t0)
+	c := New(f)
+	code := issue(t, c, agentID)
+	if _, err := claim(t, c, "ZZZZZZ"); !errors.Is(err, ErrUnknown) {
+		t.Errorf("unknown code: %v, want ErrUnknown", err)
+	}
+	f.Advance(Lifetime - time.Nanosecond)
+	if _, err := claim(t, c, code); err != nil {
+		t.Fatalf("just before 10 min: %v, want valid", err)
+	}
+	other := issue(t, c, "7c9e6679-7425-40de-944b-e07fc1f90ae7")
+	f.Advance(Lifetime)
+	if _, err := claim(t, c, other); !errors.Is(err, ErrExpired) {
+		t.Errorf("at 10 min: %v, want ErrExpired", err)
+	}
+}
+
+func TestAReleasedClaimCanBeMadeAgain(t *testing.T) {
+	c := New(clock.NewFake(t0))
+	code := issue(t, c, agentID)
+	_, release, err := c.Claim(code)
+	if err != nil {
+		t.Fatal(err)
+	}
+	release()
+	if got, err := claim(t, c, code); err != nil || got != agentID {
+		t.Errorf("Claim after release = %q, %v; want %s", got, err, agentID)
+	}
+}
+
+func TestOfTwoClaimsAtOnceOnlyOneSucceeds(t *testing.T) {
+	c := New(clock.NewFake(t0))
+	code := issue(t, c, agentID)
+	errs := make(chan error, 50)
+	var wg sync.WaitGroup
+	for range 50 {
+		wg.Add(1)
+		go func() { defer wg.Done(); _, err := claim(t, c, code); errs <- err }()
+	}
+	wg.Wait()
+	close(errs)
+	ok := 0
+	for err := range errs {
+		if err == nil {
+			ok++
+		} else if !errors.Is(err, ErrUsed) {
+			t.Errorf("Claim: %v, want nil or ErrUsed", err)
+		}
+	}
+	if ok != 1 {
+		t.Errorf("%d claims succeeded, want 1", ok)
 	}
 }

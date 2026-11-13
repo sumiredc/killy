@@ -137,3 +137,70 @@ func (s *Store) SyncFirstDetections(ctx context.Context, agentID string, parents
 	}
 	return got, nil
 }
+
+type Device struct {
+	ID string
+}
+
+// Link is one phone's view of one agent.
+type Link struct {
+	AgentID string
+	Name    string
+	Notify  bool
+}
+
+// CreateDevice stores a new device under a fresh UUID v4. pushToken may be empty.
+func (s *Store) CreateDevice(ctx context.Context, tokenSHA256 []byte, pushToken string) (Device, error) {
+	d := Device{ID: uuid.NewV4().String()}
+	var push *string
+	if pushToken != "" {
+		push = &pushToken
+	}
+	_, err := s.pool.Exec(ctx, "INSERT INTO devices (id, token_sha256, push_token) VALUES ($1, $2, $3)", d.ID, tokenSHA256, push)
+	if err != nil {
+		return Device{}, fmt.Errorf("create device: %w", err)
+	}
+	return d, nil
+}
+
+// DeviceByToken returns the device whose token has the SHA-256 tokenSHA256, or ErrNotFound.
+func (s *Store) DeviceByToken(ctx context.Context, tokenSHA256 []byte) (Device, error) {
+	var d Device
+	err := s.pool.QueryRow(ctx, "SELECT id::text FROM devices WHERE token_sha256 = $1", tokenSHA256).Scan(&d.ID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Device{}, ErrNotFound
+	}
+	if err != nil {
+		return Device{}, fmt.Errorf("find device: %w", err)
+	}
+	return d, nil
+}
+
+// AgentByID returns the agent, or ErrNotFound.
+func (s *Store) AgentByID(ctx context.Context, id string) (Agent, error) {
+	var a Agent
+	err := s.pool.QueryRow(ctx, "SELECT id::text, hostname FROM agents WHERE id = $1", id).Scan(&a.ID, &a.Hostname)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Agent{}, ErrNotFound
+	}
+	if err != nil {
+		return Agent{}, fmt.Errorf("find agent: %w", err)
+	}
+	return a, nil
+}
+
+// LinkDevice links the device to the agent. A new link is named name, or fallback when name is
+// nil; an existing link keeps its name unless name is given. The notification switch of a new
+// link is on.
+func (s *Store) LinkDevice(ctx context.Context, deviceID, agentID string, name *string, fallback string) (Link, error) {
+	l := Link{AgentID: agentID}
+	err := s.pool.QueryRow(ctx, `
+		INSERT INTO links (device_id, agent_id, name) VALUES ($1, $2, COALESCE($3, $4))
+		ON CONFLICT (device_id, agent_id) DO UPDATE SET name = COALESCE($3, links.name)
+		RETURNING name, notify`,
+		deviceID, agentID, name, fallback).Scan(&l.Name, &l.Notify)
+	if err != nil {
+		return Link{}, fmt.Errorf("link device: %w", err)
+	}
+	return l, nil
+}
