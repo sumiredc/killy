@@ -35,11 +35,13 @@ flowchart LR
 
 | 項目 | 選択 | 理由 |
 |---|---|---|
-| Expo SDK | 着手時点の最新版に固定し、PR 本文に版を書く | ARCHITECTURE の「current SDK」 |
+| Expo SDK | 58（`expo` ~58.0.25、React Native 0.88.1、React 19.3.0）。#11 の着手時点の `latest` | ARCHITECTURE の「current SDK」 |
+| アプリの ID | iOS の bundle identifier と Android の package は `pink.sumire.killy` | Killy server の `killy.sumire.pink` を逆にした。EAS（#32）で登録するときに変えるなら、そのときに |
 | 画面の切り替え | `expo-router` の tabs | Expo の標準。後の通知からの起動（#20）も URL で開ける |
-| 接続先 | `EXPO_PUBLIC_KILLY_SERVER_URL`。無ければ起動時にエラー画面 | build ごとに staging と production を分けられる。app はこの Killy server にだけ接続する（ARCHITECTURE Pairing の QR） |
+| 接続先 | `EXPO_PUBLIC_KILLY_SERVER_URL`（http か https）。無ければ起動時にエラー画面で、どこにも何も送らない。Expo は build のときに値を埋め込むので、読むのは `buildServerURL()` の 1 か所だけにし、画面のテストではこの関数を差し替える | build ごとに staging と production を分けられる。app はこの Killy server にだけ接続する（ARCHITECTURE Pairing の QR） |
 | 翻訳 | `expo-localization` で端末の言語を取り、`ja.json`・`en.json` を引く小さな `t()` を自前で持つ | 2 言語と置き換えだけなので、ライブラリを足さない |
-| フォント | Geist・Geist Mono・Zen Kaku Gothic New を `expo-font` で読む | DESIGN の Design tokens |
+| フォント | Geist・Geist Mono・Zen Kaku Gothic New を `@expo-google-fonts/*` と `expo-font` で読む（読み終わるまで splash を出したまま） | DESIGN の Design tokens |
+| タブ | `expo-router` の JS の `Tabs`（native tabs ではなく）。アイコン（幽霊と歯車）は M3 のアート（#26）で足し、#11 は文字だけ | DESIGN の Tab bar の色と高さを自分で付けるため |
 | テスト | `jest-expo` と `@testing-library/react-native` | Expo の標準の組み合わせ |
 
 翻訳のキーは `mock/app.js` の `I18N` のキーをそのまま使う。移した時点で翻訳ファイルが文言の正になる（DESIGN の冒頭）。
