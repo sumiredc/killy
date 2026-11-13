@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sumiredc/killy/internal/clock"
 	"github.com/sumiredc/killy/internal/server"
+	"github.com/sumiredc/killy/internal/server/command"
 	"github.com/sumiredc/killy/internal/server/live"
 	"github.com/sumiredc/killy/internal/server/pairing"
 	"github.com/sumiredc/killy/internal/server/ratelimit"
@@ -55,6 +56,8 @@ func runServer(args []string, stderr io.Writer) int {
 		FirstRuns:           ratelimit.New(server.FirstRunLimit, server.FirstRunPeriod, c),
 		DeviceRegistrations: ratelimit.New(server.DeviceRegistrationLimit, server.DeviceRegistrationPeriod, c),
 		FailedClaims:        ratelimit.New(server.FailedClaimLimit, server.FailedClaimPeriod, c),
+		Kills:               ratelimit.New(server.KillLimit, server.KillPeriod, c),
+		Commands:            command.New(c, time.After),
 		Live:                live.New(c, st),
 		Broker:              sse.NewBroker(),
 		Log:                 log,

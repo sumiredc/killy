@@ -16,6 +16,7 @@ import (
 
 	"github.com/sumiredc/killy/internal/clock"
 	"github.com/sumiredc/killy/internal/protocol"
+	"github.com/sumiredc/killy/internal/server/command"
 	"github.com/sumiredc/killy/internal/server/live"
 	"github.com/sumiredc/killy/internal/server/memstore"
 	"github.com/sumiredc/killy/internal/server/pairing"
@@ -29,12 +30,15 @@ type testServer struct {
 	*Server
 	mem   *memstore.Memory
 	clock *clock.Fake
+	// killTimer fires the 10 s timer of every kill the test starts.
+	killTimer chan time.Time
 }
 
 func newTestServer(t *testing.T) *testServer {
 	t.Helper()
 	c := clock.NewFake(t0)
 	mem := memstore.New()
+	killTimer := make(chan time.Time, 64)
 	return &testServer{
 		Server: &Server{
 			Store:               mem,
@@ -42,14 +46,17 @@ func newTestServer(t *testing.T) *testServer {
 			FirstRuns:           ratelimit.New(FirstRunLimit, FirstRunPeriod, c),
 			DeviceRegistrations: ratelimit.New(DeviceRegistrationLimit, DeviceRegistrationPeriod, c),
 			FailedClaims:        ratelimit.New(FailedClaimLimit, FailedClaimPeriod, c),
+			Kills:               ratelimit.New(KillLimit, KillPeriod, c),
+			Commands:            command.New(c, func(time.Duration) <-chan time.Time { return killTimer }),
 			Live:                live.New(c, mem),
 			Broker:              sse.NewBroker(),
 			// Long enough that no heartbeat comes between the events a test waits for.
 			HeartbeatInterval: time.Hour,
 			Log:               slog.New(slog.NewTextHandler(io.Discard, nil)),
 		},
-		mem:   mem,
-		clock: c,
+		mem:       mem,
+		clock:     c,
+		killTimer: killTimer,
 	}
 }
 

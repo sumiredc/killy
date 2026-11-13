@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sumiredc/killy/internal/server/command"
 	"github.com/sumiredc/killy/internal/server/live"
 	"github.com/sumiredc/killy/internal/server/pairing"
 	"github.com/sumiredc/killy/internal/server/ratelimit"
@@ -30,6 +31,8 @@ const (
 	DeviceRegistrationPeriod = time.Hour
 	FailedClaimLimit         = 10
 	FailedClaimPeriod        = 10 * time.Minute
+	KillLimit                = 30
+	KillPeriod               = time.Minute
 )
 
 const (
@@ -60,6 +63,10 @@ type Server struct {
 	DeviceRegistrations *ratelimit.Limiter
 	// FailedClaims counts failed claims per client address.
 	FailedClaims *ratelimit.Limiter
+	// Kills counts kill requests per device.
+	Kills *ratelimit.Limiter
+	// Commands carries kills to the agents' command streams and their outcomes back.
+	Commands *command.Router
 	// Live holds every agent's latest snapshot.
 	Live *live.State
 	// Broker tells each device's open event streams to send their state again.
@@ -80,6 +87,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /app/v1/devices", s.registerDevice)
 	mux.HandleFunc("POST /app/v1/pairings/claim", s.claimPairing)
 	mux.HandleFunc("GET /app/v1/events", s.streamEvents)
+	mux.HandleFunc("GET /agent/v1/commands", s.streamCommands)
+	mux.HandleFunc("POST /agent/v1/results", s.postResult)
+	mux.HandleFunc("POST /app/v1/kills", s.postKill)
 	return mux
 }
 
