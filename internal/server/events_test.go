@@ -45,10 +45,15 @@ type eventStream struct {
 // openEvents connects to GET /app/v1/events on a real HTTP server running the handler.
 func (s *testServer) openEvents(t *testing.T, deviceToken string) *eventStream {
 	t.Helper()
+	return s.openStream(t, "/app/v1/events", deviceToken)
+}
+
+func (s *testServer) openStream(t *testing.T, path, token string) *eventStream {
+	t.Helper()
 	ts := httptest.NewServer(s.Handler())
 	t.Cleanup(ts.Close)
-	req, _ := http.NewRequest("GET", ts.URL+"/app/v1/events", nil)
-	req.Header.Set("Authorization", "Bearer "+deviceToken)
+	req, _ := http.NewRequest("GET", ts.URL+path, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)

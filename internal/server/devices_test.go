@@ -44,6 +44,17 @@ func (s *testServer) do(t *testing.T, path, addr, token, body string, header ...
 	return w.Code, w.Body.Bytes()
 }
 
+func (s *testServer) doGet(t *testing.T, path, token string) (int, string) {
+	t.Helper()
+	r := httptest.NewRequest("GET", path, nil)
+	if token != "" {
+		r.Header.Set("Authorization", "Bearer "+token)
+	}
+	w := httptest.NewRecorder()
+	s.Handler().ServeHTTP(w, r)
+	return w.Code, w.Body.String()
+}
+
 func (s *testServer) registerDevice(t *testing.T, addr, body string, header ...string) (int, deviceReply) {
 	t.Helper()
 	status, b := s.do(t, "/app/v1/devices", addr, "", body, header...)

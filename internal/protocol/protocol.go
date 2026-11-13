@@ -45,6 +45,39 @@ const (
 	Refused       = "refused"
 	SignalFailed  = "signal_failed"
 	ZombiesRemain = "zombies_remain"
+	// Unknown is made by the Killy server only, when no outcome came back.
+	Unknown = "unknown"
+)
+
+// Reasons for an unknown outcome.
+const (
+	ReasonAgentDisconnected = "agent_disconnected"
+	ReasonTimeout           = "timeout"
+)
+
+// IsAgentOutcome reports whether o is an outcome an agent may return.
+func IsAgentOutcome(o string) bool {
+	switch o {
+	case Killed, AlreadyGone, Refused, SignalFailed, ZombiesRemain:
+		return true
+	}
+	return false
+}
+
+// CommandResult is what an agent posts back for a command (CommandResult in docs/openapi.yaml).
+type CommandResult struct {
+	ID      string `json:"id"`
+	Type    string `json:"type"`
+	Outcome string `json:"outcome,omitempty"`
+	Reaped  int    `json:"reaped,omitempty"`
+	Reason  string `json:"reason,omitempty"`
+	Version string `json:"version,omitempty"`
+}
+
+// Result types.
+const (
+	ResultKill = "kill"
+	ResultPong = "pong"
 )
 
 // Reasons for a refused kill.

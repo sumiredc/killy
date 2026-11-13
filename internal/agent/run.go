@@ -29,6 +29,24 @@ type RunOptions struct {
 	PidfdAvailable func() bool
 	// Ticks drives the scans: one value per scan.
 	Ticks <-chan time.Time
+	// Killer runs the kills that arrive on the command stream.
+	Killer Killer
+	// StreamClient opens the command stream; it must have no overall timeout.
+	StreamClient *http.Client
+	// Rand jitters the reconnect waits; math/rand/v2.Float64 in production.
+	Rand func() float64
+	// Sleep waits between reconnect attempts and returns early when ctx is done.
+	Sleep func(ctx context.Context, d time.Duration)
+}
+
+// SleepContext waits for d or until ctx is done.
+func SleepContext(ctx context.Context, d time.Duration) {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+	case <-t.C:
+	}
 }
 
 // Run reports snapshots to the Killy server saved in agent.json until ctx is done. Every
@@ -58,8 +76,20 @@ func Run(ctx context.Context, opts RunOptions) error {
 			return sendSnapshot(ctx, opts.Client, cfg, snap)
 		},
 	}
+	commands := &CommandClient{
+		Server:  cfg.Server,
+		Token:   cfg.Token,
+		Client:  opts.StreamClient,
+		Killer:  opts.Killer,
+		Backoff: &Backoff{Rand: opts.Rand},
+		Log:     opts.Log,
+		Sleep:   opts.Sleep,
+	}
+	done := make(chan struct{})
+	go func() { commands.Run(ctx); close(done) }()
 	opts.Log.Info("reporting", "server", cfg.Server)
 	r.Run(ctx, opts.Ticks)
+	<-done
 	return nil
 }
 

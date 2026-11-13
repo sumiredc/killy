@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"os/signal"
@@ -73,10 +74,19 @@ func runAgentRun(args []string, stderr io.Writer) int {
 	fs := flag.NewFlagSet("killy agent run", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	config := fs.String("config", agent.DefaultConfigPath, "agent configuration file")
+	outcomes := fs.String("outcomes", "/var/lib/killy/outcomes.jsonl", "file that keeps the outcome of every kill ID")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	log := slog.New(slog.NewTextHandler(stderr, nil))
+	store, err := kill.OpenFileStore(*outcomes)
+	if err != nil {
+		log.Error("open kill outcomes", "err", err)
+		return 1
+	}
+	defer store.Close()
+	scanner := &proc.Scanner{Root: os.DirFS("/proc")}
+	killer := &kill.Killer{Proc: scanner, Pidfd: kill.NewPidfdOps(), Store: store, Clock: kill.SystemClock{}, SelfPID: os.Getpid, Log: log}
 	hostname, err := os.Hostname()
 	if err != nil {
 		log.Error("hostname", "err", err)
@@ -90,9 +100,14 @@ func runAgentRun(args []string, stderr io.Writer) int {
 		Log:            log,
 		Hostname:       hostname,
 		Version:        version.Version,
-		Scanner:        &proc.Scanner{Root: os.DirFS("/proc")},
+		Scanner:        scanner,
 		PidfdAvailable: func() bool { return kill.Available(kill.NewPidfdOps(), os.Getpid()) },
 		Ticks:          every(ctx, agent.ScanInterval),
+		Killer:         killer,
+		// No overall timeout: the command stream stays open for hours.
+		StreamClient: &http.Client{},
+		Rand:         rand.Float64,
+		Sleep:        agent.SleepContext,
 	}
 	if err := agent.Run(ctx, opts); err != nil {
 		fmt.Fprintf(stderr, "killy agent run: %v\n", err)

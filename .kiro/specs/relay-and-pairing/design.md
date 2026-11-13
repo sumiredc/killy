@@ -85,7 +85,7 @@ agent ごとに最新の snapshot、最後に受け付けた `scanned_at`、最�
 
 ### Broker（`internal/server/sse`）
 
-device ごとに開いている stream の一覧を持つ。`Notify(deviceIDs)` は、それぞれの stream に「作り直して送る」合図を送るだけで、`state` は stream の側が `LinksOfDevice` と `LiveState` から作り直す。合図は 1 つまで溜め、溜まっていれば捨てる（どうせ丸ごと送るので、遅い phone が `Notify` を止めない）。stream は最初の `state` を作る前に合図を受け取り始めるので、その間の変化を取りこぼさない。サーバーは紐付けた順に並べる。`killy server` の停止が始まったら（`http.Server.RegisterOnShutdown`）、開いている stream をすべて閉じる（`Shutdown` は handler が終わるのを待つので、閉じないと 10 秒の待ちを使い切る）。phone は再接続する。切断している agent にも、最後の snapshot の親を入れたまま `disconnected: true` を付ける（どう扱うかは app が決める）。heartbeat、`http.ResponseController` による書き込み期限の解除、flush は、命令の stream と共通の `sse.Writer` にまとめる。
+device ごとに開いている stream の一覧を持つ。`Notify(deviceIDs)` は、それぞれの stream に「作り直して送る」合図を送るだけで、`state` は stream の側が `LinksOfDevice` と `LiveState` から作り直す。合図は 1 つまで溜め、溜まっていれば捨てる（どうせ丸ごと送るので、遅い phone が `Notify` を止めない）。stream は最初の `state` を作る前に合図を受け取り始めるので、その間の変化を取りこぼさない。サーバーは紐付けた順に並べる。`killy server` の停止が始まったら（`http.Server.RegisterOnShutdown`）、開いている stream（phone の `events` と agent の `commands`）をすべて閉じる（`Shutdown` は handler が終わるのを待つので、閉じないと 10 秒の待ちを使い切る）。phone は再接続する。切断している agent にも、最後の snapshot の親を入れたまま `disconnected: true` を付ける（どう扱うかは app が決める）。heartbeat、`http.ResponseController` による書き込み期限の解除、flush は、命令の stream と共通の `sse.Writer` にまとめる。
 
 `state` の JSON：
 
@@ -96,13 +96,17 @@ device ごとに開いている stream の一覧を持つ。`Notify(deviceIDs)` 
 
 ### CommandRouter（`internal/server/command`）
 
-agent ごとに命令の stream を 1 つ持つ。`Kill(ctx, agentID, cmd)` は：
+agent ごとに命令の stream を 1 つ持つ。同じ agent が新しい stream を開いたら、古い stream は閉じる。`RelayKill(ctx, agentID, cmd)` は（名前を `Kill` にしないのは、signal を送る呼び出しを探す grep の `\.Kill\(` に当てないため）：
 
-1. stream が無ければ `unknown` / `agent_disconnected`
-2. 同じ `(agentID, id)` が実行中なら、その結果を待つ
+1. 同じ `(agentID, id)` が実行中なら、その結果を待つ（命令は送らない）
+2. stream が無ければ `unknown` / `agent_disconnected`
 3. 命令を送り、`(agentID, id)` で結果を待つ。10 秒で `unknown` / `timeout`
 
-`POST /agent/v1/results` は、token の agent と `id` の組が待っている場合だけ結果を渡す。
+待ちは要求とは別に生きていて、phone が切っても 10 秒までは結果を待つ。その間に届いた同じ ID の送り直しは、この待ちに加わる。待ちが終わった後の同じ ID は新しい命令として agent に送り、二度目の signal を防ぐのは agent の記録（agent-process-control の Requirement 3）。
+
+`POST /agent/v1/results` は、token の agent と `id` の組が待っている場合だけ結果を渡し、それ以外は `404`（`command_not_found`）。結果は送ってから 10 秒より前に届いたものだけを使い、ちょうど 10 秒以降は遅すぎる（`404`、phone には `timeout`）。`type` は `kill`、`outcome` は agent が返せる 5 種類だけを受け付ける。
+
+`POST /app/v1/kills` は、device token を確かめた後のすべての要求を device ごとに数える（`400`、紐付いていないサーバー、送り直しを含む。`429` は数えない）。確かめる順は、回数制限（`429`）、本文（`400` `invalid_request`）、ID（`400` `invalid_id`）、紐付け（`404` `server_not_found`）。
 
 ### RateLimiter（`internal/server/ratelimit`）
 
@@ -135,14 +139,17 @@ agent ごとに命令の stream を 1 つ持つ。`Kill(ctx, agentID, cmd)` は�
 | `pair` | `agent.json`（`{"server", "token"}`、置き場所は `--config` で変えられ、既定は `/etc/killy/agent.json`）が無ければ token なしで `--server` に送り、token と URL を mode 0600 で保存する（一時ファイルに書いて rename）。URL は https か、localhost への http だけを受け付け、redirect には従わない（token を暗号化されない経路や別の宛先に流さないため）。初回は、`agent.json` を書けることを登録の前に確かめる（token は一度しか返らないので、保存できない登録は使えない agent を残し、初回登録の回数も使うため）。あれば保存した URL に token を付けて送り、`--server` が保存した URL と違えば何も送らずに止める（別の Killy server に token を送らないため）。コードと agent の ID を表示する |
 | `run` | `agent.json` から URL と token を読む（unit に `--server` は要らない）。`agent.json` が無ければ、先に `killy agent pair` を実行するよう出して止める |
 | `Reporter` | 5 秒ごとに `Scanner.Scan`。最後に送れた snapshot と親の集合（`(pid, starttime)` の集合）が違えばすぐ、同じでも 15 秒ごとに送る（ticker の遅れで 3 回の走査が 15 秒に少し足りなくても 3 回目で送るよう、走査の間隔の半分の余裕をとる）。同じ親のゾンビが増えただけなら次の 15 秒を待つ。送れなかったときは送れたことにしないので、次の走査でまた送る。`version` はビルド時に `-ldflags` で入れる（既定は `dev`） |
-| `CommandClient` | 命令の stream を開き続け、切れたら `Backoff`（1・2・4・8・16・30 秒の基準値に揺らぎ）で再接続する。`kill` を `Killer` に渡し、結果を送る |
+| `CommandClient` | 命令の stream を開き続け、切れたら `Backoff` で再接続する。待ちは基準値 1・2・4・8・16・30 秒（以降 30 秒）に、基準値の 0〜25% 未満の揺らぎを足したもの。つながるたびに 1 秒から数え直す。`kill` は 1 つずつ別に `Killer` に渡し（1 つの kill は回収を最大 5 秒待つので、次の命令を止めない）、結果を送る。ID が UUID v4 でない命令には結果を送らない（Killy server の側で `timeout` になる）。`kill` 以外のイベントは無視する。stream 用の HTTP client は全体の timeout を持たない |
 
 ## Error Handling
 
 | 起きたこと | 扱い |
 |---|---|
 | DB に届かない | 起動時はエラーで止める。動いている間は、その要求に `503`（`unavailable`）を返す |
-| agent の stream が切れた | `CommandRouter` から外し、待っている kill は 10 秒の期限で `timeout` になる |
+| agent の stream が切れた | `CommandRouter` から外す。待っている kill は待ち続け、その間に agent が結果を `POST /agent/v1/results` で返せば使い、返らなければ 10 秒で `timeout`。その間に届いた同じ ID の送り直しも同じ待ちに加わる |
+| agent が `outcomes.jsonl` を開けない（`killy agent run` の起動時） | 止まる。kill ID の記録が無いと、再起動の後の同じ ID で二度 signal を送りうるため（pidfd が無いときは報告を続けるのと違い、報告もしない）。置き場所は `--outcomes`（既定 `/var/lib/killy/outcomes.jsonl`） |
+| agent の命令の stream が 60 秒（heartbeat 3 回分）何も届けない | 切って、`Backoff` でつなぎ直す（片側だけ切れた接続に気づくため） |
+| agent が止まり始めたとき、実行中の kill がある | それが終わって結果を送るまで待つ（signal を送ってから記録するまでの間にあるかもしれないため） |
 | 結果の POST が、待っていない `id` | `404`（`command_not_found`）を返し、何もしない |
 | SSE の書き込みが失敗 | その stream を閉じ、`Broker` から外す。phone が再接続する |
 

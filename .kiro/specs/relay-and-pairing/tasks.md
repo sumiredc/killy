@@ -46,16 +46,16 @@
   - [x] 4.4 `go vet ./...` と `go test -race ./...` を通し、手元で `curl` の stream を 10 分以上開き続けて切れなかったことを PR 本文に書く
     - _Requirements: 4.4_
 
-- [ ] 5. kill を agent に中継し、10 秒以内に結果を返す（#10。前提：#4、#5、#9）
-  - [ ] 5.1 `CommandRouter` と `POST /app/v1/kills`・`POST /agent/v1/results` のテスト（中継・紐付いていない・`400`・切断・期限の前とちょうどと後・別の agent の結果・同じ ID の同時の要求・kill の回数制限）を書き、赤を確かめる
+- [x] 5. kill を agent に中継し、10 秒以内に結果を返す（#10。前提：#4、#5、#9）
+  - [x] 5.1 `CommandRouter` と `POST /app/v1/kills`・`POST /agent/v1/results` のテスト（中継・紐付いていない・`400`・切断・期限の前とちょうどと後・別の agent の結果・同じ ID の同時の要求・kill の回数制限）を書き、赤を確かめる
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8_
-  - [ ] 5.2 命令の stream のテスト（heartbeat・`401`）を書き、赤を確かめる
+  - [x] 5.2 命令の stream のテスト（heartbeat・`401`）を書き、赤を確かめる
     - _Requirements: 5.11, 5.12_
-  - [ ] 5.3 `CommandRouter` と handler、命令の stream を実装し、テストを緑にする
+  - [x] 5.3 `CommandRouter` と handler、命令の stream を実装し、テストを緑にする
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.11, 5.12_
-  - [ ] 5.4 agent の `CommandClient` と `Backoff` のテスト（基準値と揺らぎ・`Killer` に渡して結果を送る）を書き、実装する
+  - [x] 5.4 agent の `CommandClient` と `Backoff` のテスト（基準値と揺らぎ・`Killer` に渡して結果を送る）を書き、実装する
     - _Requirements: 5.9, 5.10_
-  - [ ] 5.5 Killy server と agent をつないだテストで、同じ kill ID の 2 回で signal が 1 回であることを確かめる
+  - [x] 5.5 Killy server と agent をつないだテストで、同じ kill ID の 2 回で signal が 1 回であることを確かめる
     - _Requirements: 5.1, 5.10_
-  - [ ] 5.6 `go vet ./...` と `go test -race ./...` を通し、Linux 上の実際のゾンビの親を `curl` で kill して `killed` が返ることを PR 本文に書く
+  - [x] 5.6 `go vet ./...` と `go test -race ./...` を通し、Linux 上の実際のゾンビの親を `curl` で kill して `killed` が返ることを PR 本文に書く
     - _Requirements: 5.1_
