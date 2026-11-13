@@ -14,7 +14,7 @@ flowchart LR
     B["Battle"]
     S["Settings / Add server sheet"]
   end
-  ST["AppState（React context + reducer）"]
+  ST["KillyProvider / BattleProvider（React context）"]
   Q["queue.ts / outcome.ts / clear.ts（純粋な関数）"]
   C["KillyClient（fetch・SSE）"]
   SEC["expo-secure-store（device token）"]
@@ -27,7 +27,7 @@ flowchart LR
   S --> I18N
 ```
 
-図から読み取ること：画面は `AppState` と純粋な関数しか見ず、Killy server と話すのは `KillyClient` だけである。
+図から読み取ること：画面は 2 つの context と純粋な関数しか見ず、Killy server と話すのは `KillyClient` だけである。
 
 ## Components and Interfaces
 
@@ -69,7 +69,7 @@ interface KillyClient {
 - 応答が 15 秒無い要求（stream を除く）は届かないとして扱う。Add server sheet が待ち続けないため
 - テストでは `makeDeps()`（fetch・token の保存先・乱数）を差し替え、Killy server の代わりに `FakeServer` を置く。要求が送られないことは `FakeServer` が受けた要求の数で見る
 - `kill` は応答が得られないときだけ同じ `id` で 1 回送り直す。`429` やほかの応答では送り直さない
-- kill ID は `expo-crypto` の `randomUUID()` で作り、小文字にそろえる
+- kill ID は `expo-crypto` の `getRandomBytes(16)` から自分で組み立てる（version の桁を `4`、variant の bit を `10` にし、小文字の 8-4-4-4-12）。形が生成元の返し方に左右されないため。`randomUUID()` は jest で `undefined` を返し、テストで形を確かめられなかった
 
 ### Add server sheet（Requirement 2）
 
@@ -81,26 +81,38 @@ interface KillyClient {
 | 追加できたとき | 「‹name› を追加しました」を 1.3 秒出して閉じる。名前は claim の応答の `name` | DESIGN。Killy の絵は #27 |
 | キーボード | `KeyboardAvoidingView` の `padding` を両 OS で | Android は Modal の窓が縮まず、キーボードが「追加する」を隠した |
 
-### AppState
+### KillyProvider
 
-`state`（Killy server から受け取った丸ごとの状態）、接続の失敗の有無、battle の進み（隠している親、この battle の `killed` の記録、要求の途中か）を持つ。`state` を受け取るたびに丸ごと置き換え、隠している親のうち新しい `state` に無いものは隠すのをやめる。
+device の登録の状況と、`state`（Killy server から受け取った丸ごとの状態）を持つ。`state` を受け取るたびに丸ごと置き換える。battle の進みは `BattleProvider`（下の「battle の状態の置き場所」）が持つ。
 
 ### 純粋な関数
 
 | 関数 | 決めること | Requirement |
 |---|---|---|
 | `buildQueue(state, hidden)` | 接続しているサーバーの親を最初の検出時刻の古い順に並べ、隠している `(サーバー, pid, starttime)` を除く。同じ時刻なら、サーバーの id、pid、starttime の順で比べる（1 つの snapshot で見つかった親は同じ時刻になるため、決めておかないと `state` のたびに先頭が入れ替わる） | 3.1, 3.2, 3.4, 3.12 |
-| `applyOutcome(battle, parent, result)` | outcome ごとの表示の種類と、列から隠すか | 3.8, 3.9, 3.10, 3.11, 3.12 |
-| `allClear(battle)` | `killed` の親の数と、kill を始めた時点のゾンビの数の合計 | 3.13 |
+| `onState(battle, state)` | 新しい `state` を受け取る。隠している親のうち `state` に無いものは隠すのをやめる。列が空から 1 つ以上に変わったら新しい battle を始める | 3.4, 3.12, 3.13 |
+| `applyOutcome(battle, state, target, result)` | outcome ごとの表示の種類、列から隠すか、`killed` の記録（kill を始めた時点のゾンビの数）、All clear を開くか | 3.8, 3.12, 3.13 |
+| `closeAllClear(battle)` | All clear を閉じ、新しい battle を始める | 3.13 |
 | `serverRow(server)` | Settings のサーバーの行の sub-line とバッジ。切断を先に見る | 2.12, 2.13, 2.14 |
 
 ### battle の区切り
 
-battle は、列が空から 1 つ以上に変わったとき（起動直後を含む）か、All clear を閉じたときに始まり、記録（`killed` の親とゾンビの数）を空にする。All clear を出すのは、`killed` か `already_gone` の直後に列が空になったときだけにする。出した時点の 2 つの数を overlay に固定し、表示している間は新しい battle を始めない（閉じた時点で列に親がいれば、そこから始める）。外で回収されたり、サーバーが切断したりして列が空になったときは、All clear を出さずに空の状態を出し、記録を捨てる。モックも最後の kill の後にだけ All clear を出す。
+battle は、列が空から 1 つ以上に変わったとき（起動直後を含む）か、All clear を閉じたときに始まり、記録（`killed` の親とゾンビの数）を空にする。All clear を出すのは、`killed` か `already_gone` の直後に列が空になったときだけにする。出した時点の 2 つの数を overlay に固定し、表示している間は新しい battle を始めない（閉じた時点で列に親がいれば、そこから始める）。外で回収されたり、サーバーが切断したりして列が空になったときは、All clear を出さずに空の状態を出す。記録は、次に列に親が入って新しい battle が始まるときに捨てる（空になった時点では捨てない。送った kill の結果がまだ届いていないことがあり、その kill で All clear になりうるため）。モックも最後の kill の後にだけ All clear を出す。
+
+### battle の状態の置き場所
+
+`BattleProvider`（`KillyProvider` の内側）が、隠している親・この battle の記録・All clear・要求の途中か・最後の outcome とエラーを持つ。タブの側（Settings を押せない、Battle の数）も同じものを見る。outcome は、結果が届いた時点の最新の `state` に当てる（kill を始めた時点の `state` ではない）。
+
+| 決めたこと | 理由 |
+|---|---|
+| outcome の文は次の kill を始めるまで出したまま | DESIGN の「briefly」の長さは演出（#28）で決める |
+| 理由の文は、知っている理由（`pid_reused`・`not_a_zombie_parent`・`protected`・`not_demo`・`pidfd_unavailable`・`timeout`・`agent_disconnected`）だけ訳し、知らない理由は agent が送った値のまま出す | agent に理由が増えても、何かは出る |
+| `signal_failed` は errno をそのまま出す（例：`EPERM`） | errno の名前は operator が調べられる |
+| All clear を出している間は kill ボタンを押せない | 数を固定している間に新しい battle を始めない（battle の区切り） |
 
 ### 長押し
 
-`useHoldToKill(onFire, clock)`：押した時刻から 1000 ms たったら 1 回だけ `onFire` を呼ぶ。1000 ms より前に離されたら何もしない。時刻はテストから与える。
+`useHoldToKill(target, onFire)`：押した時刻から 1000 ms たったら、押し始めたときの `target`（先頭の親の鍵）で 1 回だけ `onFire` を呼ぶ。1000 ms より前に離されたら何もしない。`BattleProvider` の `kill` は、そのときの先頭が同じ親でなければ何も送らない（長押しの間に古い親が先頭に入ったときなど）。時刻は jest の fake timers で進める。送り直しの規則（3.9〜3.11）は `KillyClient.kill` が持つ。
 
 ## Error Handling
 
