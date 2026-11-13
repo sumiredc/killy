@@ -1,0 +1,38 @@
+import { buildServerURL, ConfigError, serverURL } from '../config';
+
+describe('serverURL', () => {
+  test('reads the URL set for the build', () => {
+    expect(serverURL('https://killy.sumire.pink')).toBe('https://killy.sumire.pink');
+  });
+
+  test('drops a trailing slash', () => {
+    expect(serverURL('https://stg-killy.sumire.pink/')).toBe('https://stg-killy.sumire.pink');
+  });
+
+  test('fails when the build has no URL', () => {
+    expect(() => serverURL(undefined)).toThrow(ConfigError);
+    expect(() => serverURL('  ')).toThrow(ConfigError);
+  });
+
+  test('fails on something that is not an http(s) URL', () => {
+    expect(() => serverURL('killy.sumire.pink')).toThrow(ConfigError);
+    expect(() => serverURL('ftp://killy.sumire.pink')).toThrow(ConfigError);
+  });
+});
+
+describe('buildServerURL', () => {
+  const original = process.env.EXPO_PUBLIC_KILLY_SERVER_URL;
+  afterEach(() => {
+    process.env.EXPO_PUBLIC_KILLY_SERVER_URL = original;
+  });
+
+  test('reads EXPO_PUBLIC_KILLY_SERVER_URL', () => {
+    process.env.EXPO_PUBLIC_KILLY_SERVER_URL = 'https://stg-killy.sumire.pink';
+    expect(buildServerURL()).toBe('https://stg-killy.sumire.pink');
+  });
+
+  test('fails when EXPO_PUBLIC_KILLY_SERVER_URL is not set', () => {
+    delete process.env.EXPO_PUBLIC_KILLY_SERVER_URL;
+    expect(() => buildServerURL()).toThrow(ConfigError);
+  });
+});
