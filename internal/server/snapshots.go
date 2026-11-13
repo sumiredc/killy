@@ -48,7 +48,7 @@ func (s *Server) postSnapshot(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_request")
 		return
 	}
-	if err := s.Live.Report(r.Context(), agent.ID, snap); err != nil {
+	if _, err := s.Live.Report(r.Context(), agent.ID, snap); err != nil {
 		s.Log.Error("record snapshot", "agent", agent.ID, "err", err)
 		writeError(w, http.StatusServiceUnavailable, "unavailable")
 		return

@@ -47,7 +47,7 @@ func (f *fixture) report(t *testing.T, scannedAt time.Time, parents ...protocol.
 	if parents == nil {
 		parents = []protocol.Parent{}
 	}
-	err := f.state.Report(context.Background(), f.agentID, protocol.Snapshot{Hostname: "web-1", Version: "dev", ScannedAt: scannedAt, Parents: parents})
+	_, err := f.state.Report(context.Background(), f.agentID, protocol.Snapshot{Hostname: "web-1", Version: "dev", ScannedAt: scannedAt, Parents: parents})
 	if err != nil {
 		t.Fatalf("Report: %v", err)
 	}
@@ -229,13 +229,13 @@ func TestTwoSnapshotsOfOneAgentAreAppliedInTurn(t *testing.T) {
 	newer := protocol.Snapshot{ScannedAt: t0.Add(5 * time.Second), Parents: []protocol.Parent{parent(200, 7000, 201)}}
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go func() { defer wg.Done(); _ = f.state.Report(context.Background(), f.agentID, older) }()
+	go func() { defer wg.Done(); _, _ = f.state.Report(context.Background(), f.agentID, older) }()
 	for g.callCount() == 0 {
 		time.Sleep(time.Millisecond)
 	}
 	// The older snapshot is now inside its database call. Without one-at-a-time handling the
 	// newer one would be applied first and then overwritten by the older one.
-	if err := f.state.Report(context.Background(), f.agentID, newer); err != nil {
+	if _, err := f.state.Report(context.Background(), f.agentID, newer); err != nil {
 		t.Fatal(err)
 	}
 	wg.Wait()
@@ -260,7 +260,7 @@ func TestASnapshotThatCannotBeStoredKeepsThePreviousState(t *testing.T) {
 	f := newFixture(t)
 	f.report(t, t0, parent(100, 5000, 101))
 	f.state.detections = failingDetections{}
-	err := f.state.Report(context.Background(), f.agentID, protocol.Snapshot{ScannedAt: t0.Add(5 * time.Second), Parents: []protocol.Parent{}})
+	_, err := f.state.Report(context.Background(), f.agentID, protocol.Snapshot{ScannedAt: t0.Add(5 * time.Second), Parents: []protocol.Parent{}})
 	if err == nil {
 		t.Error("Report succeeded although the database failed")
 	}
@@ -275,7 +275,7 @@ func TestReadingTheStateDoesNotWaitForTheDatabase(t *testing.T) {
 	g := &gatedDetections{Detections: f.mem, second: make(chan struct{})}
 	f.state.detections = g
 	go func() {
-		_ = f.state.Report(context.Background(), f.agentID, protocol.Snapshot{ScannedAt: t0.Add(time.Second), Parents: []protocol.Parent{}})
+		_, _ = f.state.Report(context.Background(), f.agentID, protocol.Snapshot{ScannedAt: t0.Add(time.Second), Parents: []protocol.Parent{}})
 	}()
 	for g.callCount() == 0 {
 		time.Sleep(time.Millisecond)
@@ -298,10 +298,10 @@ func TestFirstDetectionsAreKeptPerAgent(t *testing.T) {
 	f.report(t, t0, parent(100, 5000, 101))
 	f.clock.Advance(time.Minute)
 	// The other agent reports no parents, then the same PID and start time as the first agent.
-	if err := f.state.Report(context.Background(), other.ID, protocol.Snapshot{ScannedAt: t0, Parents: []protocol.Parent{}}); err != nil {
+	if _, err := f.state.Report(context.Background(), other.ID, protocol.Snapshot{ScannedAt: t0, Parents: []protocol.Parent{}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.state.Report(context.Background(), other.ID, protocol.Snapshot{ScannedAt: t0.Add(time.Second), Parents: []protocol.Parent{parent(100, 5000, 101)}}); err != nil {
+	if _, err := f.state.Report(context.Background(), other.ID, protocol.Snapshot{ScannedAt: t0.Add(time.Second), Parents: []protocol.Parent{parent(100, 5000, 101)}}); err != nil {
 		t.Fatal(err)
 	}
 	f.report(t, t0.Add(15*time.Second), parent(100, 5000, 101))
@@ -311,5 +311,78 @@ func TestFirstDetectionsAreKeptPerAgent(t *testing.T) {
 	a, _ := f.state.Agent(other.ID)
 	if len(a.Parents) != 1 || !a.Parents[0].FirstDetectedAt.Equal(t0.Add(time.Minute)) {
 		t.Errorf("other agent's parents %+v, want PID 100 detected at %v", a.Parents, t0.Add(time.Minute))
+	}
+}
+
+func TestReportSaysWhetherTheSnapshotWasApplied(t *testing.T) {
+	f := newFixture(t)
+	applied, _ := f.state.Report(context.Background(), f.agentID, protocol.Snapshot{ScannedAt: t0.Add(time.Second), Parents: []protocol.Parent{}})
+	if !applied {
+		t.Error("first snapshot: applied = false")
+	}
+	applied, _ = f.state.Report(context.Background(), f.agentID, protocol.Snapshot{ScannedAt: t0, Parents: []protocol.Parent{}})
+	if applied {
+		t.Error("older snapshot: applied = true")
+	}
+}
+
+func TestConnectionChangesReportsAnAgentGoingQuietOnce(t *testing.T) {
+	f := newFixture(t)
+	f.report(t, t0)
+	changes(f.state)
+	f.clock.Advance(DisconnectedAfter - time.Nanosecond)
+	if got := changes(f.state); len(got) != 0 {
+		t.Errorf("just before 60 s: %v, want no change", got)
+	}
+	f.clock.Advance(time.Nanosecond)
+	if got := changes(f.state); len(got) != 1 || got[0] != f.agentID {
+		t.Errorf("at 60 s: %v, want the agent", got)
+	}
+	f.clock.Advance(time.Second)
+	if got := changes(f.state); len(got) != 0 {
+		t.Errorf("a second later: %v, want no change reported twice", got)
+	}
+}
+
+func TestAnAgentComingBackIsNotReportedAgainAsAConnectionChange(t *testing.T) {
+	f := newFixture(t)
+	f.report(t, t0)
+	f.clock.Advance(DisconnectedAfter)
+	if got := changes(f.state); len(got) != 1 {
+		t.Fatalf("at 60 s: %v, want the agent", got)
+	}
+	// The snapshot that brings it back is what tells the phones.
+	f.report(t, t0.Add(DisconnectedAfter))
+	if got := changes(f.state); len(got) != 0 {
+		t.Errorf("after reporting again: %v, want nothing", got)
+	}
+	f.clock.Advance(DisconnectedAfter)
+	if got := changes(f.state); len(got) != 1 {
+		t.Errorf("quiet again: %v, want the agent", got)
+	}
+}
+
+func TestTheFirstSnapshotIsNotReportedAsAConnectionChange(t *testing.T) {
+	f := newFixture(t)
+	f.report(t, t0)
+	if got := changes(f.state); len(got) != 0 {
+		t.Errorf("after the first snapshot: %v, want nothing", got)
+	}
+}
+
+// changes runs ConnectionChanges with a notifier that always succeeds and returns what it was told.
+func changes(s *State) []string {
+	var got []string
+	s.ConnectionChanges(func(agentID string) error { got = append(got, agentID); return nil })
+	return got
+}
+
+func TestAChangeWhoseNotifierFailsIsReportedAgain(t *testing.T) {
+	f := newFixture(t)
+	f.report(t, t0)
+	f.clock.Advance(DisconnectedAfter)
+	f.state.ConnectionChanges(func(string) error { return errors.New("database down") })
+	if got := changes(f.state); len(got) != 1 {
+		t.Errorf("after a failed notification: %v, want the agent again", got)
 	}
 }
