@@ -20,6 +20,7 @@ import (
 	"github.com/sumiredc/killy/internal/server/memstore"
 	"github.com/sumiredc/killy/internal/server/pairing"
 	"github.com/sumiredc/killy/internal/server/ratelimit"
+	"github.com/sumiredc/killy/internal/server/sse"
 )
 
 var t0 = time.Date(2026, 11, 13, 9, 0, 0, 0, time.UTC)
@@ -42,7 +43,10 @@ func newTestServer(t *testing.T) *testServer {
 			DeviceRegistrations: ratelimit.New(DeviceRegistrationLimit, DeviceRegistrationPeriod, c),
 			FailedClaims:        ratelimit.New(FailedClaimLimit, FailedClaimPeriod, c),
 			Live:                live.New(c, mem),
-			Log:                 slog.New(slog.NewTextHandler(io.Discard, nil)),
+			Broker:              sse.NewBroker(),
+			// Long enough that no heartbeat comes between the events a test waits for.
+			HeartbeatInterval: time.Hour,
+			Log:               slog.New(slog.NewTextHandler(io.Discard, nil)),
 		},
 		mem:   mem,
 		clock: c,

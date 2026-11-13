@@ -21,11 +21,13 @@ type Memory struct {
 	// Err, when set, is returned by every call, as when the database cannot be reached.
 	Err error
 	// FailLink makes LinkDevice alone fail, as when the database goes away in the middle of a claim.
-	FailLink   bool
-	agents     []AgentRow
-	devices    []DeviceRow
-	links      []LinkRow
-	detections map[string]map[store.ParentKey]time.Time
+	FailLink bool
+	// FailLinksOfDevice and FailDevicesOfAgent make those queries alone fail.
+	FailLinksOfDevice, FailDevicesOfAgent bool
+	agents                                []AgentRow
+	devices                               []DeviceRow
+	links                                 []LinkRow
+	detections                            map[string]map[store.ParentKey]time.Time
 }
 
 // AgentRow is what the agents table would hold.
@@ -210,4 +212,56 @@ func (m *Memory) Links() []LinkRow {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return slices.Clone(m.links)
+}
+
+func (m *Memory) LinksOfDevice(_ context.Context, deviceID string) ([]store.LinkedServer, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Err != nil {
+		return nil, m.Err
+	}
+	if m.FailLinksOfDevice {
+		return nil, errors.New("memstore: connection lost")
+	}
+	servers := []store.LinkedServer{}
+	for _, l := range m.links {
+		if l.DeviceID != deviceID {
+			continue
+		}
+		for _, a := range m.agents {
+			if a.ID == l.AgentID {
+				servers = append(servers, store.LinkedServer{AgentID: a.ID, Name: l.Name, Notify: l.Notify, Hostname: a.Hostname})
+			}
+		}
+	}
+	return servers, nil
+}
+
+func (m *Memory) DevicesOfAgent(_ context.Context, agentID string) ([]string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Err != nil {
+		return nil, m.Err
+	}
+	if m.FailDevicesOfAgent {
+		return nil, errors.New("memstore: connection lost")
+	}
+	var ids []string
+	for _, l := range m.links {
+		if l.AgentID == agentID {
+			ids = append(ids, l.DeviceID)
+		}
+	}
+	return ids, nil
+}
+
+// SetLink changes a link's name and switch directly, standing in for the PATCH of a later issue.
+func (m *Memory) SetLink(deviceID, agentID, name string, notify bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, l := range m.links {
+		if l.DeviceID == deviceID && l.AgentID == agentID {
+			m.links[i].Name, m.links[i].Notify = name, notify
+		}
+	}
 }

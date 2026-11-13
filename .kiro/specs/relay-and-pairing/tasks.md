@@ -36,14 +36,14 @@
   - [x] 3.3 `POST /app/v1/devices` と `POST /app/v1/pairings/claim` を実装し、`go vet ./...` と `go test -race ./...` を通す
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10_
 
-- [ ] 4. phone に状態を SSE で配る（#9。前提：#7、#8）
-  - [ ] 4.1 共通の `sse.Writer`（heartbeat・書き込み期限の解除・flush・ヘッダ）のテストを書き、実装する
+- [x] 4. phone に状態を SSE で配る（#9。前提：#7、#8）
+  - [x] 4.1 共通の `sse.Writer`（heartbeat・書き込み期限の解除・flush・ヘッダ）のテストを書き、実装する
     - _Requirements: 4.4, 4.5, 4.6_
-  - [ ] 4.2 `GET /app/v1/events` と `Broker` のテスト（最初の `state`・紐付いた device だけ・表示名と通知の設定・id・切断と接続・紐付けの増減・`401`）を書き、赤を確かめる
+  - [x] 4.2 `GET /app/v1/events` と `Broker` のテスト（最初の `state`・紐付いた device だけ・表示名と通知の設定・id・切断と接続・紐付けの増減・`401`）を書き、赤を確かめる
     - _Requirements: 4.1, 4.2, 4.3, 4.7_
-  - [ ] 4.3 `Broker` を実装し、`LiveState` と claim から呼ぶ
+  - [x] 4.3 `Broker` を実装し、`LiveState` と claim から呼ぶ
     - _Requirements: 4.1, 4.2, 4.3_
-  - [ ] 4.4 `go vet ./...` と `go test -race ./...` を通し、手元で `curl` の stream を 10 分以上開き続けて切れなかったことを PR 本文に書く
+  - [x] 4.4 `go vet ./...` と `go test -race ./...` を通し、手元で `curl` の stream を 10 分以上開き続けて切れなかったことを PR 本文に書く
     - _Requirements: 4.4_
 
 - [ ] 5. kill を agent に中継し、10 秒以内に結果を返す（#10。前提：#4、#5、#9）

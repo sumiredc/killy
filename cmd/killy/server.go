@@ -19,6 +19,7 @@ import (
 	"github.com/sumiredc/killy/internal/server/live"
 	"github.com/sumiredc/killy/internal/server/pairing"
 	"github.com/sumiredc/killy/internal/server/ratelimit"
+	"github.com/sumiredc/killy/internal/server/sse"
 	"github.com/sumiredc/killy/internal/server/store"
 )
 
@@ -55,12 +56,18 @@ func runServer(args []string, stderr io.Writer) int {
 		DeviceRegistrations: ratelimit.New(server.DeviceRegistrationLimit, server.DeviceRegistrationPeriod, c),
 		FailedClaims:        ratelimit.New(server.FailedClaimLimit, server.FailedClaimPeriod, c),
 		Live:                live.New(c, st),
+		Broker:              sse.NewBroker(),
 		Log:                 log,
 	}
+	go func() {
+		t := time.NewTicker(server.ConnectionCheckInterval)
+		defer t.Stop()
+		srv.WatchConnections(ctx, t.C)
+	}()
 	err = serve(ctx, log,
 		func(ctx context.Context) error { return store.Migrate(ctx, pool) },
 		func() (net.Listener, error) { return net.Listen("tcp", *listen) },
-		srv.Handler())
+		srv.Handler(), srv.StopStreams)
 	if err != nil {
 		log.Error("killy server stopped", "err", err)
 		return 1
@@ -70,7 +77,8 @@ func runServer(args []string, stderr io.Writer) int {
 
 // serve migrates the database, then listens and serves until ctx is done. It does not listen
 // when the migration fails, so no request ever meets an old or half-migrated schema.
-func serve(ctx context.Context, log *slog.Logger, migrate func(context.Context) error, listen func() (net.Listener, error), h http.Handler) error {
+// onShutdown runs when shutdown starts, to end the long-lived streams Shutdown would wait for.
+func serve(ctx context.Context, log *slog.Logger, migrate func(context.Context) error, listen func() (net.Listener, error), h http.Handler, onShutdown func()) error {
 	if err := migrate(ctx); err != nil {
 		return err
 	}
@@ -79,6 +87,7 @@ func serve(ctx context.Context, log *slog.Logger, migrate func(context.Context) 
 		return err
 	}
 	httpServer := &http.Server{Handler: h, ReadHeaderTimeout: 10 * time.Second}
+	httpServer.RegisterOnShutdown(onShutdown)
 	errc := make(chan error, 1)
 	go func() { errc <- httpServer.Serve(ln) }()
 	log.Info("listening", "addr", ln.Addr().String())

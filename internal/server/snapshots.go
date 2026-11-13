@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"time"
@@ -48,10 +49,15 @@ func (s *Server) postSnapshot(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_request")
 		return
 	}
-	if err := s.Live.Report(r.Context(), agent.ID, snap); err != nil {
+	applied, err := s.Live.Report(r.Context(), agent.ID, snap)
+	if err != nil {
 		s.Log.Error("record snapshot", "agent", agent.ID, "err", err)
 		writeError(w, http.StatusServiceUnavailable, "unavailable")
 		return
+	}
+	if applied {
+		// Not cancelled when the agent hangs up: the snapshot is applied, so the phones must hear of it.
+		_ = s.notifyAgent(context.WithoutCancel(r.Context()), agent.ID)
 	}
 	// A snapshot older than the last one is discarded inside Report and still answered 204, so
 	// the agent does not resend it.
