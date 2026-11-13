@@ -60,10 +60,26 @@ interface KillyClient {
 ```
 
 - エラーは本文の `error` で見分ける。値と status の正は [openapi.yaml](../../../docs/openapi.yaml)
-- SSE の受信は `react-native-sse` か `expo/fetch` の streaming のどちらかで作り、選んだ理由を #12 の PR 本文に書く
-- 再接続の待ち時間は `backoff(n, rand)` の純粋な関数にする（1・2・4・8・16・30・30 秒の基準値に揺らぎ）
+- SSE の受信は `expo/fetch`（Expo が global の `fetch` に入れている）の streaming で読み、`SSEParser` で行に分ける。`react-native-sse` は足さない：最終の公開が 2024-03 の 1.2.1 で、XHR の上に作られていて、Killy server が送る形（名前付きの event、1 行の data、コメント行）だけなら数十行で読めるため
+- 再接続の待ち時間は `backoff(n, rand)` の純粋な関数にする（1・2・4・8・16・30・30 秒の基準値に、基準値の 0〜25% 未満の揺らぎを足す。agent の再接続と同じ幅）。つながって 200 が返ったら次の待ちは 1 秒から。200 以外の応答（`401`・`503` など）も切断と同じに待つ
+- device token が無い間（登録の失敗、`429`）は stream を開かない。登録は起動ごとに 1 回だけ試す
+- 保存した token を読めなかったとき（iOS は端末のロック中に読めない）は新しく登録せず、登録の失敗として扱う。上書きすると、その token に紐付いたサーバーがすべて消えるため
+- 登録の途中は「追加する」を押せない（長くても要求の待ちの 15 秒）
+- stream が 60 秒何も送ってこない（20 秒ごとの heartbeat も無い）ときは切ってつなぎ直す。切れたことに気づかない接続で、古い状態を出し続けないため。agent の命令の stream と同じ長さ
+- 応答が 15 秒無い要求（stream を除く）は届かないとして扱う。Add server sheet が待ち続けないため
+- テストでは `makeDeps()`（fetch・token の保存先・乱数）を差し替え、Killy server の代わりに `FakeServer` を置く。要求が送られないことは `FakeServer` が受けた要求の数で見る
 - `kill` は応答が得られないときだけ同じ `id` で 1 回送り直す。`429` やほかの応答では送り直さない
 - kill ID は `expo-crypto` の `randomUUID()` で作り、小文字にそろえる
+
+### Add server sheet（Requirement 2）
+
+| 項目 | 選択 | 理由 |
+|---|---|---|
+| コードの入力 | NFKC で正規化してから大文字にし、英大文字と数字以外を落として 6 文字で切る。キーボードは iOS で `ascii-capable`、Android で `visible-password` | 日本語のキーボードは全角で入力し、変換中の文字を重ねる。実機（シミュレーター）で `ａ３ｅ` のように入った |
+| claim の失敗の文言 | `code_unknown`・`code_used`・`code_expired` は同じ 1 つ（`pairError`。`killy agent pair` をもう一度実行する）、`rate_limited` は `pairRateLimited`、届かない は `pairUnreachable`、ほか（`invalid_request`・`unauthorized`・`unavailable`・JSON でない応答）は `pairFailed` | 3 つのコードの失敗は、どれも operator がすることが同じ |
+| 登録できていないとき | 「追加する」を押すと何も送らず、`429` なら `deviceRateLimited`、それ以外（届かなかったなど）なら `deviceNotRegistered` を sheet のエラーに出す。`429` は起動直後の Battle にも出す | Requirement 2.2・2.3 |
+| 追加できたとき | 「‹name› を追加しました」を 1.3 秒出して閉じる。名前は claim の応答の `name` | DESIGN。Killy の絵は #27 |
+| キーボード | `KeyboardAvoidingView` の `padding` を両 OS で | Android は Modal の窓が縮まず、キーボードが「追加する」を隠した |
 
 ### AppState
 

@@ -250,7 +250,7 @@ Availability: with one replica and `Recreate`, a node reboot or eviction stops t
 | Framework | Expo (current SDK), TypeScript, development builds (Expo Go cannot receive push) |
 | Drawing | `react-native-svg` (artwork is ported from `mock/art.js`) |
 | Animation | `react-native-reanimated` |
-| SSE | `react-native-sse` or `expo/fetch` streaming |
+| SSE | `expo/fetch` streaming (Expo installs it as the global `fetch`), split into events by a small parser in the app |
 | Push | `expo-notifications` |
 | QR | `expo-camera` |
 | Secrets | Device token in `expo-secure-store` |
