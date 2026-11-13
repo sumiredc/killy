@@ -1,5 +1,6 @@
 import { backoff } from './backoff';
 import { SSEParser } from './sse';
+import type { KillResult } from './battle';
 import type { Server, State } from './types';
 
 export type ReaderLike = {
@@ -35,6 +36,16 @@ export class RegisterError extends Error {
   }
 }
 
+export type KillErrorKind = 'rate_limited' | 'unreachable' | 'other';
+
+export class KillError extends Error {
+  constructor(readonly kind: KillErrorKind) {
+    super(kind);
+  }
+}
+
+export type KillRequest = { id: string; serverId: string; ppid: number; starttime: number };
+
 export class ClaimError extends Error {
   constructor(readonly kind: ClaimErrorKind) {
     super(kind);
@@ -45,6 +56,8 @@ export class ClaimError extends Error {
 export interface KillyClient {
   registerDevice(): Promise<{ deviceToken: string }>;
   claim(code: string, name?: string): Promise<Server>;
+  /** Sends a kill and returns its outcome. Without an answer it sends the same kill once more. */
+  kill(req: KillRequest): Promise<KillResult>;
   /** Streams the state to onState, reconnecting on its own, until the returned function is called. */
   events(onState: (s: State) => void): () => void;
 }
@@ -125,6 +138,32 @@ export function createKillyClient({ baseURL, fetch, deviceToken, random }: Clien
         default:
           throw new ClaimError('other');
       }
+    },
+
+    async kill({ id, serverId, ppid, starttime }) {
+      const token = deviceToken();
+      if (token === null) {
+        throw new KillError('other');
+      }
+      const body = { id, server_id: serverId, ppid, starttime };
+      let answer: Answer;
+      try {
+        answer = await request('POST', '/app/v1/kills', body, token);
+      } catch {
+        // No answer at all: the same ID once more is safe, since the agent never signals twice for it.
+        try {
+          answer = await request('POST', '/app/v1/kills', body, token);
+        } catch {
+          throw new KillError('unreachable');
+        }
+      }
+      const outcome = field(answer.body, 'outcome');
+      if (answer.status === 200 && outcome) {
+        const res = answer.body as KillResult;
+        return { outcome, ...(res.reaped !== undefined && { reaped: res.reaped }), ...(res.reason !== undefined && { reason: res.reason }) };
+      }
+      // An answer came, so nothing is sent again.
+      throw new KillError(answer.status === 429 ? 'rate_limited' : 'other');
     },
 
     events(onState) {

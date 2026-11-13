@@ -35,7 +35,7 @@ afterEach(() => {
 async function startApp(server: FakeServer, tokens = new MemoryTokens(), languageCode = 'en') {
   jest.spyOn(config, 'buildServerURL').mockReturnValue('https://killy.example');
   jest.mocked(Localization.getLocales).mockReturnValue([{ languageCode } as Localization.Locale]);
-  jest.spyOn(deps, 'makeDeps').mockReturnValue({ fetch: server.fetch, tokens, random: () => 0 });
+  jest.spyOn(deps, 'makeDeps').mockReturnValue({ fetch: server.fetch, tokens, random: () => 0, randomBytes: (n) => new Uint8Array(n) });
   const r = await renderRouter(routes, { initialUrl: '/' });
   await act(settle);
   return r;

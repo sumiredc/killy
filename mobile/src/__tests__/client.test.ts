@@ -1,4 +1,4 @@
-import { ClaimError, createKillyClient, RegisterError } from '../killy/client';
+import { ClaimError, createKillyClient, KillError, RegisterError } from '../killy/client';
 import { FakeServer } from '../testing/fake-server';
 
 const url = 'https://killy.example';
@@ -97,6 +97,92 @@ describe('claim', () => {
     const server = new FakeServer();
     await expect(client(server, null).claim('K7Q4XP')).rejects.toEqual(new ClaimError('not_registered'));
     expect(server.requests).toEqual([]);
+  });
+});
+
+describe('kill', () => {
+  const req = { id: '16fd2706-8baf-433b-82eb-8c7fada847da', serverId: 'a1', ppid: 3801, starttime: 123456 };
+
+  test('sends the kill with the device token and returns the outcome', async () => {
+    const server = new FakeServer();
+    server.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 3 });
+    await expect(client(server).kill(req)).resolves.toEqual({ outcome: 'killed', reaped: 3 });
+    expect(server.requests).toEqual([
+      expect.objectContaining({
+        url: `${url}/app/v1/kills`,
+        body: { id: req.id, server_id: 'a1', ppid: 3801, starttime: 123456 },
+        authorization: 'Bearer dev-token',
+      }),
+    ]);
+  });
+
+  test('without an answer it sends the same kill once more, and not a third time', async () => {
+    const server = new FakeServer();
+    server.unreachable('POST /app/v1/kills');
+    await expect(client(server).kill(req)).rejects.toEqual(new KillError('unreachable'));
+    expect(server.requests.map((r) => r.body)).toEqual([
+      { id: req.id, server_id: 'a1', ppid: 3801, starttime: 123456 },
+      { id: req.id, server_id: 'a1', ppid: 3801, starttime: 123456 },
+    ]);
+  });
+
+  test('an answer to the second try is used', async () => {
+    const server = new FakeServer();
+    let calls = 0;
+    const fetch: typeof server.fetch = async (u, init) => {
+      calls++;
+      if (calls === 1) {
+        throw new TypeError('Network request failed');
+      }
+      return server.fetch(u, init);
+    };
+    server.respond('POST /app/v1/kills', 200, { outcome: 'already_gone' });
+    const c = createKillyClient({ baseURL: url, fetch, deviceToken: () => 'dev-token', random: () => 0 });
+    await expect(c.kill(req)).resolves.toEqual({ outcome: 'already_gone' });
+    expect(calls).toBe(2);
+  });
+
+  test('a 429 to the second try is rate_limited, with no third try', async () => {
+    const server = new FakeServer();
+    let calls = 0;
+    const fetch: typeof server.fetch = async (u, init) => {
+      calls++;
+      if (calls === 1) {
+        throw new TypeError('Network request failed');
+      }
+      return server.fetch(u, init);
+    };
+    server.respond('POST /app/v1/kills', 429, { error: 'rate_limited' });
+    const c = createKillyClient({ baseURL: url, fetch, deviceToken: () => 'dev-token', random: () => 0 });
+    await expect(c.kill(req)).rejects.toEqual(new KillError('rate_limited'));
+    expect(calls).toBe(2);
+  });
+
+  test('a 429 is rate_limited and is not sent again', async () => {
+    const server = new FakeServer();
+    server.respond('POST /app/v1/kills', 429, { error: 'rate_limited' });
+    await expect(client(server).kill(req)).rejects.toEqual(new KillError('rate_limited'));
+    expect(server.count('POST /app/v1/kills')).toBe(1);
+  });
+
+  test.each([
+    [400, { error: 'invalid_id' }],
+    [401, { error: 'unauthorized' }],
+    [404, { error: 'server_not_found' }],
+    [503, { error: 'unavailable' }],
+    [200, { nothing: true }],
+  ])('a %i %j is other and is not sent again', async (status, body) => {
+    const server = new FakeServer();
+    server.respond('POST /app/v1/kills', status, body);
+    await expect(client(server).kill(req)).rejects.toEqual(new KillError('other'));
+    expect(server.count('POST /app/v1/kills')).toBe(1);
+  });
+
+  test('an answer that is not JSON is other and is not sent again', async () => {
+    const server = new FakeServer();
+    server.respondText('POST /app/v1/kills', 502, '<html>Bad gateway</html>');
+    await expect(client(server).kill(req)).rejects.toEqual(new KillError('other'));
+    expect(server.count('POST /app/v1/kills')).toBe(1);
   });
 });
 
