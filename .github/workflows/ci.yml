@@ -24,7 +24,8 @@ jobs:
       - run: go version
       - run: go vet ./...
       # -count=1: the Linux tests check the runner itself (pidfd, reaping), so a cached pass proves nothing.
-      - run: go test -race -count=1 ./...
+      # -v: the log lists every test, so a skipped one (--- SKIP) can be seen.
+      - run: go test -race -count=1 -v ./...
 
   app:
     # Every job runs on the self-hosted runner while the repository is private. Write the runner
