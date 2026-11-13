@@ -36,6 +36,12 @@ func New(limit int, period time.Duration, c clock.Clock) *Limiter {
 // Allow reports whether one more request for key fits in its window, and counts it if it does.
 // A refused request is not counted.
 func (l *Limiter) Allow(key string) bool {
+	_, ok := l.take(key)
+	return ok
+}
+
+// take counts one request for key if it fits, and returns the start of the window it was counted in.
+func (l *Limiter) take(key string) (time.Time, bool) {
 	now := l.clock.Now()
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -45,11 +51,11 @@ func (l *Limiter) Allow(key string) bool {
 		w = window{start: now}
 	}
 	if w.n >= l.limit {
-		return false
+		return time.Time{}, false
 	}
 	w.n++
 	l.windows[key] = w
-	return true
+	return w.start, true
 }
 
 // sweep drops windows that have ended, so keys seen once do not stay in memory. It looks at every
@@ -77,4 +83,36 @@ func ClientAddr(r *http.Request) string {
 		return r.RemoteAddr
 	}
 	return host
+}
+
+// Take counts one request for key like Allow, and returns a refund that uncounts it again. Failed
+// claims count each claim up front and refund the ones that turn out not to fail, so claims still
+// in flight count too: checking first and counting after the outcome would let concurrent guesses
+// get past the limit. A refund is applied once at most and only while the window it was counted in
+// lasts.
+func (l *Limiter) Take(key string) (refund func(), ok bool) {
+	start, ok := l.take(key)
+	if !ok {
+		return func() {}, false
+	}
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			l.mu.Lock()
+			defer l.mu.Unlock()
+			if w, ok := l.windows[key]; ok && w.start.Equal(start) && w.n > 0 {
+				w.n--
+				l.windows[key] = w
+			}
+		})
+	}, true
+}
+
+// Full reports, without counting anything, whether key has used up its current window.
+func (l *Limiter) Full(key string) bool {
+	now := l.clock.Now()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	w, ok := l.windows[key]
+	return ok && now.Before(w.start.Add(l.period)) && w.n >= l.limit
 }

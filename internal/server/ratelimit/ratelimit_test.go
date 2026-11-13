@@ -101,3 +101,63 @@ func TestClientAddrFallsBackToTheTCPPeerWithoutThePort(t *testing.T) {
 		}
 	}
 }
+
+func TestTakeCountsLikeAllow(t *testing.T) {
+	l := New(2, time.Hour, clock.NewFake(t0))
+	for i := range 2 {
+		if _, ok := l.Take("a"); !ok {
+			t.Fatalf("take %d refused", i+1)
+		}
+	}
+	if _, ok := l.Take("a"); ok {
+		t.Error("third take allowed, want refused")
+	}
+	if l.Allow("a") {
+		t.Error("Allow after two takes allowed, want refused")
+	}
+}
+
+func TestARefundFreesTheSlotOnce(t *testing.T) {
+	l := New(2, time.Hour, clock.NewFake(t0))
+	refund, _ := l.Take("a")
+	l.Take("a")
+	refund()
+	refund()
+	if _, ok := l.Take("a"); !ok {
+		t.Error("take after a refund refused, want allowed")
+	}
+	if _, ok := l.Take("a"); ok {
+		t.Error("a second refund of the same take freed another slot")
+	}
+}
+
+func TestARefundDoesNotTouchALaterWindow(t *testing.T) {
+	c := clock.NewFake(t0)
+	l := New(1, time.Hour, c)
+	refund, _ := l.Take("a")
+	c.Advance(time.Hour)
+	l.Take("a")
+	refund()
+	if _, ok := l.Take("a"); ok {
+		t.Error("a refund from the old window freed a slot in the new one")
+	}
+}
+
+func TestFullWhenTheWindowIsUsedUpWithoutCounting(t *testing.T) {
+	c := clock.NewFake(t0)
+	l := New(2, time.Hour, c)
+	allowN(t, l, "a", 1)
+	for range 3 {
+		if l.Full("a") {
+			t.Fatal("full after 1 of 2")
+		}
+	}
+	allowN(t, l, "a", 1)
+	if !l.Full("a") || l.Full("b") {
+		t.Error("want a full and b not")
+	}
+	c.Advance(time.Hour)
+	if l.Full("a") {
+		t.Error("full at exactly the end of the window")
+	}
+}
