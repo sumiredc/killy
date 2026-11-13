@@ -127,6 +127,7 @@ func (s *Server) claimPairing(w http.ResponseWriter, r *http.Request) {
 		var link store.Link
 		link, err = s.Store.LinkDevice(ctx, device.ID, agentID, name, agent.Hostname)
 		if err == nil {
+			s.NotifyDevice(device.ID)
 			writeJSON(w, http.StatusOK, serverResponse{ID: agentID, Name: link.Name, Hostname: agent.Hostname, Notify: link.Notify})
 			return
 		}

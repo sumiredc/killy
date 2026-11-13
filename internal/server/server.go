@@ -12,11 +12,13 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sumiredc/killy/internal/server/live"
 	"github.com/sumiredc/killy/internal/server/pairing"
 	"github.com/sumiredc/killy/internal/server/ratelimit"
+	"github.com/sumiredc/killy/internal/server/sse"
 	"github.com/sumiredc/killy/internal/server/store"
 )
 
@@ -45,6 +47,8 @@ type Store interface {
 	CreateDevice(ctx context.Context, tokenSHA256 []byte, pushToken string) (store.Device, error)
 	DeviceByToken(ctx context.Context, tokenSHA256 []byte) (store.Device, error)
 	LinkDevice(ctx context.Context, deviceID, agentID string, name *string, fallback string) (store.Link, error)
+	LinksOfDevice(ctx context.Context, deviceID string) ([]store.LinkedServer, error)
+	DevicesOfAgent(ctx context.Context, agentID string) ([]string, error)
 }
 
 type Server struct {
@@ -58,7 +62,15 @@ type Server struct {
 	FailedClaims *ratelimit.Limiter
 	// Live holds every agent's latest snapshot.
 	Live *live.State
-	Log  *slog.Logger
+	// Broker tells each device's open event streams to send their state again.
+	Broker *sse.Broker
+	// HeartbeatInterval is how often a stream sends ": hb"; zero means sse.HeartbeatInterval.
+	HeartbeatInterval time.Duration
+
+	stopOnce sync.Once
+	stopMu   sync.Mutex
+	stopping chan struct{}
+	Log      *slog.Logger
 }
 
 func (s *Server) Handler() http.Handler {
@@ -67,6 +79,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /agent/v1/snapshots", s.postSnapshot)
 	mux.HandleFunc("POST /app/v1/devices", s.registerDevice)
 	mux.HandleFunc("POST /app/v1/pairings/claim", s.claimPairing)
+	mux.HandleFunc("GET /app/v1/events", s.streamEvents)
 	return mux
 }
 
