@@ -22,8 +22,12 @@ import (
 
 // First-run agent registrations allowed per client address (docs/ARCHITECTURE.md, Rate limits).
 const (
-	FirstRunLimit  = 10
-	FirstRunPeriod = time.Hour
+	FirstRunLimit            = 10
+	FirstRunPeriod           = time.Hour
+	DeviceRegistrationLimit  = 10
+	DeviceRegistrationPeriod = time.Hour
+	FailedClaimLimit         = 10
+	FailedClaimPeriod        = 10 * time.Minute
 )
 
 const (
@@ -32,18 +36,26 @@ const (
 	tokenRandomSize = 32
 )
 
-// AgentStore keeps registered agents; *store.Store (PostgreSQL) in production.
-type AgentStore interface {
+// Store keeps agents, devices and their links; *store.Store (PostgreSQL) in production. The
+// lookups return store.ErrNotFound when nothing matches.
+type Store interface {
 	CreateAgent(ctx context.Context, tokenSHA256 []byte, hostname string) (store.Agent, error)
-	// AgentByToken returns store.ErrNotFound when no agent has that token.
 	AgentByToken(ctx context.Context, tokenSHA256 []byte) (store.Agent, error)
+	AgentByID(ctx context.Context, id string) (store.Agent, error)
+	CreateDevice(ctx context.Context, tokenSHA256 []byte, pushToken string) (store.Device, error)
+	DeviceByToken(ctx context.Context, tokenSHA256 []byte) (store.Device, error)
+	LinkDevice(ctx context.Context, deviceID, agentID string, name *string, fallback string) (store.Link, error)
 }
 
 type Server struct {
-	Store AgentStore
+	Store Store
 	Codes *pairing.Codes
 	// FirstRuns counts first-run registrations per client address.
 	FirstRuns *ratelimit.Limiter
+	// DeviceRegistrations counts device registrations per client address.
+	DeviceRegistrations *ratelimit.Limiter
+	// FailedClaims counts failed claims per client address.
+	FailedClaims *ratelimit.Limiter
 	// Live holds every agent's latest snapshot.
 	Live *live.State
 	Log  *slog.Logger
@@ -53,6 +65,8 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /agent/v1/pairings", s.createPairing)
 	mux.HandleFunc("POST /agent/v1/snapshots", s.postSnapshot)
+	mux.HandleFunc("POST /app/v1/devices", s.registerDevice)
+	mux.HandleFunc("POST /app/v1/pairings/claim", s.claimPairing)
 	return mux
 }
 

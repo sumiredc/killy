@@ -19,8 +19,12 @@ import (
 type Memory struct {
 	mu sync.Mutex
 	// Err, when set, is returned by every call, as when the database cannot be reached.
-	Err        error
+	Err error
+	// FailLink makes LinkDevice alone fail, as when the database goes away in the middle of a claim.
+	FailLink   bool
 	agents     []AgentRow
+	devices    []DeviceRow
+	links      []LinkRow
 	detections map[string]map[store.ParentKey]time.Time
 }
 
@@ -106,4 +110,104 @@ func (m *Memory) Detections(agentID string) map[store.ParentKey]time.Time {
 		got[k] = v
 	}
 	return got
+}
+
+// DeviceRow is what the devices table would hold.
+type DeviceRow struct {
+	ID          string
+	TokenSHA256 []byte
+	PushToken   string
+}
+
+// LinkRow is what the links table would hold.
+type LinkRow struct {
+	DeviceID, AgentID, Name string
+	Notify                  bool
+}
+
+func (m *Memory) CreateDevice(_ context.Context, tokenSHA256 []byte, pushToken string) (store.Device, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Err != nil {
+		return store.Device{}, m.Err
+	}
+	for _, d := range m.devices {
+		if bytes.Equal(d.TokenSHA256, tokenSHA256) {
+			return store.Device{}, errors.New("memstore: duplicate token_sha256 (UNIQUE in the devices table)")
+		}
+	}
+	row := DeviceRow{ID: uuid.NewV4().String(), TokenSHA256: bytes.Clone(tokenSHA256), PushToken: pushToken}
+	m.devices = append(m.devices, row)
+	return store.Device{ID: row.ID}, nil
+}
+
+func (m *Memory) DeviceByToken(_ context.Context, tokenSHA256 []byte) (store.Device, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Err != nil {
+		return store.Device{}, m.Err
+	}
+	for _, d := range m.devices {
+		if bytes.Equal(d.TokenSHA256, tokenSHA256) {
+			return store.Device{ID: d.ID}, nil
+		}
+	}
+	return store.Device{}, store.ErrNotFound
+}
+
+func (m *Memory) AgentByID(_ context.Context, id string) (store.Agent, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Err != nil {
+		return store.Agent{}, m.Err
+	}
+	for _, a := range m.agents {
+		if a.ID == id {
+			return store.Agent{ID: a.ID, Hostname: a.Hostname}, nil
+		}
+	}
+	return store.Agent{}, store.ErrNotFound
+}
+
+func (m *Memory) LinkDevice(_ context.Context, deviceID, agentID string, name *string, fallback string) (store.Link, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Err != nil {
+		return store.Link{}, m.Err
+	}
+	if m.FailLink {
+		return store.Link{}, errors.New("memstore: connection lost")
+	}
+	if !slices.ContainsFunc(m.devices, func(d DeviceRow) bool { return d.ID == deviceID }) ||
+		!slices.ContainsFunc(m.agents, func(a AgentRow) bool { return a.ID == agentID }) {
+		return store.Link{}, errors.New("memstore: foreign key violation")
+	}
+	for i, l := range m.links {
+		if l.DeviceID == deviceID && l.AgentID == agentID {
+			if name != nil {
+				m.links[i].Name = *name
+			}
+			return store.Link{AgentID: agentID, Name: m.links[i].Name, Notify: l.Notify}, nil
+		}
+	}
+	row := LinkRow{DeviceID: deviceID, AgentID: agentID, Name: fallback, Notify: true}
+	if name != nil {
+		row.Name = *name
+	}
+	m.links = append(m.links, row)
+	return store.Link{AgentID: agentID, Name: row.Name, Notify: row.Notify}, nil
+}
+
+// Devices returns a copy of the stored device rows.
+func (m *Memory) Devices() []DeviceRow {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Clone(m.devices)
+}
+
+// Links returns a copy of the stored link rows.
+func (m *Memory) Links() []LinkRow {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Clone(m.links)
 }
