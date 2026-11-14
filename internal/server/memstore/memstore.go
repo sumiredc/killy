@@ -26,10 +26,23 @@ type Memory struct {
 	FailLinksOfDevice, FailDevicesOfAgent bool
 	// FailLinkChanges makes UpdateLink and UnlinkDevice alone fail.
 	FailLinkChanges bool
-	agents          []AgentRow
-	devices         []DeviceRow
-	links           []LinkRow
-	detections      map[string]map[store.ParentKey]time.Time
+	// FailUpdateDevice makes UpdateDevice alone fail.
+	FailUpdateDevice bool
+	// FailRecordNotified makes RecordNotified alone fail.
+	FailRecordNotified bool
+	agents             []AgentRow
+	devices            []DeviceRow
+	links              []LinkRow
+	detections         map[string]map[store.ParentKey]time.Time
+	// notified holds the notified_parents rows.
+	notified []NotifiedRow
+}
+
+// NotifiedRow is what the notified_parents table would hold.
+type NotifiedRow struct {
+	AgentID  string
+	Parent   store.ParentKey
+	DeviceID string
 }
 
 // AgentRow is what the agents table would hold.
@@ -98,6 +111,11 @@ func (m *Memory) SyncFirstDetections(_ context.Context, agentID string, parents 
 		}
 	}
 	m.detections[agentID] = next
+	// ON DELETE CASCADE from first_detections.
+	m.notified = slices.DeleteFunc(m.notified, func(n NotifiedRow) bool {
+		_, kept := next[n.Parent]
+		return n.AgentID == agentID && !kept
+	})
 	got := make(map[store.ParentKey]time.Time, len(next))
 	for k, v := range next {
 		got[k] = v
@@ -121,6 +139,8 @@ type DeviceRow struct {
 	ID          string
 	TokenSHA256 []byte
 	PushToken   string
+	// Notify is the app-wide notification switch; on for a new device, as in the devices table.
+	Notify bool
 }
 
 // LinkRow is what the links table would hold.
@@ -140,7 +160,7 @@ func (m *Memory) CreateDevice(_ context.Context, tokenSHA256 []byte, pushToken s
 			return store.Device{}, errors.New("memstore: duplicate token_sha256 (UNIQUE in the devices table)")
 		}
 	}
-	row := DeviceRow{ID: uuid.NewV4().String(), TokenSHA256: bytes.Clone(tokenSHA256), PushToken: pushToken}
+	row := DeviceRow{ID: uuid.NewV4().String(), TokenSHA256: bytes.Clone(tokenSHA256), PushToken: pushToken, Notify: true}
 	m.devices = append(m.devices, row)
 	return store.Device{ID: row.ID}, nil
 }
@@ -300,6 +320,8 @@ func (m *Memory) UnlinkDevice(_ context.Context, deviceID, agentID string) error
 	for i, l := range m.links {
 		if l.DeviceID == deviceID && l.AgentID == agentID {
 			m.links = slices.Delete(m.links, i, i+1)
+			// ON DELETE CASCADE from links.
+			m.notified = slices.DeleteFunc(m.notified, func(n NotifiedRow) bool { return n.DeviceID == deviceID && n.AgentID == agentID })
 			return nil
 		}
 	}
@@ -325,4 +347,117 @@ func (m *Memory) SetLink(deviceID, agentID, name string, notify bool) {
 			m.links[i].Name, m.links[i].Notify = name, notify
 		}
 	}
+}
+
+func (m *Memory) UpdateDevice(_ context.Context, deviceID string, pushToken *string, notify *bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Err != nil {
+		return m.Err
+	}
+	if m.FailUpdateDevice {
+		return errors.New("memstore: connection lost")
+	}
+	i := slices.IndexFunc(m.devices, func(d DeviceRow) bool { return d.ID == deviceID })
+	if i < 0 {
+		return store.ErrNotFound
+	}
+	if pushToken != nil {
+		for j := range m.devices {
+			if j != i && m.devices[j].PushToken == *pushToken {
+				m.devices[j].PushToken = ""
+			}
+		}
+		m.devices[i].PushToken = *pushToken
+	}
+	if notify != nil {
+		m.devices[i].Notify = *notify
+	}
+	return nil
+}
+
+func (m *Memory) PushTargets(_ context.Context, agentID string) ([]store.PushTarget, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Err != nil {
+		return nil, m.Err
+	}
+	var targets []store.PushTarget
+	for _, l := range m.links {
+		if l.AgentID != agentID || !l.Notify {
+			continue
+		}
+		for _, d := range m.devices {
+			if d.ID == l.DeviceID && d.Notify && d.PushToken != "" {
+				targets = append(targets, store.PushTarget{DeviceID: d.ID, PushToken: d.PushToken, Name: l.Name})
+			}
+		}
+	}
+	return targets, nil
+}
+
+func (m *Memory) NotifiedOf(_ context.Context, agentID string) ([]store.Notified, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Err != nil {
+		return nil, m.Err
+	}
+	return m.notifiedOf(agentID), nil
+}
+
+func (m *Memory) notifiedOf(agentID string) []store.Notified {
+	var out []store.Notified
+	for _, n := range m.notified {
+		if n.AgentID == agentID {
+			out = append(out, store.Notified{Parent: n.Parent, DeviceID: n.DeviceID})
+		}
+	}
+	return out
+}
+
+func (m *Memory) RecordNotified(_ context.Context, agentID string, pairs []store.Notified) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Err != nil {
+		return m.Err
+	}
+	if m.FailRecordNotified {
+		return errors.New("memstore: connection lost")
+	}
+	for _, p := range pairs {
+		// Only pairs whose parent and link still exist, as the SQL does instead of failing on the
+		// foreign keys; a pair already there is left as it is.
+		if _, ok := m.detections[agentID][p.Parent]; !ok {
+			continue
+		}
+		if !slices.ContainsFunc(m.links, func(l LinkRow) bool { return l.DeviceID == p.DeviceID && l.AgentID == agentID }) {
+			continue
+		}
+		row := NotifiedRow{AgentID: agentID, Parent: p.Parent, DeviceID: p.DeviceID}
+		if !slices.Contains(m.notified, row) {
+			m.notified = append(m.notified, row)
+		}
+	}
+	return nil
+}
+
+func (m *Memory) ClearPushToken(_ context.Context, deviceID, pushToken string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Err != nil {
+		return m.Err
+	}
+	for i, d := range m.devices {
+		if d.ID == deviceID && d.PushToken == pushToken {
+			m.devices[i].PushToken = ""
+		}
+	}
+	return nil
+}
+
+// Notified returns a copy of the agent's notified rows.
+func (m *Memory) Notified(agentID string) []store.Notified {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.notifiedOf(agentID)
 }

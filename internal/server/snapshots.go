@@ -58,6 +58,10 @@ func (s *Server) postSnapshot(w http.ResponseWriter, r *http.Request) {
 	if applied {
 		// Not cancelled when the agent hangs up: the snapshot is applied, so the phones must hear of it.
 		_ = s.notifyAgent(context.WithoutCancel(r.Context()), agent.ID)
+		// Without waiting: Expo being slow must not slow the agent's report.
+		if s.Pushes != nil {
+			s.Pushes.Wake(agent.ID)
+		}
 	}
 	// A snapshot older than the last one is discarded inside Report and still answered 204, so
 	// the agent does not resend it.

@@ -20,6 +20,7 @@ import (
 	"github.com/sumiredc/killy/internal/server/live"
 	"github.com/sumiredc/killy/internal/server/memstore"
 	"github.com/sumiredc/killy/internal/server/pairing"
+	"github.com/sumiredc/killy/internal/server/push"
 	"github.com/sumiredc/killy/internal/server/ratelimit"
 	"github.com/sumiredc/killy/internal/server/sse"
 )
@@ -32,13 +33,28 @@ type testServer struct {
 	clock *clock.Fake
 	// killTimer fires the 10 s timer of every kill the test starts.
 	killTimer chan time.Time
+	// sender stands in for Expo Push Service; pushes is the notifier that uses it.
+	sender *fakeSender
+	pushes *push.Notifier
+	// scans counts the snapshots report sent, so each has a later scanned_at.
+	scans int
 }
 
 func newTestServer(t *testing.T) *testServer {
 	t.Helper()
+	return newTestServerOn(t, memstore.New())
+}
+
+// newTestServerOn starts a Killy server on an existing database, as a restart does: everything in
+// memory starts empty, what the store holds stays.
+func newTestServerOn(t *testing.T, mem *memstore.Memory) *testServer {
+	t.Helper()
 	c := clock.NewFake(t0)
-	mem := memstore.New()
 	killTimer := make(chan time.Time, 64)
+	lv := live.New(c, mem)
+	sender := &fakeSender{}
+	pushes := push.New(mem, lv, sender, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	t.Cleanup(pushes.Close)
 	return &testServer{
 		Server: &Server{
 			Store:               mem,
@@ -48,8 +64,9 @@ func newTestServer(t *testing.T) *testServer {
 			FailedClaims:        ratelimit.New(FailedClaimLimit, FailedClaimPeriod, c),
 			Kills:               ratelimit.New(KillLimit, KillPeriod, c),
 			Commands:            command.New(c, func(time.Duration) <-chan time.Time { return killTimer }),
-			Live:                live.New(c, mem),
+			Live:                lv,
 			Broker:              sse.NewBroker(),
+			Pushes:              pushes,
 			// Long enough that no heartbeat comes between the events a test waits for.
 			HeartbeatInterval: time.Hour,
 			Log:               slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -57,6 +74,8 @@ func newTestServer(t *testing.T) *testServer {
 		mem:       mem,
 		clock:     c,
 		killTimer: killTimer,
+		sender:    sender,
+		pushes:    pushes,
 	}
 }
 

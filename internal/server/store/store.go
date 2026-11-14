@@ -282,3 +282,122 @@ func (s *Store) DevicesOfAgent(ctx context.Context, agentID string) ([]string, e
 	}
 	return ids, rows.Err()
 }
+
+// UpdateDevice changes the device's push token or app-wide switch; a nil field is left as it is.
+// A push token moves: any other device that had it loses it, so one phone gets one push. It
+// returns ErrNotFound when there is no such device.
+func (s *Store) UpdateDevice(ctx context.Context, deviceID string, pushToken *string, notify *bool) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("update device: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	if pushToken != nil {
+		if _, err := tx.Exec(ctx, "UPDATE devices SET push_token = NULL WHERE push_token = $1 AND id <> $2", *pushToken, deviceID); err != nil {
+			return fmt.Errorf("move push token: %w", err)
+		}
+	}
+	tag, err := tx.Exec(ctx, "UPDATE devices SET push_token = COALESCE($2, push_token), notify = COALESCE($3, notify) WHERE id = $1",
+		deviceID, pushToken, notify)
+	if err != nil {
+		return fmt.Errorf("update device: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("update device: %w", err)
+	}
+	return nil
+}
+
+// PushTarget is a device to notify of an agent's parents, with the agent's name on that device.
+type PushTarget struct {
+	DeviceID  string
+	PushToken string
+	Name      string
+}
+
+// Notified is one parent a device was already notified of.
+type Notified struct {
+	Parent   ParentKey
+	DeviceID string
+}
+
+// PushTargets returns the devices linked to the agent that have a push token and both the
+// app-wide and the server's switch on.
+func (s *Store) PushTargets(ctx context.Context, agentID string) ([]PushTarget, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT d.id::text, d.push_token, l.name
+		FROM links l JOIN devices d ON d.id = l.device_id
+		WHERE l.agent_id = $1 AND l.notify AND d.notify AND d.push_token IS NOT NULL
+		ORDER BY l.created_at, d.id`, agentID)
+	if err != nil {
+		return nil, fmt.Errorf("list push targets: %w", err)
+	}
+	defer rows.Close()
+	var targets []PushTarget
+	for rows.Next() {
+		var t PushTarget
+		if err := rows.Scan(&t.DeviceID, &t.PushToken, &t.Name); err != nil {
+			return nil, err
+		}
+		targets = append(targets, t)
+	}
+	return targets, rows.Err()
+}
+
+// NotifiedOf returns the agent's parents each device was already notified of.
+func (s *Store) NotifiedOf(ctx context.Context, agentID string) ([]Notified, error) {
+	rows, err := s.pool.Query(ctx,
+		"SELECT pid, starttime, device_id::text FROM notified_parents WHERE agent_id = $1", agentID)
+	if err != nil {
+		return nil, fmt.Errorf("list notified parents: %w", err)
+	}
+	defer rows.Close()
+	var got []Notified
+	for rows.Next() {
+		var n Notified
+		if err := rows.Scan(&n.Parent.PID, &n.Parent.StartTime, &n.DeviceID); err != nil {
+			return nil, err
+		}
+		got = append(got, n)
+	}
+	return got, rows.Err()
+}
+
+// RecordNotified records the pairs as notified. A pair whose parent left the snapshot, or whose
+// device was unlinked, meanwhile is dropped; a pair already recorded is left as it is.
+func (s *Store) RecordNotified(ctx context.Context, agentID string, pairs []Notified) error {
+	if len(pairs) == 0 {
+		return nil
+	}
+	pids := make([]int32, len(pairs))
+	starts := make([]int64, len(pairs))
+	devices := make([]string, len(pairs))
+	for i, p := range pairs {
+		pids[i], starts[i], devices[i] = int32(p.Parent.PID), p.Parent.StartTime, p.DeviceID
+	}
+	// The joins drop the pairs whose rows are gone instead of failing on the foreign keys.
+	if _, err := s.pool.Exec(ctx, `
+		INSERT INTO notified_parents (agent_id, pid, starttime, device_id)
+		SELECT f.agent_id, f.pid, f.starttime, l.device_id
+		FROM unnest($2::integer[], $3::bigint[], $4::uuid[]) AS p(pid, starttime, device_id)
+		JOIN first_detections f ON f.agent_id = $1 AND f.pid = p.pid AND f.starttime = p.starttime
+		JOIN links l ON l.agent_id = $1 AND l.device_id = p.device_id
+		ON CONFLICT DO NOTHING`,
+		agentID, pids, starts, devices); err != nil {
+		return fmt.Errorf("record notified parents: %w", err)
+	}
+	return nil
+}
+
+// ClearPushToken removes the device's push token if it is still pushToken, so a newer one the app
+// registered meanwhile is kept.
+func (s *Store) ClearPushToken(ctx context.Context, deviceID, pushToken string) error {
+	if _, err := s.pool.Exec(ctx,
+		"UPDATE devices SET push_token = NULL WHERE id = $1 AND push_token = $2", deviceID, pushToken); err != nil {
+		return fmt.Errorf("clear push token: %w", err)
+	}
+	return nil
+}

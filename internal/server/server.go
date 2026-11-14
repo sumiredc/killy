@@ -49,6 +49,7 @@ type Store interface {
 	AgentByID(ctx context.Context, id string) (store.Agent, error)
 	CreateDevice(ctx context.Context, tokenSHA256 []byte, pushToken string) (store.Device, error)
 	DeviceByToken(ctx context.Context, tokenSHA256 []byte) (store.Device, error)
+	UpdateDevice(ctx context.Context, deviceID string, pushToken *string, notify *bool) error
 	LinkDevice(ctx context.Context, deviceID, agentID string, name *string, fallback string) (store.Link, error)
 	UpdateLink(ctx context.Context, deviceID, agentID string, name *string, notify *bool) (store.Link, error)
 	UnlinkDevice(ctx context.Context, deviceID, agentID string) error
@@ -73,6 +74,8 @@ type Server struct {
 	Live *live.State
 	// Broker tells each device's open event streams to send their state again.
 	Broker *sse.Broker
+	// Pushes sends push notifications of the parents in applied snapshots; nil sends none.
+	Pushes interface{ Wake(agentID string) }
 	// HeartbeatInterval is how often a stream sends ": hb"; zero means sse.HeartbeatInterval.
 	HeartbeatInterval time.Duration
 
@@ -87,6 +90,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /agent/v1/pairings", s.createPairing)
 	mux.HandleFunc("POST /agent/v1/snapshots", s.postSnapshot)
 	mux.HandleFunc("POST /app/v1/devices", s.registerDevice)
+	mux.HandleFunc("PATCH /app/v1/devices/me", s.patchDevice)
 	mux.HandleFunc("POST /app/v1/pairings/claim", s.claimPairing)
 	mux.HandleFunc("GET /app/v1/events", s.streamEvents)
 	mux.HandleFunc("GET /agent/v1/commands", s.streamCommands)
