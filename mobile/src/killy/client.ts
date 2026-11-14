@@ -46,6 +46,14 @@ export class KillError extends Error {
 
 export type KillRequest = { id: string; serverId: string; ppid: number; starttime: number };
 
+export type ServerErrorKind = 'unreachable' | 'other';
+
+export class ServerError extends Error {
+  constructor(readonly kind: ServerErrorKind) {
+    super(kind);
+  }
+}
+
 export class ClaimError extends Error {
   constructor(readonly kind: ClaimErrorKind) {
     super(kind);
@@ -58,6 +66,10 @@ export interface KillyClient {
   claim(code: string, name?: string): Promise<Server>;
   /** Sends a kill and returns its outcome. Without an answer it sends the same kill once more. */
   kill(req: KillRequest): Promise<KillResult>;
+  /** Renames or mutes the server for this phone only. Nothing is sent again: the operator sees the error and retries. */
+  updateServer(id: string, patch: { name?: string; notify?: boolean }): Promise<void>;
+  /** Unlinks this phone from the server. Nothing is sent again, as for updateServer. */
+  removeServer(id: string): Promise<void>;
   /** Streams the state to onState, reconnecting on its own, until the returned function is called. */
   events(onState: (s: State) => void): () => void;
 }
@@ -94,6 +106,22 @@ export function createKillyClient({ baseURL, fetch, deviceToken, random }: Clien
       return { status: res.status, body: parseJSON(text) };
     } finally {
       clearTimeout(timer);
+    }
+  }
+
+  async function changeServer(method: 'PATCH' | 'DELETE', id: string, body: unknown): Promise<void> {
+    const token = deviceToken();
+    if (token === null) {
+      throw new ServerError('other');
+    }
+    let answer: Answer;
+    try {
+      answer = await request(method, `/app/v1/servers/${encodeURIComponent(id)}`, body, token);
+    } catch {
+      throw new ServerError('unreachable');
+    }
+    if (answer.status !== 204) {
+      throw new ServerError('other');
     }
   }
 
@@ -164,6 +192,14 @@ export function createKillyClient({ baseURL, fetch, deviceToken, random }: Clien
       }
       // An answer came, so nothing is sent again.
       throw new KillError(answer.status === 429 ? 'rate_limited' : 'other');
+    },
+
+    async updateServer(id, patch) {
+      await changeServer('PATCH', id, patch);
+    },
+
+    async removeServer(id) {
+      await changeServer('DELETE', id, undefined);
     },
 
     events(onState) {

@@ -1,4 +1,4 @@
-import { ClaimError, createKillyClient, KillError, RegisterError } from '../killy/client';
+import { ClaimError, createKillyClient, KillError, RegisterError, ServerError } from '../killy/client';
 import { FakeServer } from '../testing/fake-server';
 
 const url = 'https://killy.example';
@@ -302,5 +302,88 @@ describe('events', () => {
     await stream.send('event: state\ndata: {oops\n\nevent: state\ndata: {"servers":[]}\n\n');
     expect(states).toEqual([{ servers: [] }]);
     stop();
+  });
+});
+
+describe('updateServer and removeServer', () => {
+  test('a rename or mute is a PATCH of that server with only the fields given and the device token', async () => {
+    const server = new FakeServer();
+    server.respond('PATCH /app/v1/servers/a1', 204, null);
+    await expect(client(server).updateServer('a1', { name: 'Renamed' })).resolves.toBeUndefined();
+    await client(server).updateServer('a1', { notify: false });
+    expect(server.requests).toEqual([
+      expect.objectContaining({ method: 'PATCH', url: `${url}/app/v1/servers/a1`, body: { name: 'Renamed' }, authorization: 'Bearer dev-token' }),
+      expect.objectContaining({ method: 'PATCH', url: `${url}/app/v1/servers/a1`, body: { notify: false }, authorization: 'Bearer dev-token' }),
+    ]);
+  });
+
+  test('a removal is a DELETE of that server with the device token', async () => {
+    const server = new FakeServer();
+    server.respond('DELETE /app/v1/servers/a1', 204, null);
+    await expect(client(server).removeServer('a1')).resolves.toBeUndefined();
+    expect(server.requests).toEqual([
+      expect.objectContaining({ method: 'DELETE', url: `${url}/app/v1/servers/a1`, authorization: 'Bearer dev-token' }),
+    ]);
+  });
+
+  test('the server id is escaped in the path', async () => {
+    const server = new FakeServer();
+    await client(server).updateServer('a/../b?c', { notify: true }).catch(() => {});
+    await client(server).removeServer('a/../b?c').catch(() => {});
+    expect(server.requests.map((r) => r.url)).toEqual([`${url}/app/v1/servers/a%2F..%2Fb%3Fc`, `${url}/app/v1/servers/a%2F..%2Fb%3Fc`]);
+  });
+
+  test.each([
+    [400, { error: 'invalid_request' }],
+    [401, { error: 'unauthorized' }],
+    [404, { error: 'server_not_found' }],
+    [503, { error: 'unavailable' }],
+    [200, {}],
+  ] as const)('a %i answer is other and is not sent again', async (status, body) => {
+    const server = new FakeServer();
+    server.respond('PATCH /app/v1/servers/a1', status, body);
+    server.respond('DELETE /app/v1/servers/a1', status, body);
+    await expect(client(server).updateServer('a1', { name: 'x' })).rejects.toEqual(new ServerError('other'));
+    await expect(client(server).removeServer('a1')).rejects.toEqual(new ServerError('other'));
+    expect(server.requests.length).toBe(2);
+  });
+
+  test('an answer that is not JSON is other', async () => {
+    const server = new FakeServer();
+    server.respondText('PATCH /app/v1/servers/a1', 502, '<html>Bad gateway</html>');
+    server.respondText('DELETE /app/v1/servers/a1', 502, '<html>Bad gateway</html>');
+    await expect(client(server).updateServer('a1', { name: 'x' })).rejects.toEqual(new ServerError('other'));
+    await expect(client(server).removeServer('a1')).rejects.toEqual(new ServerError('other'));
+  });
+
+  test('no answer is unreachable and is not sent again', async () => {
+    const server = new FakeServer();
+    server.unreachable('PATCH /app/v1/servers/a1');
+    server.unreachable('DELETE /app/v1/servers/a1');
+    await expect(client(server).updateServer('a1', { notify: false })).rejects.toEqual(new ServerError('unreachable'));
+    await expect(client(server).removeServer('a1')).rejects.toEqual(new ServerError('unreachable'));
+    expect(server.requests.length).toBe(2);
+  });
+
+  test('an answer that has not come after 15 seconds is unreachable', async () => {
+    jest.useFakeTimers();
+    try {
+      const server = new FakeServer();
+      server.hold('PATCH /app/v1/servers/a1');
+      const result = client(server).updateServer('a1', { notify: false }).catch((e) => e);
+      await jest.advanceTimersByTimeAsync(14_999);
+      expect(server.lastSignal()?.aborted).toBe(false);
+      await jest.advanceTimersByTimeAsync(1);
+      await expect(result).resolves.toEqual(new ServerError('unreachable'));
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('without a device token nothing is sent', async () => {
+    const server = new FakeServer();
+    await expect(client(server, null).updateServer('a1', { name: 'x' })).rejects.toEqual(new ServerError('other'));
+    await expect(client(server, null).removeServer('a1')).rejects.toEqual(new ServerError('other'));
+    expect(server.requests).toEqual([]);
   });
 });
