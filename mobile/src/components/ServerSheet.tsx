@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Pressable, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Pressable, StyleSheet, Switch, TextInput, View } from 'react-native';
 
 import type { Key } from '@/i18n';
 import { useI18n } from '@/i18n/context';
-import { ServerError } from '@/killy/client';
+import { type CheckResult, ServerError } from '@/killy/client';
 import { useKilly } from '@/killy/context';
 import type { ServerState } from '@/killy/types';
 import { KText } from '@/theme/KText';
@@ -12,6 +12,17 @@ import { colors, fonts, radii } from '@/theme/tokens';
 function failure(e: unknown): Key {
   return e instanceof ServerError && e.kind === 'unreachable' ? 'pairUnreachable' : 'serverSaveFailed';
 }
+
+/** The light red of a failed check (DESIGN: Server sheet; `#checkResult.fail` in the mock). */
+const connFailColor = '#FF9AAA';
+
+/** What the Connection row says for each result of a check (PRD UC4). */
+const checkMessages: Record<Exclude<CheckResult['kind'], 'ok'>, Key> = {
+  agent_disconnected: 'connFail',
+  no_response: 'connNoResponse',
+  unreachable: 'pairUnreachable',
+  failed: 'connFailed',
+};
 
 /**
  * Rename, mute or remove one server, for this phone only (DESIGN: Server sheet). The switch is
@@ -38,6 +49,9 @@ export function ServerSheet({ server, onClose }: { server: ServerState; onClose:
   const [confirming, setConfirming] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [removeError, setRemoveError] = useState<Key | null>(null);
+  // Kept only while the sheet is open: there is no permanent connection indicator.
+  const [checking, setChecking] = useState(false);
+  const [checked, setChecked] = useState<CheckResult | null>(null);
   const mounted = useRef(true);
   // While a change is on its way the sheet stays open and no other change can start, so a failure
   // has a place to show and a save that closes the sheet leaves nothing behind.
@@ -85,6 +99,15 @@ export function ServerSheet({ server, onClose }: { server: ServerState; onClose:
       setNameError(failure(e));
       setSaving(false);
     }
+  }
+
+  async function checkConnection() {
+    setChecking(true);
+    // A check changes nothing on the server, so it does not hold the sheet open.
+    const result = await client.check(server.id);
+    if (!mounted.current) return;
+    setChecked(result);
+    setChecking(false);
   }
 
   async function remove() {
@@ -138,6 +161,27 @@ export function ServerSheet({ server, onClose }: { server: ServerState; onClose:
               </KText>
             </View>
             <View style={[styles.row, styles.rowDivider]}>
+              <View style={[styles.rowMain, styles.connMain]}>
+                <KText style={styles.rowTitle}>{t('connTitle')}</KText>
+                {checking ? (
+                  <View style={styles.connLine} testID="conn-result">
+                    <ActivityIndicator color={colors.purple300} size="small" testID="conn-spinner" />
+                    <KText style={[styles.connText, styles.connChecking]}>{t('connChecking')}</KText>
+                  </View>
+                ) : (
+                  checked !== null && <CheckLine result={checked} text={checked.kind === 'ok' ? t('connOk', { ver: checked.version }) : t(checkMessages[checked.kind])} />
+                )}
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t(checked === null ? 'connCheck' : 'connRecheck')}
+                disabled={checking}
+                onPress={() => void checkConnection()}
+                style={[styles.checkButton, checking && styles.checkButtonDisabled]}>
+                <KText style={styles.checkButtonLabel}>{t(checked === null ? 'connCheck' : 'connRecheck')}</KText>
+              </Pressable>
+            </View>
+            <View style={[styles.row, styles.rowDivider]}>
               <KText style={[styles.rowTitle, styles.rowMain]}>{t('notifyServer')}</KText>
               <Switch
                 accessibilityLabel={t('notifyServer')}
@@ -182,6 +226,20 @@ export function ServerSheet({ server, onClose }: { server: ServerState; onClose:
   );
 }
 
+function CheckLine({ result, text }: { result: CheckResult; text: string }) {
+  const color = result.kind === 'ok' ? colors.green : connFailColor;
+  return (
+    <View style={styles.connLine} testID="conn-result" accessibilityLiveRegion="polite">
+      <KText kind="bodyMedium" style={[styles.connText, { color }]} testID="conn-mark">
+        {result.kind === 'ok' ? '✓' : '!'}
+      </KText>
+      <KText style={[styles.connText, styles.connMessage, { color }]} testID="conn-message">
+        {text}
+      </KText>
+    </View>
+  );
+}
+
 function ErrorLine({ text, testID }: { text: string; testID: string }) {
   return (
     <KText style={styles.errorLine} testID={testID} accessibilityLiveRegion="polite">
@@ -223,6 +281,21 @@ const styles = StyleSheet.create({
   rowMain: { flex: 1, minWidth: 0 },
   rowTitle: { color: colors.text, fontSize: 15 },
   rowValue: { color: colors.muted, fontSize: 13, flexShrink: 1 },
+  checkButton: {
+    minHeight: 36,
+    paddingHorizontal: 14,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(191,158,255,0.5)',
+    justifyContent: 'center',
+  },
+  checkButtonLabel: { color: colors.purple300, fontSize: 13 },
+  checkButtonDisabled: { opacity: 0.5 },
+  connMain: { gap: 4 },
+  connLine: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  connText: { fontSize: 12.5, lineHeight: 19 },
+  connMessage: { flexShrink: 1 },
+  connChecking: { color: colors.muted, flexShrink: 1 },
   errorLine: { color: colors.red, fontSize: 13, lineHeight: 20, marginTop: 6, marginHorizontal: 4 },
   danger: {
     minHeight: 48,

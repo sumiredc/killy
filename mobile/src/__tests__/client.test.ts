@@ -387,3 +387,85 @@ describe('updateServer and removeServer', () => {
     expect(server.requests).toEqual([]);
   });
 });
+
+describe('check', () => {
+  const route = 'POST /app/v1/servers/a1/check';
+
+  test('sends a check of that server with the device token', async () => {
+    const server = new FakeServer();
+    server.respond(route, 200, { result: 'ok', version: '1.2.3' });
+    await client(server).check('a1');
+    expect(server.requests).toEqual([
+      expect.objectContaining({ method: 'POST', url: `${url}/app/v1/servers/a1/check`, authorization: 'Bearer dev-token' }),
+    ]);
+  });
+
+  test.each([
+    [{ result: 'ok', version: '1.2.3' }, { kind: 'ok', version: '1.2.3' }],
+    [{ result: 'agent_disconnected' }, { kind: 'agent_disconnected' }],
+    [{ result: 'no_response' }, { kind: 'no_response' }],
+    [{ result: 'ok' }, { kind: 'failed' }],
+    [{ result: 'rebooting' }, { kind: 'failed' }],
+    [{}, { kind: 'failed' }],
+  ] as const)('a 200 %j is %j', async (body, want) => {
+    const server = new FakeServer();
+    server.respond(route, 200, body);
+    await expect(client(server).check('a1')).resolves.toEqual(want);
+  });
+
+  test.each([
+    [401, { error: 'unauthorized' }],
+    [404, { error: 'server_not_found' }],
+    [503, { error: 'unavailable' }],
+  ] as const)('a %i is failed', async (status, body) => {
+    const server = new FakeServer();
+    server.respond(route, status, body);
+    await expect(client(server).check('a1')).resolves.toEqual({ kind: 'failed' });
+  });
+
+  test('an answer that is not JSON is failed', async () => {
+    const server = new FakeServer();
+    server.respondText(route, 502, '<html>Bad gateway</html>');
+    await expect(client(server).check('a1')).resolves.toEqual({ kind: 'failed' });
+  });
+
+  test('an answer other than 200 is failed even if its body looks like a result', async () => {
+    const server = new FakeServer();
+    server.respond(route, 502, { result: 'ok', version: '1.2.3' });
+    await expect(client(server).check('a1')).resolves.toEqual({ kind: 'failed' });
+  });
+
+  test('no answer is unreachable and is not sent again', async () => {
+    const server = new FakeServer();
+    server.unreachable(route);
+    await expect(client(server).check('a1')).resolves.toEqual({ kind: 'unreachable' });
+    expect(server.requests.length).toBe(1);
+  });
+
+  test('an answer that has not come after 15 seconds is unreachable', async () => {
+    jest.useFakeTimers();
+    try {
+      const server = new FakeServer();
+      server.hold(route);
+      const result = client(server).check('a1');
+      await jest.advanceTimersByTimeAsync(14_999);
+      expect(server.lastSignal()?.aborted).toBe(false);
+      await jest.advanceTimersByTimeAsync(1);
+      await expect(result).resolves.toEqual({ kind: 'unreachable' });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('the server id is escaped in the path', async () => {
+    const server = new FakeServer();
+    await client(server).check('a/../b?c');
+    expect(server.requests[0].url).toBe(`${url}/app/v1/servers/a%2F..%2Fb%3Fc/check`);
+  });
+
+  test('without a device token nothing is sent and the check failed', async () => {
+    const server = new FakeServer();
+    await expect(client(server, null).check('a1')).resolves.toEqual({ kind: 'failed' });
+    expect(server.requests).toEqual([]);
+  });
+});

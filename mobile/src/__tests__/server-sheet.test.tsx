@@ -345,3 +345,120 @@ test("a muted server's parents stay in the battle queue", async () => {
   await fireEvent.press(screen.getByLabelText('Battle'));
   expect(await screen.findByText('parent PID 3801')).toBeOnTheScreen();
 });
+
+describe('the Connection check', () => {
+  const checkRoute = 'POST /app/v1/servers/a1/check';
+  const failedText = 'The connection could not be checked. Try again in a while.';
+
+  test('before a check the row has Connection and Check, and no result', async () => {
+    await startWith([web]);
+    const sheet = await openSheet('Prod web');
+    expect(sheet.getByText('Connection')).toBeOnTheScreen();
+    expect(sheet.getByRole('button', { name: 'Check' })).toBeEnabled();
+    expect(sheet.queryByTestId('conn-result')).toBeNull();
+  });
+
+  test('while checking, the button cannot be pressed and the row says it is asking the agent', async () => {
+    const { server } = await startWith([web]);
+    const check = server.hold(checkRoute);
+    const sheet = await openSheet('Prod web');
+    await fireEvent.press(sheet.getByRole('button', { name: 'Check' }));
+    expect(sheet.getByTestId('conn-result')).toHaveTextContent('Asking the agent…');
+    expect(sheet.getByTestId('conn-spinner')).toBeOnTheScreen();
+    expect(sheet.getByRole('button', { name: 'Check' })).toBeDisabled();
+    await act(() => check.resolve(200, { result: 'ok', version: '1.2.3' }));
+    expect(sheet.queryByTestId('conn-spinner')).toBeNull();
+    expect(server.count(checkRoute)).toBe(1);
+  });
+
+  test.each([
+    ['ok', (s: FakeServer) => s.respond(checkRoute, 200, { result: 'ok', version: '1.2.3' }), 'Connected (agent 1.2.3)'],
+    [
+      'agent_disconnected',
+      (s: FakeServer) => s.respond(checkRoute, 200, { result: 'agent_disconnected' }),
+      'No response from the agent. Check that killy agent is running on the server.',
+    ],
+    [
+      'no_response',
+      (s: FakeServer) => s.respond(checkRoute, 200, { result: 'no_response' }),
+      'Commands are not reaching the agent. Restart the agent.',
+    ],
+    ['no answer from the Killy server', (s: FakeServer) => s.unreachable(checkRoute), 'Cannot reach the Killy server. Check your network.'],
+    ['a 401', (s: FakeServer) => s.respond(checkRoute, 401, { error: 'unauthorized' }), failedText],
+    ['a 404', (s: FakeServer) => s.respond(checkRoute, 404, { error: 'server_not_found' }), failedText],
+    ['a 503', (s: FakeServer) => s.respond(checkRoute, 503, { error: 'unavailable' }), failedText],
+    ['an answer that is not JSON', (s: FakeServer) => s.respondText(checkRoute, 502, '<html>502</html>'), failedText],
+  ] as const)('%s shows its message and the button becomes Check again', async (_, answer, message) => {
+    const { server } = await startWith([web]);
+    answer(server);
+    const sheet = await openSheet('Prod web');
+    await fireEvent.press(sheet.getByRole('button', { name: 'Check' }));
+    await act(settle);
+    expect(sheet.getByTestId('conn-message')).toHaveTextContent(message);
+    expect(sheet.getByRole('button', { name: 'Check again' })).toBeEnabled();
+  });
+
+  test('success is green with ✓, a failure light red with !', async () => {
+    const { server } = await startWith([web]);
+    server.respond(checkRoute, 200, { result: 'ok', version: '1.2.3' });
+    const sheet = await openSheet('Prod web');
+    await fireEvent.press(sheet.getByRole('button', { name: 'Check' }));
+    await act(settle);
+    expect(sheet.getByTestId('conn-mark')).toHaveTextContent('✓');
+    expect(sheet.getByTestId('conn-mark')).toHaveStyle({ color: '#4FDB8F' });
+    server.respond(checkRoute, 200, { result: 'no_response' });
+    await fireEvent.press(sheet.getByRole('button', { name: 'Check again' }));
+    await act(settle);
+    expect(sheet.getByTestId('conn-mark')).toHaveTextContent('!');
+    expect(sheet.getByTestId('conn-mark')).toHaveStyle({ color: '#FF9AAA' });
+  });
+
+  test('Check again sends another check', async () => {
+    const { server } = await startWith([web]);
+    server.respond(checkRoute, 200, { result: 'ok', version: '1.2.3' });
+    const sheet = await openSheet('Prod web');
+    await fireEvent.press(sheet.getByRole('button', { name: 'Check' }));
+    await act(settle);
+    await fireEvent.press(sheet.getByRole('button', { name: 'Check again' }));
+    await act(settle);
+    expect(server.count(checkRoute)).toBe(2);
+  });
+
+  test('the result is not kept once the sheet closes', async () => {
+    const { server } = await startWith([web]);
+    server.respond(checkRoute, 200, { result: 'ok', version: '1.2.3' });
+    let sheet = await openSheet('Prod web');
+    await fireEvent.press(sheet.getByRole('button', { name: 'Check' }));
+    await act(settle);
+    await fireEvent.press(sheet.getByRole('button', { name: 'Done' }));
+    await sheetGone();
+    sheet = await openSheet('Prod web');
+    expect(sheet.queryByTestId('conn-result')).toBeNull();
+    expect(sheet.getByRole('button', { name: 'Check' })).toBeOnTheScreen();
+  });
+
+  test('a check changes nothing, so the sheet can close while it runs', async () => {
+    const { server } = await startWith([web]);
+    const check = server.hold(checkRoute);
+    const sheet = await openSheet('Prod web');
+    await fireEvent.press(sheet.getByRole('button', { name: 'Check' }));
+    expect(sheet.getByRole('button', { name: 'Done' })).toBeEnabled();
+    await fireEvent.press(sheet.getByRole('button', { name: 'Done' }));
+    await sheetGone();
+    await act(() => check.resolve(200, { result: 'ok', version: '1.2.3' }));
+    expect(server.count('PATCH /app/v1/servers/a1')).toBe(0);
+  });
+
+  test('in Japanese the results use the Japanese messages', async () => {
+    const { server } = await startWith([web], 'ja');
+    server.respond(checkRoute, 200, { result: 'no_response' });
+    const sheet = await openSheet('Prod web');
+    await fireEvent.press(sheet.getByRole('button', { name: '確認する' }));
+    await act(settle);
+    expect(sheet.getByTestId('conn-message')).toHaveTextContent('命令がエージェントに届いていません。エージェントを再起動してください。');
+    server.respond(checkRoute, 503, { error: 'unavailable' });
+    await fireEvent.press(sheet.getByRole('button', { name: 'もう一度確認' }));
+    await act(settle);
+    expect(sheet.getByTestId('conn-message')).toHaveTextContent('接続を確認できませんでした。しばらくしてから、もう一度お試しください。');
+  });
+});
