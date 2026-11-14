@@ -39,6 +39,11 @@ export function ServerSheet({ server, onClose }: { server: ServerState; onClose:
   const [removing, setRemoving] = useState(false);
   const [removeError, setRemoveError] = useState<Key | null>(null);
   const mounted = useRef(true);
+  // While a change is on its way the sheet stays open, so a failure has a place to show.
+  const sending = saving || notifySending || removing;
+  const close = () => {
+    if (!sending) onClose();
+  };
 
   useEffect(() => {
     mounted.current = true;
@@ -99,7 +104,7 @@ export function ServerSheet({ server, onClose }: { server: ServerState; onClose:
   }
 
   return (
-    <Modal transparent animationType="slide" onRequestClose={onClose} visible>
+    <Modal transparent animationType="slide" onRequestClose={close} visible testID="server-sheet-modal">
       <KeyboardAvoidingView style={styles.backdrop} behavior="padding">
         <View style={styles.sheet} testID="server-sheet">
           <View style={styles.grabber} />
@@ -162,9 +167,9 @@ export function ServerSheet({ server, onClose }: { server: ServerState; onClose:
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t('done')}
-              disabled={saving}
+              disabled={sending}
               onPress={() => void done()}
-              style={[styles.primary, saving && styles.primaryDisabled]}>
+              style={[styles.primary, sending && styles.primaryDisabled]}>
               <KText kind="monoSemiBold" style={styles.primaryLabel}>
                 {t('done')}
               </KText>

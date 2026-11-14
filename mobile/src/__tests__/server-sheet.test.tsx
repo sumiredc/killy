@@ -97,6 +97,16 @@ describe('opening the server sheet', () => {
     await sheetGone();
   });
 
+  test('a server that leaves the state and comes back does not reopen its sheet', async () => {
+    const { stream } = await startWith([web, db]);
+    await openSheet('Prod web');
+    await sendState(stream, [db]);
+    await sheetGone();
+    // Linked again, as when the same agent is paired again or the demo server is added again.
+    await sendState(stream, [db, web]);
+    expect(screen.queryByTestId('server-sheet')).toBeNull();
+  });
+
   test('in Japanese the sheet uses the Japanese labels', async () => {
     await startWith([web], 'ja');
     const sheet = await openSheet('Prod web');
@@ -104,6 +114,8 @@ describe('opening the server sheet', () => {
     expect(sheet.getByText('ホスト名')).toBeOnTheScreen();
     expect(sheet.getByRole('button', { name: 'このサーバーを削除' })).toBeOnTheScreen();
     expect(sheet.getByRole('button', { name: '完了' })).toBeOnTheScreen();
+    await fireEvent.press(sheet.getByRole('button', { name: 'このサーバーを削除' }));
+    expect(sheet.getByRole('button', { name: 'もう一度押すと削除します' })).toBeOnTheScreen();
   });
 });
 
@@ -261,6 +273,48 @@ describe('failures keep the sheet open with a red line under the control that fa
     await fireEvent(sheet.getByRole('switch'), 'valueChange', false);
     await act(settle);
     expect(sheet.getByTestId('notify-error')).toHaveTextContent('変更を保存できませんでした。しばらくしてから、もう一度お試しください。');
+  });
+
+  test('the error line is red', async () => {
+    const { server } = await startWith([web]);
+    server.unreachable('PATCH /app/v1/servers/a1');
+    const sheet = await openSheet('Prod web');
+    await fireEvent(sheet.getByRole('switch'), 'valueChange', false);
+    await act(settle);
+    expect(sheet.getByTestId('notify-error')).toHaveStyle({ color: '#F7506A' });
+  });
+});
+
+describe('the sheet cannot be closed while a change is being sent, so its failure is not lost', () => {
+  test.each([
+    ['the switch', 'PATCH /app/v1/servers/a1'],
+    ['Remove', 'DELETE /app/v1/servers/a1'],
+  ] as const)('while %s is being sent, Done and Back do not close it, and the failure shows', async (control, route) => {
+    const { server } = await startWith([web]);
+    const pending = server.hold(route);
+    const sheet = await openSheet('Prod web');
+    if (control === 'the switch') {
+      await fireEvent(sheet.getByRole('switch'), 'valueChange', false);
+    } else {
+      await fireEvent.press(sheet.getByRole('button', { name: 'Remove this server' }));
+      await fireEvent.press(sheet.getByRole('button', { name: 'Tap again to remove' }));
+    }
+    expect(sheet.getByRole('button', { name: 'Done' })).toBeDisabled();
+    await fireEvent.press(sheet.getByRole('button', { name: 'Done' }));
+    await fireEvent(screen.getByTestId('server-sheet-modal'), 'requestClose');
+    expect(screen.getByTestId('server-sheet')).toBeOnTheScreen();
+    await act(() => pending.resolve(503, { error: 'unavailable' }));
+    expect(sheet.getByTestId(control === 'the switch' ? 'notify-error' : 'remove-error')).toHaveTextContent(
+      'The change could not be saved. Try again in a while.',
+    );
+    expect(sheet.getByRole('button', { name: 'Done' })).toBeEnabled();
+  });
+
+  test('Back closes the sheet when nothing is being sent', async () => {
+    await startWith([web]);
+    await openSheet('Prod web');
+    await fireEvent(screen.getByTestId('server-sheet-modal'), 'requestClose');
+    await sheetGone();
   });
 });
 

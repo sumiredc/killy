@@ -19,6 +19,11 @@ export default function SettingsScreen() {
   const servers = state?.servers ?? [];
   // Looked up in every state, so the sheet shows the latest values and closes once the server is gone.
   const open = servers.find((s) => s.id === openId);
+  // A server that left the state closed its sheet; forget it, so the sheet does not open again by
+  // itself if the server is linked again.
+  if (openId !== null && state !== null && open === undefined) {
+    setOpenId(null);
+  }
   return (
     <SafeAreaView style={styles.screen} edges={['top']} testID="settings-screen">
       <KText kind="mono" style={styles.title}>
