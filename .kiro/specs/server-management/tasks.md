@@ -18,20 +18,20 @@
   - [x] 1.7 `go vet ./...`・`go test -race ./...` と、app の型検査・lint・テストを通す
     - _Requirements: 1.7_
 
-- [ ] 2. サーバーへの接続を確認し、失敗した箇所を示す（#17。前提：#10、#16、#15、#38、#43）
-  - [ ] 2.1 `internal/protocol` に `PingCommand` と check の結果の値を置き、`command.Router` の `Check` のテスト（`ok` と版・`agent_disconnected` で ping を送らない・5 秒より前とちょうど 5 秒とそれより後の `pong`・2 秒より前とちょうど 2 秒で ping を送らず実行中と直前の結果を返す・2 秒を過ぎたら送る・種類の取り違えでどちらの待ちも終わらない・別の agent の `pong`）を `clock.Fake` で書き、赤を確かめる
+- [x] 2. サーバーへの接続を確認し、失敗した箇所を示す（#17。前提：#10、#16、#15、#38、#43）
+  - [x] 2.1 `internal/protocol` に `PingCommand` と check の結果の値を置き、`command.Router` の `Check` のテスト（`ok` と版・`agent_disconnected` で ping を送らない・5 秒より前とちょうど 5 秒とそれより後の `pong`・2 秒より前とちょうど 2 秒で ping を送らず実行中と直前の結果を返す・2 秒を過ぎたら送る・種類の取り違えでどちらの待ちも終わらない・別の agent の `pong`）を `clock.Fake` で書き、赤を確かめる
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.6, 2.7_
-  - [ ] 2.2 `Router` の ping の待ちと 2 秒の制限、`POST /agent/v1/results` の `type: pong` を実装し、テストを緑にする
+  - [x] 2.2 `Router` の ping の待ちと 2 秒の制限、`POST /agent/v1/results` の `type: pong` を実装し、テストを緑にする
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.6, 2.7_
-  - [ ] 2.3 `POST /app/v1/servers/{id}/check` のテスト（応答が `result` と版だけで時間の値を含まない・紐付いていないと `404` で ping を送らない・`401`・`503`）を書き、赤を確かめてから実装する。openapi.yaml の check に `503` を足す
+  - [x] 2.3 `POST /app/v1/servers/{id}/check` のテスト（応答が `result` と版だけで時間の値を含まない・紐付いていないと `404` で ping を送らない・`401`・`503`）を書き、赤を確かめてから実装する。openapi.yaml の check に `503` を足す
     - _Requirements: 2.5, 2.8, 2.9, 2.10_
-  - [ ] 2.4 agent の `CommandClient` のテスト（5 秒かかる kill の間に届いた `ping` に、kill を待たずに `pong` と版を返す・ping で `Killer` を呼ばない）を書き、赤を確かめてから実装し、`killy agent run` から版を渡す。`TestOtherEventsAreIgnored` を `ping` 以外の event で確かめるように直す
+  - [x] 2.4 agent の `CommandClient` のテスト（5 秒かかる kill の間に届いた `ping` に、kill を待たずに `pong` と版を返す・ping で `Killer` を呼ばない）を書き、赤を確かめてから実装し、`killy agent run` から版を渡す。`TestOtherEventsAreIgnored` を `ping` 以外の event で確かめるように直す
     - _Requirements: 2.11, 2.12, 2.13_
-  - [ ] 2.5 `KillyClient.check` と Connection の欄のテスト（5 つの結果それぞれの文言・「確認する」から「もう一度確認」・問い合わせ中）を書き、赤を確かめてから、足りない文を翻訳ファイルに足して実装する
+  - [x] 2.5 `KillyClient.check` と Connection の欄のテスト（5 つの結果それぞれの文言・「確認する」から「もう一度確認」・問い合わせ中）を書き、赤を確かめてから、足りない文を翻訳ファイルに足して実装する
     - _Requirements: 2.14, 2.15_
-  - [ ] 2.6 実機かエミュレータで、agent を動かしているときと止めたときに確認を行い、それぞれの表示になったことを PR 本文に書く
+  - [x] 2.6 実機かエミュレータで、agent を動かしているときと止めたときに確認を行い、それぞれの表示になったことを PR 本文に書く
     - _Requirements: 2.1, 2.2, 2.15_
-  - [ ] 2.7 `go vet ./...`・`go test -race ./...` と、app の型検査・lint・テストを通す
+  - [x] 2.7 `go vet ./...`・`go test -race ./...` と、app の型検査・lint・テストを通す
     - _Requirements: 2.4_
 
 - [ ] 3. killy agent pair の QR を app で読み取ってサーバーを追加する（#18。前提：#6、#12、#15、#38）

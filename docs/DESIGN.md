@@ -114,7 +114,7 @@ States: waiting (spinner, "追加しています…" / "Adding…"), added (Kill
 
 Display name input; group with Hostname (ホスト名; mono, read-only: the hostname the agent reports, so the server can be recognised after renaming), Connection (row title, result line, "確認する" pill button that becomes "もう一度確認"), and the server's notification switch; red outlined "このサーバーを削除" that turns solid red with "もう一度押すと削除します" on the first tap; hint "削除しても、サーバー上のエージェントは止まりません。"; "完了" button.
 
-Connection results: checking (spinner + "エージェントに問い合わせています…"), OK (`green`, ✓, agent version), failure (light red, `!`, the message for the failing part as listed in PRD UC4).
+Connection results: checking (spinner + "エージェントに問い合わせています…"), OK (`green`, ✓, agent version), failure (light red, `!`, the message for the failing part as listed in PRD UC4). When the Killy server answers with an error instead of a result, the failure line says the connection could not be checked (not in the mock). The result is kept only while the sheet is open.
 
 The notification switch is saved as soon as it is flipped. While a change is on its way, nothing else in the sheet can be changed and the sheet cannot be closed, until the Killy server answers. The display name is saved when "完了" is pressed, only if it is not empty after trimming and differs from the current name; otherwise "完了" just closes. The sheet closes once the name or the removal is saved. When a change cannot be saved (no answer, or an error), the sheet stays open and a `red` line under the name field, the switch or the remove button gives the reason; the switch goes back to the value the Killy server has (not in the mock).
 
