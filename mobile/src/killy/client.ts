@@ -48,6 +48,15 @@ export type KillRequest = { id: string; serverId: string; ppid: number; starttim
 
 export type ServerErrorKind = 'unreachable' | 'other';
 
+export type UpdateErrorKind = 'unreachable' | 'not_registered' | 'other';
+
+/** A change to this device (push token, app-wide switch) that did not reach the Killy server. */
+export class UpdateError extends Error {
+  constructor(readonly kind: UpdateErrorKind) {
+    super(kind);
+  }
+}
+
 /**
  * The result of a connection check, as the server sheet shows it: the Killy server's three results,
  * no answer at all (`unreachable`), or any other answer (`failed`).
@@ -74,6 +83,8 @@ export class ClaimError extends Error {
 /** Everything the app asks of the Killy server. Only this talks to it. */
 export interface KillyClient {
   registerDevice(): Promise<{ deviceToken: string }>;
+  /** Saves this device's push token or app-wide notification switch. Nothing is sent again. */
+  updateDevice(patch: { pushToken?: string; notify?: boolean }): Promise<void>;
   claim(code: string, name?: string): Promise<Server>;
   /** Sends a kill and returns its outcome. Without an answer it sends the same kill once more. */
   kill(req: KillRequest): Promise<KillResult>;
@@ -152,6 +163,23 @@ export function createKillyClient({ baseURL, fetch, deviceToken, random }: Clien
         return { deviceToken: token };
       }
       throw new RegisterError(answer.status === 429 ? 'rate_limited' : 'other');
+    },
+
+    async updateDevice({ pushToken, notify }) {
+      const token = deviceToken();
+      if (token === null) {
+        throw new UpdateError('not_registered');
+      }
+      const body = { ...(pushToken !== undefined && { push_token: pushToken }), ...(notify !== undefined && { notify }) };
+      let answer: Answer;
+      try {
+        answer = await request('PATCH', '/app/v1/devices/me', body, token);
+      } catch {
+        throw new UpdateError('unreachable');
+      }
+      if (answer.status !== 204) {
+        throw new UpdateError('other');
+      }
     },
 
     async claim(code, name) {

@@ -7,6 +7,8 @@ import TabsLayout from '../app/(tabs)/_layout';
 import BattleScreen from '../app/(tabs)/index';
 import SettingsScreen from '../app/(tabs)/settings';
 import * as deps from '../killy/deps';
+import * as prefs from '../prefs';
+import { FakeNotifications, MemoryPrefs } from '../testing/fake-notifications';
 import { FakeServer, settle } from '../testing/fake-server';
 
 jest.mock('expo-localization', () => ({ getLocales: jest.fn(() => [{ languageCode: 'en' }]) }));
@@ -30,7 +32,8 @@ async function startApp(languageCode = 'en', url: string | null = 'https://killy
   const server = new FakeServer();
   server.respond('POST /app/v1/devices', 200, { device_token: 'tok' });
   server.stream();
-  jest.spyOn(deps, 'makeDeps').mockReturnValue({ fetch: server.fetch, tokens: { get: async () => null, set: async () => {} }, random: () => 0, randomBytes: (n) => new Uint8Array(n) });
+  jest.spyOn(prefs, 'makePrefs').mockReturnValue(new MemoryPrefs());
+  jest.spyOn(deps, 'makeDeps').mockReturnValue({ fetch: server.fetch, tokens: { get: async () => null, set: async () => {} }, random: () => 0, randomBytes: (n) => new Uint8Array(n), notifications: new FakeNotifications() });
   await renderRouter(routes, { initialUrl: '/' });
   await act(settle);
   return server;

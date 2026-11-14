@@ -2,6 +2,7 @@ import { getRandomBytes } from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 
 import type { FetchLike } from './client';
+import { makeNotifications, type NotificationsDeps } from './notifications';
 
 /** Where the device token is kept between starts. */
 export type TokenStore = {
@@ -9,13 +10,14 @@ export type TokenStore = {
   set(token: string): Promise<void>;
 };
 
-/** What the app uses outside itself: the network, the device token store and randomness. */
+/** What the app uses outside itself: the network, the device token store, randomness and the OS notifications. */
 export type Deps = {
   fetch: FetchLike;
   tokens: TokenStore;
   random: () => number;
   /** Cryptographically random bytes, for kill IDs. */
   randomBytes: (n: number) => Uint8Array;
+  notifications: NotificationsDeps;
 };
 
 const tokenKey = 'device_token';
@@ -33,5 +35,6 @@ export function makeDeps(): Deps {
     },
     random: Math.random,
     randomBytes: getRandomBytes,
+    notifications: makeNotifications(),
   };
 }

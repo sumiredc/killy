@@ -1,17 +1,18 @@
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AddServerSheet } from '@/components/AddServerSheet';
 import { ServerSheet } from '@/components/ServerSheet';
 import { useI18n } from '@/i18n/context';
 import { useKilly } from '@/killy/context';
+import { useNotifications } from '@/killy/notifications-context';
 import { usePairLinks } from '@/killy/pair-link';
 import { serverRow } from '@/killy/server-row';
 import { KText } from '@/theme/KText';
 import { colors, gutter, radii } from '@/theme/tokens';
 
-// The settings screen. The app group comes with #20 and #21.
+// The settings screen. The language row of the App group comes with #21.
 export default function SettingsScreen() {
   const { t } = useI18n();
   const { state } = useKilly();
@@ -24,6 +25,18 @@ export default function SettingsScreen() {
     setAdding(false);
     clear();
   };
+  // A sheet is a Modal and stays above the tabs. A tap on a notification opens the Battle tab, so
+  // it closes the sheets that would hide it. Not on every blur: the killy://pair route also covers
+  // Settings, and its link must reach the sheet.
+  const { taps: tapCount } = useNotifications();
+  const seenTaps = useRef(tapCount);
+  useEffect(() => {
+    if (tapCount === seenTaps.current) return;
+    seenTaps.current = tapCount;
+    setAdding(false);
+    setOpenId(null);
+    clear();
+  }, [tapCount, clear]);
   const servers = state?.servers ?? [];
   // Looked up in every state, so the sheet shows the latest values and closes once the server is gone.
   const open = servers.find((s) => s.id === openId);
@@ -77,11 +90,60 @@ export default function SettingsScreen() {
           <KText style={styles.addButtonText}>＋</KText>
           <KText style={styles.addButtonText}>{t('addServer')}</KText>
         </Pressable>
+        <KText style={styles.groupTitle}>{t('app')}</KText>
+        <View style={styles.group}>
+          <NotificationsRow />
+        </View>
+        <NotificationsError />
       </ScrollView>
       {/* Not over the Server sheet: iOS presents one sheet at a time, so a link waits until it closes. */}
       {(adding || link !== null) && open === undefined && <AddServerSheet onClose={closeAdd} link={link} />}
       {open !== undefined && <ServerSheet server={open} onClose={() => setOpenId(null)} />}
     </SafeAreaView>
+  );
+}
+
+function NotificationsRow() {
+  const { t } = useI18n();
+  const { permission, notify, sending, setNotify, openSettings } = useNotifications();
+  const blocked = permission === 'denied';
+  const disabled = blocked || sending;
+  return (
+    <View style={styles.row}>
+      <View style={styles.rowMain}>
+        <KText style={styles.rowTitle}>{t('notifications')}</KText>
+        <KText style={styles.rowSub}>{t('notificationsHint')}</KText>
+        {blocked && (
+          <>
+            <KText style={styles.blocked}>{t('notifBlocked')}</KText>
+            <Pressable accessibilityRole="link" onPress={openSettings} hitSlop={8}>
+              <KText style={styles.link}>{t('notifOpenSettings')}</KText>
+            </Pressable>
+          </>
+        )}
+      </View>
+      <Switch
+        accessibilityLabel={t('notifications')}
+        value={notify}
+        onValueChange={setNotify}
+        disabled={disabled}
+        accessibilityState={{ disabled }}
+        trackColor={{ false: colors.elev3, true: colors.purple }}
+        thumbColor="#FFFFFF"
+        ios_backgroundColor={colors.elev3}
+      />
+    </View>
+  );
+}
+
+function NotificationsError() {
+  const { t } = useI18n();
+  const { error } = useNotifications();
+  if (error === null) return null;
+  return (
+    <KText style={styles.errorLine} testID="notify-app-error" accessibilityLiveRegion="polite">
+      {t(error)}
+    </KText>
   );
 }
 
@@ -100,6 +162,10 @@ const styles = StyleSheet.create({
   rowMain: { flex: 1, minWidth: 0, gap: 2 },
   serverName: { color: colors.text, fontSize: 15 },
   rowSub: { color: colors.muted, fontSize: 12.5 },
+  rowTitle: { color: colors.text, fontSize: 15 },
+  blocked: { color: colors.text, fontSize: 12.5, marginTop: 4 },
+  link: { color: colors.purple300, fontSize: 12.5, marginTop: 2 },
+  errorLine: { color: colors.red, fontSize: 13, lineHeight: 20, marginTop: 6, marginHorizontal: 4 },
   badge: { paddingVertical: 3, paddingHorizontal: 9, borderRadius: radii.pill, backgroundColor: 'rgba(144,70,255,0.2)' },
   badgeText: { color: colors.purple100, fontSize: 13 },
   chevron: { color: colors.muted, fontSize: 18 },
