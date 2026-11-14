@@ -670,11 +670,13 @@ func TestAParentThatLeavesWhileTheNotifierReadsTheStoreIsNotSentAgain(t *testing
 	agentToken, _, _ := s.withPush(t, "Prod web", tokenA)
 	s.report(t, agentToken, parent100)
 	var once sync.Once
-	s.mem.BeforeNotifiedOf = func() {
+	s.mem.BeforeNotifyState = func() {
 		once.Do(func() {
 			// The parent leaves, taking its notified rows with it, while the notifier is reading.
 			s.scans++
-			s.postSnapshot(t, agentToken, snapshotJSON(t0.Add(time.Duration(s.scans)*time.Second), ""))
+			if status, body := s.postSnapshot(t, agentToken, snapshotJSON(t0.Add(time.Duration(s.scans)*time.Second), "")); status != http.StatusNoContent {
+				t.Errorf("snapshot: %d %s", status, body)
+			}
 		})
 	}
 	s.report(t, agentToken, parent100)
@@ -769,5 +771,24 @@ func TestAfterARestartTheFailuresAreCountedAgainAndTheLimitStillHolds(t *testing
 	}
 	if n := len(again.mem.Notified(agentID)); n != 1 {
 		t.Errorf("%d notified rows, want the pair given up and recorded", n)
+	}
+}
+
+func TestAParentWhoseRowsAreGoneBeforeTheSnapshotChangesIsNotSentAgain(t *testing.T) {
+	s := newTestServer(t)
+	agentToken, agentID, _ := s.withPush(t, "Prod web", tokenA)
+	s.report(t, agentToken, parent100)
+	var once sync.Once
+	s.mem.AfterSyncFirstDetections = func() {
+		once.Do(func() {
+			// The report without the parent has removed its rows but not yet changed the
+			// snapshot; a send that runs now sees the old snapshot.
+			s.pushes.Wake(agentID)
+			s.pushes.Wait()
+		})
+	}
+	s.report(t, agentToken)
+	if n := s.sender.sentTo(tokenA); n != 1 {
+		t.Errorf("%d pushes, want 1: a parent already notified was sent again from an older snapshot", n)
 	}
 }

@@ -30,13 +30,16 @@ type Memory struct {
 	FailUpdateDevice bool
 	// FailPushTargets, FailRecordNotified and FailClearPushToken make those calls alone fail.
 	FailPushTargets, FailRecordNotified, FailClearPushToken bool
-	// BeforeNotifiedOf, when set, runs at the start of every NotifiedOf call, outside the lock, so a
-	// test can change the store while a send is reading it.
-	BeforeNotifiedOf func()
-	agents           []AgentRow
-	devices          []DeviceRow
-	links            []LinkRow
-	detections       map[string]map[store.ParentKey]time.Time
+	// BeforeNotifyState, when set, runs at the start of every NotifyState call, outside the lock,
+	// so a test can change the store while a send is reading it. AfterSyncFirstDetections runs at
+	// the end of every SyncFirstDetections call, outside the lock: the rows are changed but the
+	// caller has not used the result yet.
+	BeforeNotifyState        func()
+	AfterSyncFirstDetections func()
+	agents                   []AgentRow
+	devices                  []DeviceRow
+	links                    []LinkRow
+	detections               map[string]map[store.ParentKey]time.Time
 	// notified holds the notified_parents rows.
 	notified []notifiedRow
 }
@@ -122,6 +125,11 @@ func (m *Memory) SyncFirstDetections(_ context.Context, agentID string, parents 
 	got := make(map[store.ParentKey]time.Time, len(next))
 	for k, v := range next {
 		got[k] = v
+	}
+	if after := m.AfterSyncFirstDetections; after != nil {
+		m.mu.Unlock()
+		after()
+		m.mu.Lock()
 	}
 	return got, nil
 }
@@ -402,16 +410,20 @@ func (m *Memory) PushTargets(_ context.Context, agentID string) ([]store.PushTar
 	return targets, nil
 }
 
-func (m *Memory) NotifiedOf(_ context.Context, agentID string) ([]store.Notified, error) {
-	if m.BeforeNotifiedOf != nil {
-		m.BeforeNotifiedOf()
+func (m *Memory) NotifyState(_ context.Context, agentID string) (store.NotifyState, error) {
+	if m.BeforeNotifyState != nil {
+		m.BeforeNotifyState()
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.Err != nil {
-		return nil, m.Err
+		return store.NotifyState{}, m.Err
 	}
-	return m.notifiedOf(agentID), nil
+	st := store.NotifyState{FirstDetected: map[store.ParentKey]time.Time{}, Notified: m.notifiedOf(agentID)}
+	for k, v := range m.detections[agentID] {
+		st.FirstDetected[k] = v
+	}
+	return st, nil
 }
 
 func (m *Memory) notifiedOf(agentID string) []store.Notified {

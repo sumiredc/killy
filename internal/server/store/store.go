@@ -349,26 +349,39 @@ func (s *Store) PushTargets(ctx context.Context, agentID string) ([]PushTarget, 
 	return targets, rows.Err()
 }
 
-// NotifiedOf returns the agent's parents each device was already notified of.
-func (s *Store) NotifiedOf(ctx context.Context, agentID string) ([]Notified, error) {
+// NotifyState is what the notifier needs from the store about one agent, read in one statement
+// so both parts are from the same moment: the agent's parents with their first-detection times,
+// and the devices already notified of each.
+type NotifyState struct {
+	FirstDetected map[ParentKey]time.Time
+	Notified      []Notified
+}
+
+// NotifyState returns the agent's first-detection rows and its notified rows.
+func (s *Store) NotifyState(ctx context.Context, agentID string) (NotifyState, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT n.pid, n.starttime, f.detected_at, n.device_id::text
-		FROM notified_parents n
-		JOIN first_detections f ON f.agent_id = n.agent_id AND f.pid = n.pid AND f.starttime = n.starttime
-		WHERE n.agent_id = $1`, agentID)
+		SELECT f.pid, f.starttime, f.detected_at, n.device_id::text
+		FROM first_detections f
+		LEFT JOIN notified_parents n ON n.agent_id = f.agent_id AND n.pid = f.pid AND n.starttime = f.starttime
+		WHERE f.agent_id = $1`, agentID)
 	if err != nil {
-		return nil, fmt.Errorf("list notified parents: %w", err)
+		return NotifyState{}, fmt.Errorf("read notify state: %w", err)
 	}
 	defer rows.Close()
-	var got []Notified
+	st := NotifyState{FirstDetected: map[ParentKey]time.Time{}}
 	for rows.Next() {
-		var n Notified
-		if err := rows.Scan(&n.Parent.PID, &n.Parent.StartTime, &n.FirstDetectedAt, &n.DeviceID); err != nil {
-			return nil, err
+		var k ParentKey
+		var at time.Time
+		var device *string
+		if err := rows.Scan(&k.PID, &k.StartTime, &at, &device); err != nil {
+			return NotifyState{}, err
 		}
-		got = append(got, n)
+		st.FirstDetected[k] = at
+		if device != nil {
+			st.Notified = append(st.Notified, Notified{Parent: k, FirstDetectedAt: at, DeviceID: *device})
+		}
 	}
-	return got, rows.Err()
+	return st, rows.Err()
 }
 
 // RecordNotified records the pairs as notified. A pair whose parent left the snapshot (or left

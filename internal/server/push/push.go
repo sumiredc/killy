@@ -48,7 +48,7 @@ type Sender interface {
 // Store is what the notifier reads and writes; *store.Store (PostgreSQL) in production.
 type Store interface {
 	PushTargets(ctx context.Context, agentID string) ([]store.PushTarget, error)
-	NotifiedOf(ctx context.Context, agentID string) ([]store.Notified, error)
+	NotifyState(ctx context.Context, agentID string) (store.NotifyState, error)
 	RecordNotified(ctx context.Context, agentID string, pairs []store.Notified) error
 	ClearPushToken(ctx context.Context, deviceID, pushToken string) error
 }
@@ -154,18 +154,14 @@ func (n *Notifier) Close() {
 // send pushes every parent of the agent's latest snapshot to every device that should hear of it
 // and has not yet.
 func (n *Notifier) send(agentID string) {
-	// The store is read before the snapshot. A snapshot applied in between can only make the
-	// records older than the snapshot read here, never newer: a parent that left takes its records
-	// with it, and reading them after the snapshot would make it look not yet notified. Such a
-	// snapshot also wakes the notifier again, so what is skipped now is looked at once more.
 	targets, err := n.store.PushTargets(n.ctx, agentID)
 	if err != nil {
 		n.log.Error("list push targets", "agent", agentID, "err", err)
 		return
 	}
-	done, err := n.store.NotifiedOf(n.ctx, agentID)
+	state, err := n.store.NotifyState(n.ctx, agentID)
 	if err != nil {
-		n.log.Error("list notified parents", "agent", agentID, "err", err)
+		n.log.Error("read notify state", "agent", agentID, "err", err)
 		return
 	}
 	a, ok := n.live.Agent(agentID)
@@ -178,8 +174,8 @@ func (n *Notifier) send(agentID string) {
 	}
 	n.forgetGone(agentID, current)
 
-	notified := make(map[pair]bool, len(done))
-	for _, d := range done {
+	notified := make(map[pair]bool, len(state.Notified))
+	for _, d := range state.Notified {
 		notified[pairOf(agentID, d)] = true
 	}
 	// Pairs Expo took on an earlier send whose record failed: record them now, never send them.
@@ -190,6 +186,14 @@ func (n *Notifier) send(agentID string) {
 	var pairs []pair
 	for _, p := range a.Parents {
 		key := store.ParentKey{PID: p.PID, StartTime: p.StartTime}
+		// The snapshot and the store are read apart, and a report changes the store before it
+		// changes the snapshot (live.Report does both under one lock per agent, so the store is
+		// at most one report ahead). A parent of the snapshot that the store no longer has has
+		// left in that report, and its notified rows went with it: sending now would notify it
+		// again. That report wakes the notifier once more, so nothing is missed.
+		if _, ok := state.FirstDetected[key]; !ok {
+			continue
+		}
 		for _, t := range targets {
 			pr := pair{agentID: agentID, parent: key, firstDetected: p.FirstDetectedAt.UnixMicro(), deviceID: t.DeviceID}
 			if notified[pr] || n.isAccepted(pr) {
