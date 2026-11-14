@@ -9,7 +9,7 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "pink.sumire.killy"
+      "bundleIdentifier": "com.sumiredc.killy"
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +19,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "pink.sumire.killy"
+      "package": "com.sumiredc.killy",
+      "googleServicesFile": "./firebase/google-services.json"
     },
     "plugins": [
       "expo-router",
@@ -37,6 +38,12 @@
     ],
     "experiments": {
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "fd79de26-81ac-4ab1-8152-c6081d1b0730"
+      }
+    },
+    "owner": "sumire-sakamoto"
   }
 }
