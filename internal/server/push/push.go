@@ -154,6 +154,9 @@ func (n *Notifier) Close() {
 // send pushes every parent of the agent's latest snapshot to every device that should hear of it
 // and has not yet.
 func (n *Notifier) send(agentID string) {
+	// The store is read before the snapshot. The store can then be ahead of the snapshot only by
+	// the one report in progress, which the check on FirstDetected below handles. Read the other
+	// way round, a parent could leave and come back in between and its old episode be sent again.
 	targets, err := n.store.PushTargets(n.ctx, agentID)
 	if err != nil {
 		n.log.Error("list push targets", "agent", agentID, "err", err)
