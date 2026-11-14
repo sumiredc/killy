@@ -75,6 +75,10 @@ function isTap(r: Notifications.NotificationResponse | null): boolean {
 
 /** The real ones, on expo-notifications. */
 export function makeNotifications(): NotificationsDeps {
+  // The device token last seen. The OS sends the token event on every fetch of the token, not only
+  // when it changes, and the Expo token is fetched again on that event: without this the two would
+  // call each other without end.
+  let lastDevice: string | null = null;
   return {
     permission: async () => permissionOf(await Notifications.getPermissionsAsync()),
     prepare: async (channelName) => {
@@ -92,11 +96,19 @@ export function makeNotifications(): NotificationsDeps {
       if (typeof projectId !== 'string') {
         throw new Error('no EAS project ID in app.json');
       }
-      return (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+      const device = await Notifications.getDevicePushTokenAsync();
+      lastDevice = String(device.data);
+      // Given the device token, it does not fetch it (and send the event) again.
+      return (await Notifications.getExpoPushTokenAsync({ projectId, devicePushToken: device })).data;
     },
     // The listener gets the device token; the Expo token is asked for again by the caller.
     onPushTokenChange: (cb) => {
-      const sub = Notifications.addPushTokenListener(() => cb());
+      const sub = Notifications.addPushTokenListener((token) => {
+        const data = String(token.data);
+        if (data === lastDevice) return;
+        lastDevice = data;
+        cb();
+      });
       return () => sub.remove();
     },
     openSettings: () => Linking.openSettings(),

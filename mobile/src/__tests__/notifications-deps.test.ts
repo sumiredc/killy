@@ -57,10 +57,33 @@ describe('the permission', () => {
   });
 });
 
-test('the push token is the Expo token for the EAS project in app.json', async () => {
+test('the push token is the Expo token for the EAS project in app.json, made from the device token fetched once', async () => {
+  const device = { type: 'android', data: 'fcm-1' } as const;
+  n.getDevicePushTokenAsync.mockResolvedValueOnce(device);
   n.getExpoPushTokenAsync.mockResolvedValueOnce({ type: 'expo', data: 'ExponentPushToken[abc]' });
   await expect(makeNotifications().pushToken()).resolves.toBe('ExponentPushToken[abc]');
-  expect(n.getExpoPushTokenAsync).toHaveBeenCalledWith({ projectId: 'project-1' });
+  // Without the device token it would fetch it again, and every fetch sends the token event.
+  expect(n.getExpoPushTokenAsync).toHaveBeenCalledWith({ projectId: 'project-1', devicePushToken: device });
+});
+
+test('the token event the OS sends for the app’s own fetch is not a new token', async () => {
+  let listener: (t: Notifications.DevicePushToken) => void = () => {};
+  n.addPushTokenListener.mockImplementationOnce((l) => {
+    listener = l;
+    return { remove: jest.fn() };
+  });
+  const d = makeNotifications();
+  const cb = jest.fn();
+  d.onPushTokenChange(cb);
+  n.getDevicePushTokenAsync.mockResolvedValueOnce({ type: 'android', data: 'fcm-1' });
+  n.getExpoPushTokenAsync.mockResolvedValueOnce({ type: 'expo', data: 'ExponentPushToken[abc]' });
+  await d.pushToken();
+  listener({ type: 'android', data: 'fcm-1' });
+  expect(cb).not.toHaveBeenCalled();
+  listener({ type: 'android', data: 'fcm-2' });
+  expect(cb).toHaveBeenCalledTimes(1);
+  listener({ type: 'android', data: 'fcm-2' });
+  expect(cb).toHaveBeenCalledTimes(1);
 });
 
 describe('the channel', () => {
@@ -120,14 +143,14 @@ describe('taps', () => {
 
 test('a new device token calls back until unsubscribed', () => {
   const remove = jest.fn();
-  let listener: () => void = () => {};
+  let listener: (t: Notifications.DevicePushToken) => void = () => {};
   n.addPushTokenListener.mockImplementationOnce((l) => {
-    listener = l as () => void;
+    listener = l;
     return { remove };
   });
   const cb = jest.fn();
   const stop = makeNotifications().onPushTokenChange(cb);
-  listener();
+  listener({ type: 'ios', data: 'apns-1' });
   expect(cb).toHaveBeenCalledTimes(1);
   stop();
   expect(remove).toHaveBeenCalled();

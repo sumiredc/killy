@@ -205,6 +205,20 @@ describe('push token registration', () => {
     expect(p.notifications.calls).not.toContain('pushToken');
   });
 
+  test('registrations that come at once send the token once', async () => {
+    const server = new FakeServer();
+    const held = server.hold(patchRoute);
+    const p = allowing();
+    await startApp(server, p);
+    await act(async () => {
+      p.notifications.changeToken('ExponentPushToken[one]');
+      await settle();
+    });
+    await act(() => held.resolve(204, {}));
+    await act(settle);
+    expect(patches(server)).toEqual([{ push_token: 'ExponentPushToken[one]' }]);
+  });
+
   test('a phone that could not register with the Killy server asks for nothing and sends nothing', async () => {
     const server = new FakeServer();
     server.respond('POST /app/v1/devices', 500, { error: 'unavailable' });
@@ -364,6 +378,19 @@ describe('notifications blocked by the OS', () => {
     expect(patches(server)).toEqual([{ push_token: 'ExponentPushToken[later]' }]);
   });
 
+  test('a refusal that the OS would let Killy ask again counts as blocked until the next start', async () => {
+    const server = new FakeServer();
+    const p = phone();
+    p.notifications.current = 'undetermined';
+    p.notifications.answer = 'undetermined'; // Android after the first refusal: it may ask once more
+    await startApp(server, p);
+    await openSettings();
+    expect(screen.getByText('Notifications are blocked by the OS')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Notifications')).toBeDisabled();
+    await viaSystemSettings();
+    expect(screen.getByText('Notifications are blocked by the OS')).toBeOnTheScreen();
+  });
+
   test('coming back still blocked keeps the block and sends nothing', async () => {
     const server = new FakeServer();
     const p = phone();
@@ -394,7 +421,8 @@ describe('tapping a notification', () => {
     const p = phone();
     p.notifications.tapped = true;
     await startApp(server, p, { initialUrl: '/settings' });
-    await waitFor(() => expect(screen.queryByTestId('settings-screen')).toBeNull());
+    expect(await screen.findByTestId('battle-screen')).toBeOnTheScreen();
+    expect(screen.queryByTestId('settings-screen')).toBeNull();
     expect(p.notifications.calls).toContain('clearTap');
     await openSettings();
     await act(settle);
@@ -410,7 +438,22 @@ describe('tapping a notification', () => {
       p.notifications.tap();
       await settle();
     });
-    await waitFor(() => expect(screen.queryByTestId('settings-screen')).toBeNull());
+    expect(await screen.findByTestId('battle-screen')).toBeOnTheScreen();
+    expect(screen.queryByTestId('settings-screen')).toBeNull();
+  });
+
+  test('a tap closes an open server sheet too', async () => {
+    const server = new FakeServer();
+    const p = phone();
+    const stream = await startApp(server, p, { initialUrl: '/settings' });
+    await act(() => stream.send(`event: state\ndata: ${JSON.stringify({ servers: [{ ...web, parents: [] }] })}\n\n`));
+    await fireEvent.press(await screen.findByTestId('server-row'));
+    expect(await screen.findByTestId('server-sheet')).toBeOnTheScreen();
+    await act(async () => {
+      p.notifications.tap();
+      await settle();
+    });
+    await waitFor(() => expect(screen.queryByTestId('server-sheet', { includeHiddenElements: true })).toBeNull());
   });
 
   test('a tap closes an open sheet so the Battle tab is not hidden behind it', async () => {

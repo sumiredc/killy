@@ -57,24 +57,37 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const sent = useRef<string | null>(null);
   const channelName = t('notifChannel');
 
-  const register = useCallback(async () => {
-    let token: string;
-    try {
-      token = await n.pushToken();
-    } catch {
-      return;
-    }
-    if (token === sent.current) {
-      return;
-    }
-    try {
-      await client.updateDevice({ pushToken: token });
-      sent.current = token;
-    } catch {
-      // Nothing is shown: battle and adding servers work without it. Sent again on the next start
-      // or the next new token.
-    }
+  // One registration at a time: the start, a new token and a return from the system settings can
+  // all ask at once (the permission prompt itself sends the app to the background and back), and
+  // each waits for the one before, so the same token is sent once.
+  const queue = useRef<Promise<void>>(Promise.resolve());
+  const register = useCallback(() => {
+    const run = async () => {
+      let token: string;
+      try {
+        token = await n.pushToken();
+      } catch {
+        return;
+      }
+      if (token === sent.current) {
+        return;
+      }
+      try {
+        await client.updateDevice({ pushToken: token });
+        sent.current = token;
+      } catch {
+        // Nothing is shown: battle and adding servers work without it. Sent again on the next
+        // start or the next new token.
+      }
+    };
+    queue.current = queue.current.then(run);
+    return queue.current;
   }, [client, n]);
+  // Whether Killy asked for the permission in this run. Android lets an app ask twice, so after one
+  // refusal the OS still says it may ask; until the next start, that counts as blocked, so the
+  // switch does not look on while nothing can arrive.
+  const asked = useRef(false);
+  const shown = (p: NotificationPermission): NotificationPermission => (p === 'undetermined' && asked.current ? 'denied' : p);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,11 +97,12 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         if (registered) {
           await n.prepare(channelName).catch(() => {});
           if (p === 'undetermined') {
+            asked.current = true;
             p = await n.requestPermission();
           }
         }
         if (cancelled) return;
-        setPermission(p);
+        setPermission(shown(p));
         if (registered && p === 'granted') {
           await register();
         }
@@ -113,7 +127,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   // The operator may have changed the permission in the system settings.
   const onPermission = useEffectEvent((p: NotificationPermission) => {
     const before = permission;
-    setPermission(p);
+    setPermission(shown(p));
     if (p === 'granted' && before !== 'granted' && registered) {
       void register();
     }
