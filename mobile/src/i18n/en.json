@@ -74,5 +74,6 @@
   "remove": "Remove this server",
   "removeConfirm": "Tap again to remove",
   "removeHint": "Removing it does not stop the agent on the server.",
+  "serverSaveFailed": "The change could not be saved. Try again in a while.",
   "done": "Done"
 }
