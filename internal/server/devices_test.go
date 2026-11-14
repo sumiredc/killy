@@ -342,6 +342,7 @@ func TestAnInvalidClaimIsAnInvalidRequest(t *testing.T) {
 		"lower case":    `{"code":"abc123"}`,
 		"too short":     `{"code":"ABC12"}`,
 		"name too long": claimBody("ABC123", strings.Repeat("n", 101)),
+		"NUL in name":   `{"code":"ABC123","name":"web\u0000"}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			if status, resp := s.claim(t, device, phoneAddr, body); status != http.StatusBadRequest || resp.Error != "invalid_request" {

@@ -145,8 +145,8 @@ func (s *Server) stateFor(ctx context.Context, deviceID string) (state, error) {
 	return st, nil
 }
 
-// NotifyDevice makes the device's open streams send their state again. Claims call it; renaming,
-// muting and removing a server will too.
+// NotifyDevice makes the device's open streams send their state again. Claims, renaming, muting
+// and removing a server call it.
 func (s *Server) NotifyDevice(deviceID string) {
 	s.Broker.Notify(deviceID)
 }

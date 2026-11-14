@@ -50,6 +50,8 @@ type Store interface {
 	CreateDevice(ctx context.Context, tokenSHA256 []byte, pushToken string) (store.Device, error)
 	DeviceByToken(ctx context.Context, tokenSHA256 []byte) (store.Device, error)
 	LinkDevice(ctx context.Context, deviceID, agentID string, name *string, fallback string) (store.Link, error)
+	UpdateLink(ctx context.Context, deviceID, agentID string, name *string, notify *bool) (store.Link, error)
+	UnlinkDevice(ctx context.Context, deviceID, agentID string) error
 	LinksOfDevice(ctx context.Context, deviceID string) ([]store.LinkedServer, error)
 	DevicesOfAgent(ctx context.Context, agentID string) ([]string, error)
 }
@@ -90,6 +92,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /agent/v1/commands", s.streamCommands)
 	mux.HandleFunc("POST /agent/v1/results", s.postResult)
 	mux.HandleFunc("POST /app/v1/kills", s.postKill)
+	mux.HandleFunc("PATCH /app/v1/servers/{id}", s.patchServer)
+	mux.HandleFunc("DELETE /app/v1/servers/{id}", s.deleteServer)
 	return mux
 }
 

@@ -93,16 +93,11 @@ func (s *Server) claimPairing(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_request")
 		return
 	}
-	var name *string
-	if req.Name != nil {
-		if utf8.RuneCountInString(*req.Name) > maxNameRunes {
-			refund()
-			writeError(w, http.StatusBadRequest, "invalid_request")
-			return
-		}
-		if n := strings.TrimSpace(*req.Name); n != "" {
-			name = &n
-		}
+	name, ok := displayName(req.Name)
+	if !ok {
+		refund()
+		writeError(w, http.StatusBadRequest, "invalid_request")
+		return
 	}
 
 	agentID, release, err := s.Codes.Claim(req.Code)
@@ -136,6 +131,24 @@ func (s *Server) claimPairing(w http.ResponseWriter, r *http.Request) {
 	release()
 	s.Log.Error("link device to agent", "agent", agentID, "err", err)
 	writeError(w, http.StatusServiceUnavailable, "unavailable")
+}
+
+// displayName applies the rules a display name follows wherever it comes in (claim and PATCH): it
+// is refused (false) over maxNameRunes, counted before trimming, or with U+0000, which PostgreSQL
+// text cannot hold; it is saved trimmed; and a name that is missing or empty after trimming is nil,
+// which keeps the previous name.
+func displayName(raw *string) (*string, bool) {
+	if raw == nil {
+		return nil, true
+	}
+	if utf8.RuneCountInString(*raw) > maxNameRunes || strings.ContainsRune(*raw, 0) {
+		return nil, false
+	}
+	n := strings.TrimSpace(*raw)
+	if n == "" {
+		return nil, true
+	}
+	return &n, true
 }
 
 // authDevice finds the device of the request's bearer token. When it returns false it has already

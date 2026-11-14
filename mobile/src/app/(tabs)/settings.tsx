@@ -3,18 +3,27 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AddServerSheet } from '@/components/AddServerSheet';
+import { ServerSheet } from '@/components/ServerSheet';
 import { useI18n } from '@/i18n/context';
 import { useKilly } from '@/killy/context';
 import { serverRow } from '@/killy/server-row';
 import { KText } from '@/theme/KText';
 import { colors, gutter, radii } from '@/theme/tokens';
 
-// The settings screen. Tapping a server (the server sheet) comes with #16, the app group with #20 and #21.
+// The settings screen. The app group comes with #20 and #21.
 export default function SettingsScreen() {
   const { t } = useI18n();
   const { state } = useKilly();
   const [adding, setAdding] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
   const servers = state?.servers ?? [];
+  // Looked up in every state, so the sheet shows the latest values and closes once the server is gone.
+  const open = servers.find((s) => s.id === openId);
+  // A server that left the state closed its sheet; forget it, so the sheet does not open again by
+  // itself if the server is linked again.
+  if (openId !== null && state !== null && open === undefined) {
+    setOpenId(null);
+  }
   return (
     <SafeAreaView style={styles.screen} edges={['top']} testID="settings-screen">
       <KText kind="mono" style={styles.title}>
@@ -31,7 +40,12 @@ export default function SettingsScreen() {
             {servers.map((s, i) => {
               const row = serverRow(s);
               return (
-                <View key={s.id} style={[styles.row, i > 0 && styles.rowDivider]} testID="server-row">
+                <Pressable
+                  key={s.id}
+                  accessibilityRole="button"
+                  onPress={() => setOpenId(s.id)}
+                  style={[styles.row, i > 0 && styles.rowDivider]}
+                  testID="server-row">
                   <View style={styles.rowMain}>
                     <KText kind="mono" style={styles.serverName} numberOfLines={1}>
                       {row.name}
@@ -46,7 +60,7 @@ export default function SettingsScreen() {
                     </View>
                   )}
                   <KText style={styles.chevron}>›</KText>
-                </View>
+                </Pressable>
               );
             })}
           </View>
@@ -57,6 +71,7 @@ export default function SettingsScreen() {
         </Pressable>
       </ScrollView>
       {adding && <AddServerSheet onClose={() => setAdding(false)} />}
+      {open !== undefined && <ServerSheet server={open} onClose={() => setOpenId(null)} />}
     </SafeAreaView>
   );
 }

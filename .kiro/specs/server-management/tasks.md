@@ -2,20 +2,20 @@
 
 各トップレベルのタスクが 1 つの issue と 1 つの PR に当たる。テストは実装より先に書き、期待した理由で赤になることを確かめる。完了条件の正は各 issue。テストは PostgreSQL を使わず、DB は interface の向こうのメモリ上の偽物（`internal/server/memstore`）で置き換える。各 PR で `go vet ./...`・`go test -race ./...` と `cd mobile && npm run typecheck && npm run lint && npm test` を通す。
 
-- [ ] 1. サーバーの表示名の変更・通知の停止・削除をできるようにする（#16。前提：#12、#15、#38、#43）
-  - [ ] 1.1 `PATCH`・`DELETE /app/v1/servers/{id}` のテスト（その device の名前だけが変わり別の device の名前は変わらない・空と空白だけの名前で変わらない・101 文字で `400`・`notify=false` でサーバーと親が `state` に残り別の device の設定は変わらない・削除でその device の `state` から消えて別の device には残る・紐付いていない ID と UUID の形でない ID で `404` と何も変わらない・`401`・`503`・その device にだけ `state` が届く）を `memstore` で書き、赤を確かめる
+- [x] 1. サーバーの表示名の変更・通知の停止・削除をできるようにする（#16。前提：#12、#15、#38、#43）
+  - [x] 1.1 `PATCH`・`DELETE /app/v1/servers/{id}` のテスト（その device の名前だけが変わり別の device の名前は変わらない・空と空白だけの名前で変わらない・101 文字で `400`・`notify=false` でサーバーと親が `state` に残り別の device の設定は変わらない・削除でその device の `state` から消えて別の device には残る・紐付いていない ID と UUID の形でない ID で `404` と何も変わらない・`401`・`503`・その device にだけ `state` が届く）を `memstore` で書き、赤を確かめる
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8_
-  - [ ] 1.2 `server.Store` に `UpdateLink`・`UnlinkDevice` を足して `store.Store`（SQL）と `memstore` に同じ規則で入れ、claim と共有する `displayName` と handler を実装し、テストを緑にする。`memstore.SetLink` はテスト用の helper として残す。`events_test.go` の 2 か所の `SetLink` は、そのままにするか `UpdateLink` に替えるかを PR で決める
+  - [x] 1.2 `server.Store` に `UpdateLink`・`UnlinkDevice` を足して `store.Store`（SQL）と `memstore` に同じ規則で入れ、claim と共有する `displayName` と handler を実装し、テストを緑にする。`memstore.SetLink` はテスト用の helper として残す。`events_test.go` の 2 か所の `SetLink` は、そのままにするか `UpdateLink` に替えるかを PR で決める
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8_
-  - [ ] 1.3 `KillyClient` の `updateServer`・`removeServer` のテスト（送る path と本文・応答が無いと `unreachable`・エラーの応答で `other`・送り直さない）を書き、実装する
+  - [x] 1.3 `KillyClient` の `updateServer`・`removeServer` のテスト（送る path と本文・応答が無いと `unreachable`・エラーの応答で `other`・送り直さない）を書き、実装する
     - _Requirements: 1.12, 1.13, 1.14, 1.15_
-  - [ ] 1.4 server sheet の画面のテスト（行を押すと開く・ホスト名の行に `state` の hostname・switch を切り替えた時点で送る・「完了」で変わったときだけ送る・削除が 1 回目では行われず 2 回目で行われる・応答が無いときとエラーのときに閉じずに赤い行・通知が off でも battle の列に残る）を書き、赤を確かめる
+  - [x] 1.4 server sheet の画面のテスト（行を押すと開く・ホスト名の行に `state` の hostname・switch を切り替えた時点で送る・「完了」で変わったときだけ送る・削除が 1 回目では行われず 2 回目で行われる・応答が無いときとエラーのときに閉じずに赤い行・通知が off でも battle の列に残る）を書き、赤を確かめる
     - _Requirements: 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16_
-  - [ ] 1.5 `ServerSheet` を作り、Settings の行を押せるようにして、翻訳を足し、テストを緑にする。表示名と通知を送る時点と、失敗の表示を DESIGN の Server sheet に書き足す
+  - [x] 1.5 `ServerSheet` を作り、Settings の行を押せるようにして、翻訳を足し、テストを緑にする。表示名と通知を送る時点と、失敗の表示を DESIGN の Server sheet に書き足す
     - _Requirements: 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16_
-  - [ ] 1.6 手元の PostgreSQL（`make db-up`）に向けて `killy server` を動かし、名前の変更・通知の停止・削除が Killy server の再起動の後も保たれていることを PR 本文に書く
+  - [x] 1.6 手元の PostgreSQL（`make db-up`）に向けて `killy server` を動かし、名前の変更・通知の停止・削除が Killy server の再起動の後も保たれていることを PR 本文に書く
     - _Requirements: 1.9_
-  - [ ] 1.7 `go vet ./...`・`go test -race ./...` と、app の型検査・lint・テストを通す
+  - [x] 1.7 `go vet ./...`・`go test -race ./...` と、app の型検査・lint・テストを通す
     - _Requirements: 1.7_
 
 - [ ] 2. サーバーへの接続を確認し、失敗した箇所を示す（#17。前提：#10、#16、#15、#38、#43）

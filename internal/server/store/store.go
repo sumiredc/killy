@@ -205,6 +205,36 @@ func (s *Store) LinkDevice(ctx context.Context, deviceID, agentID string, name *
 	return l, nil
 }
 
+// UpdateLink changes this device's link only; a nil name or notify leaves that field as it is. It
+// returns ErrNotFound when the device is not linked to the agent.
+func (s *Store) UpdateLink(ctx context.Context, deviceID, agentID string, name *string, notify *bool) (Link, error) {
+	l := Link{AgentID: agentID}
+	err := s.pool.QueryRow(ctx, `
+		UPDATE links SET name = COALESCE($3, name), notify = COALESCE($4, notify)
+		WHERE device_id = $1 AND agent_id = $2
+		RETURNING name, notify`,
+		deviceID, agentID, name, notify).Scan(&l.Name, &l.Notify)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Link{}, ErrNotFound
+	}
+	if err != nil {
+		return Link{}, fmt.Errorf("update link: %w", err)
+	}
+	return l, nil
+}
+
+// UnlinkDevice removes this device's link only, or returns ErrNotFound.
+func (s *Store) UnlinkDevice(ctx context.Context, deviceID, agentID string) error {
+	tag, err := s.pool.Exec(ctx, "DELETE FROM links WHERE device_id = $1 AND agent_id = $2", deviceID, agentID)
+	if err != nil {
+		return fmt.Errorf("unlink device: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // LinkedServer is an agent as one device sees it.
 type LinkedServer struct {
 	AgentID  string
