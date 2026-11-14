@@ -36,7 +36,7 @@ flowchart LR
 | 項目 | 選択 | 理由 |
 |---|---|---|
 | Expo SDK | 58（`expo` ~58.0.25、React Native 0.88.1、React 19.3.0）。#11 の着手時点の `latest` | ARCHITECTURE の「current SDK」 |
-| アプリの ID | iOS の bundle identifier と Android の package は `pink.sumire.killy` | Killy server の `killy.sumire.pink` を逆にした。EAS（#32）で登録するときに変えるなら、そのときに |
+| アプリの ID | iOS の bundle identifier と Android の package は `com.sumiredc.killy` | sumire の他の app（debugger の `com.sumiredc.debugger`）とそろえる（#65 で、Firebase と Apple に登録する前に `pink.sumire.killy` から変えた）。登録した後は変えない。変えると別の app になる |
 | 画面の切り替え | `expo-router` の tabs | Expo の標準。後の通知からの起動（#20）も URL で開ける |
 | 接続先 | `EXPO_PUBLIC_KILLY_SERVER_URL`（http か https）。無ければ起動時にエラー画面で、どこにも何も送らない。Expo は build のときに値を埋め込むので、読むのは `buildServerURL()` の 1 か所だけにし、画面のテストではこの関数を差し替える | build ごとに staging と production を分けられる。app はこの Killy server にだけ接続する（ARCHITECTURE Pairing の QR） |
 | 翻訳 | `expo-localization` で端末の言語を取り、`ja.json`・`en.json` を引く小さな `t()` を自前で持つ | 2 言語と置き換えだけなので、ライブラリを足さない |

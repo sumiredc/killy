@@ -9,7 +9,7 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "pink.sumire.killy"
+      "bundleIdentifier": "com.sumiredc.killy"
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +19,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "pink.sumire.killy"
+      "package": "com.sumiredc.killy"
     },
     "plugins": [
       "expo-router",
