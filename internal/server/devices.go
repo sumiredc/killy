@@ -134,13 +134,14 @@ func (s *Server) claimPairing(w http.ResponseWriter, r *http.Request) {
 }
 
 // displayName applies the rules a display name follows wherever it comes in (claim and PATCH): it
-// is refused (false) over maxNameRunes, counted before trimming; it is saved trimmed; and a name
-// that is missing or empty after trimming is nil, which keeps the previous name.
+// is refused (false) over maxNameRunes, counted before trimming, or with U+0000, which PostgreSQL
+// text cannot hold; it is saved trimmed; and a name that is missing or empty after trimming is nil,
+// which keeps the previous name.
 func displayName(raw *string) (*string, bool) {
 	if raw == nil {
 		return nil, true
 	}
-	if utf8.RuneCountInString(*raw) > maxNameRunes {
+	if utf8.RuneCountInString(*raw) > maxNameRunes || strings.ContainsRune(*raw, 0) {
 		return nil, false
 	}
 	n := strings.TrimSpace(*raw)

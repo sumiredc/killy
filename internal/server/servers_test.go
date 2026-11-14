@@ -211,6 +211,19 @@ func TestAPatchKeepsTheSettingItDoesNotSend(t *testing.T) {
 	}
 }
 
+func TestANameWithANulCharacterIsRefused(t *testing.T) {
+	// PostgreSQL text cannot hold U+0000; letting it through would answer 503 instead of 400.
+	s := newTestServer(t)
+	_, agentID, phoneA, _ := s.twoPhones(t)
+	before := s.mem.Links()
+	if status, body := s.patchServer(t, phoneA, agentID, `{"name":"web\u0000"}`); status != http.StatusBadRequest || errorCode(t, body) != "invalid_request" {
+		t.Errorf("PATCH: %d %s, want 400 invalid_request", status, body)
+	}
+	if after := s.mem.Links(); !slices.Equal(before, after) {
+		t.Errorf("links changed from %+v to %+v", before, after)
+	}
+}
+
 func TestRemovingUnlinksThisPhoneOnly(t *testing.T) {
 	s := newTestServer(t)
 	agentToken, agentID, phoneA, phoneB := s.twoPhones(t)
