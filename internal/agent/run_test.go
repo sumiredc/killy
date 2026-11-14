@@ -168,3 +168,32 @@ func TestRunAlsoOpensTheCommandStream(t *testing.T) {
 		t.Fatal("Run did not return after cancel")
 	}
 }
+
+func TestRunAnswersAPingWithItsOwnVersion(t *testing.T) {
+	server := newCommandServer(t)
+	path := configPath(t)
+	writeConfig(t, path, Config{Server: server.URL, Token: issuedToken})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- Run(ctx, RunOptions{ConfigPath: path, Client: http.DefaultClient, Log: slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+			Version: "9.9.9", Scanner: &fakeScanner{}, PidfdAvailable: func() bool { return true }, Ticks: make(chan time.Time),
+			Killer: &fakeKiller{}, StreamClient: http.DefaultClient, Rand: func() float64 { return 0 }, Sleep: SleepContext})
+	}()
+	waitConnections(t, server, 1)
+	server.commands <- pingEvent("p-1")
+	select {
+	case r := <-server.got:
+		if r.Type != protocol.ResultPong || r.Version != "9.9.9" {
+			t.Errorf("result %+v, want a pong with the version Run was given", r)
+		}
+	case <-time.After(3 * time.Second):
+		t.Error("no pong")
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run did not return after cancel")
+	}
+}
