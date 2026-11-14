@@ -327,7 +327,9 @@ func TestAPongFromAnotherAgentIsRefused(t *testing.T) {
 	stillWaiting(t, out)
 }
 
-func TestACheckWhoseStreamTakesNoCommandsIsAgentDisconnected(t *testing.T) {
+func TestACheckWhoseStreamTakesNoCommandsIsNoResponse(t *testing.T) {
+	// The agent is connected but commands are not getting through: UC4's "Commands are not
+	// reaching the agent. Restart the agent.", not "check that killy agent is running".
 	f := newFixture()
 	cmds, detach := f.r.Attach(agentA)
 	defer detach()
@@ -338,8 +340,8 @@ func TestACheckWhoseStreamTakesNoCommandsIsAgentDisconnected(t *testing.T) {
 	for len(cmds) < cap(cmds) && time.Now().Before(deadline) {
 		time.Sleep(time.Millisecond)
 	}
-	if r := f.checkNow(t, agentA); r != agentGone {
-		t.Errorf("result %+v, want agent_disconnected", r)
+	if r := f.checkNow(t, agentA); r != noResponse {
+		t.Errorf("result %+v, want no_response", r)
 	}
 }
 

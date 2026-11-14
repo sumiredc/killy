@@ -51,7 +51,7 @@
 
 1. WHEN 紐付いたサーバーへの `POST /app/v1/servers/{id}/check` が届き、agent の命令の stream がある THEN Killy server SHALL その stream に `ping {id}` を送り、送ってから 5 秒より前に `pong` が届けば `{result: ok, version}` を返す
 2. IF agent の命令の stream が無い THEN Killy server SHALL ping を送らずに `{result: agent_disconnected}` を返す
-3. IF ping を送ってから 5 秒より前に `pong` が届かない（ちょうど 5 秒に届いたものを含む） THEN Killy server SHALL `{result: no_response}` を返す
+3. IF ping を送ってから 5 秒より前に `pong` が届かない（ちょうど 5 秒に届いたものを含む）、または stream はあるが命令を受け取らず ping を送れない THEN Killy server SHALL `{result: no_response}` を返す
 4. WHEN 同じサーバーの前の確認から 2 秒以内（ちょうど 2 秒を含む）に確認が届く THEN Killy server SHALL ping を送らず、実行中の確認の結果か、直前の確認の結果を返す。2 秒を過ぎた確認では ping を送る
 5. THE check の応答 SHALL `result` と、`ok` のときの agent の版だけを持ち、応答の時間・最後の受信の時刻を含めない
 6. THE Killy server SHALL `pong` を ping の待ちにだけ、kill の結果を kill の待ちにだけ渡す。待っている kill の ID を付けた `pong` も、待っている ping の ID を付けた kill の結果も受け付けず、どちらの待ちも終わらせない
