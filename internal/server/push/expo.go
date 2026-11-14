@@ -10,6 +10,13 @@ import (
 	"time"
 )
 
+// RequestError is an answer other than 200 to a whole request.
+type RequestError struct {
+	Status int
+}
+
+func (e *RequestError) Error() string { return fmt.Sprintf("expo push: status %d", e.Status) }
+
 // DefaultExpoURL is Expo Push Service's send endpoint.
 const DefaultExpoURL = "https://exp.host/--/api/v2/push/send"
 
@@ -71,7 +78,7 @@ func (e *Expo) Send(ctx context.Context, msgs []Message) ([]Ticket, error) {
 		return nil, fmt.Errorf("expo push: read answer: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("expo push: status %d", resp.StatusCode)
+		return nil, &RequestError{Status: resp.StatusCode}
 	}
 	var answer struct {
 		Data []Ticket `json:"data"`
