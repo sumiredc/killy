@@ -830,6 +830,10 @@ func TestARequestRefusedWith400IsSentAgainOneMessageAtATime(t *testing.T) {
 	if a := s.sender.sentTo(tokenA); a != 2 {
 		t.Errorf("phone A got %d messages, want 2: the refused request and its own one", a)
 	}
+	// The refused request counts against nobody: phone B fails 4 times on its own after it.
+	if b := s.sender.sentTo(tokenB); b != 1+push.MaxAttempts {
+		t.Errorf("phone B got %d messages, want %d", b, 1+push.MaxAttempts)
+	}
 	if n := len(s.mem.Notified(agentID)); n != 2 {
 		t.Errorf("%d notified rows, want phone B given up after its own failures too", n)
 	}

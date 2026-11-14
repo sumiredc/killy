@@ -11,7 +11,7 @@ Linux サーバーに新しいゾンビの親が現れたことを、app を閉�
 ## 保証しないこと
 
 - push receipt を取りに行くこと。receipt にだけ出る `DeviceNotRegistered` には気づかず、その push token には新しい親が現れるたびに送り続ける（#19 の決定）
-- 通知を必ず 1 回だけにすること。Expo Push Service が受け付けた直後、記録する前に Killy server が止まると、その 1 件は再起動の後にもう一度送られる。Expo が受け付けたのに応答が失われたか遅れたときも、もう一度送られる（[PRD: Duplicates and identity](../../../docs/PRD.md#duplicates-and-identity) の例外。応答の喪失は #19 のレビューの後に sumire が足した）
+- 通知を必ず 1 回だけにすること。Expo Push Service が受け付けた直後、記録する前に Killy server が止まると、その 1 件は再起動の後にもう一度送られる。Expo が受け付けたのに応答が失われたか遅れたときは失敗として数えるので、最大 3 回まで送り直される（[PRD: Duplicates and identity](../../../docs/PRD.md#duplicates-and-identity) の例外。応答の喪失は #19 のレビューの後に sumire が足した）
 - 端末に実際に表示されること。Expo が受け付けた後の配信は APNs・FCM と OS が行う
 - 通知の文面を app の言語に合わせること。文面は DESIGN の 1 つの形（`zombie ×<n> on <server>`）で、Killy server は phone の言語を知らない
 - 通知をタップしたときに、その親を battle の先頭にすること。battle は全サーバーの 1 列で、最も古く検出された親から戦う（[PRD: Not guaranteed](../../../docs/PRD.md#not-guaranteed) の「Choosing which server to fight」）

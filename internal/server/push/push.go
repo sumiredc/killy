@@ -227,7 +227,11 @@ func (n *Notifier) sendBatch(agentID string, msgs []Message, pairs []pair) {
 	// sent alone, so one device's token cannot stop the pushes to the others.
 	var refused *RequestError
 	if len(msgs) > 1 && errors.As(err, &refused) && refused.Status == http.StatusBadRequest {
+		n.log.Warn("expo refused the request; sending its messages one at a time", "agent", agentID, "messages", len(msgs))
 		for i := range msgs {
+			if n.ctx.Err() != nil {
+				return // stopping: the rest would only fail
+			}
 			n.sendBatch(agentID, msgs[i:i+1], pairs[i:i+1])
 		}
 		return
