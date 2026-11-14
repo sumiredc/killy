@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -134,50 +135,60 @@ func post(t *testing.T, url, token, body string, into any) int {
 	return res.StatusCode
 }
 
-func TestTheSameKillIDTwiceSignalsOnceEndToEnd(t *testing.T) {
+// relay is a Killy server with one paired agent running its command stream, and one phone linked to it.
+type relay struct {
+	url, device, agentID string
+	machine              *machine
+	outcomes             string
+}
+
+func startRelay(t *testing.T, version string) *relay {
+	t.Helper()
 	srv := newServer()
 	ts := httptest.NewServer(srv.Handler())
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
-	var pair struct{ AgentToken, AgentID, Code string }
-	var pairRaw map[string]string
-	post(t, ts.URL+"/agent/v1/pairings", "", `{"hostname":"web-1"}`, &pairRaw)
-	pair.AgentToken, pair.AgentID, pair.Code = pairRaw["agent_token"], pairRaw["agent_id"], pairRaw["code"]
+	var pair map[string]string
+	post(t, ts.URL+"/agent/v1/pairings", "", `{"hostname":"web-1"}`, &pair)
 	var dev map[string]string
 	post(t, ts.URL+"/app/v1/devices", "", `{}`, &dev)
-	device := dev["device_token"]
-	if status := post(t, ts.URL+"/app/v1/pairings/claim", device, `{"code":"`+pair.Code+`"}`, nil); status != http.StatusOK {
+	r := &relay{url: ts.URL, device: dev["device_token"], agentID: pair["agent_id"], machine: &machine{},
+		outcomes: filepath.Join(t.TempDir(), "outcomes.jsonl")}
+	if status := post(t, ts.URL+"/app/v1/pairings/claim", r.device, `{"code":"`+pair["code"]+`"}`, nil); status != http.StatusOK {
 		t.Fatalf("claim: %d", status)
 	}
 
-	m := &machine{}
-	store, err := kill.OpenFileStore(filepath.Join(t.TempDir(), "outcomes.jsonl"))
+	store, err := kill.OpenFileStore(r.outcomes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
-	killer := &kill.Killer{Proc: &proc.Scanner{Root: m}, Pidfd: pidfds{m}, Store: store, Clock: &instant{}, SelfPID: func() int { return 500 },
+	t.Cleanup(func() { store.Close() })
+	killer := &kill.Killer{Proc: &proc.Scanner{Root: r.machine}, Pidfd: pidfds{r.machine}, Store: store, Clock: &instant{}, SelfPID: func() int { return 500 },
 		Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	client := &agent.CommandClient{Server: ts.URL, Token: pair.AgentToken, Client: &http.Client{}, Killer: killer,
+	t.Cleanup(cancel)
+	client := &agent.CommandClient{Server: ts.URL, Token: pair["agent_token"], Client: &http.Client{}, Killer: killer, Version: version,
 		Backoff: &agent.Backoff{Rand: func() float64 { return 0 }}, Log: slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
 		Sleep: agent.SleepContext}
 	go client.Run(ctx)
 	deadline := time.Now().Add(3 * time.Second)
-	for !srv.Commands.Attached(pair.AgentID) {
+	for !srv.Commands.Attached(r.agentID) {
 		if time.Now().After(deadline) {
 			t.Fatal("the agent's command stream never attached")
 		}
 		time.Sleep(time.Millisecond)
 	}
+	return r
+}
 
-	body := `{"id":"16fd2706-8baf-433b-82eb-8c7fada847da","server_id":"` + pair.AgentID + `","ppid":100,"starttime":5000}`
+func TestTheSameKillIDTwiceSignalsOnceEndToEnd(t *testing.T) {
+	r := startRelay(t, "dev")
+	body := `{"id":"16fd2706-8baf-433b-82eb-8c7fada847da","server_id":"` + r.agentID + `","ppid":100,"starttime":5000}`
 	var first, again map[string]any
-	if status := post(t, ts.URL+"/app/v1/kills", device, body, &first); status != http.StatusOK {
+	if status := post(t, r.url+"/app/v1/kills", r.device, body, &first); status != http.StatusOK {
 		t.Fatalf("first kill: %d", status)
 	}
-	if status := post(t, ts.URL+"/app/v1/kills", device, body, &again); status != http.StatusOK {
+	if status := post(t, r.url+"/app/v1/kills", r.device, body, &again); status != http.StatusOK {
 		t.Fatalf("resent kill: %d", status)
 	}
 	// Without the agent's record of the ID the resend would end already_gone (the parent is a zombie
@@ -185,7 +196,24 @@ func TestTheSameKillIDTwiceSignalsOnceEndToEnd(t *testing.T) {
 	if first["outcome"] != "killed" || fmt.Sprint(first) != fmt.Sprint(again) {
 		t.Errorf("outcomes %v and %v, want killed twice", first, again)
 	}
-	if n := m.Signals(); n != 1 {
+	if n := r.machine.Signals(); n != 1 {
 		t.Errorf("SIGKILL sent %d times, want 1", n)
+	}
+}
+
+func TestACheckGoesToTheAgentAndBackAndChangesNothingEndToEnd(t *testing.T) {
+	r := startRelay(t, "1.2.3")
+	var got map[string]any
+	if status := post(t, r.url+"/app/v1/servers/"+r.agentID+"/check", r.device, "", &got); status != http.StatusOK {
+		t.Fatalf("check: %d", status)
+	}
+	if fmt.Sprint(got) != "map[result:ok version:1.2.3]" {
+		t.Errorf("check %v, want {result: ok, version: 1.2.3} only", got)
+	}
+	if n := r.machine.Signals(); n != 0 {
+		t.Errorf("SIGKILL sent %d times by a check, want 0", n)
+	}
+	if b, err := os.ReadFile(r.outcomes); err != nil || len(b) != 0 {
+		t.Errorf("outcomes file %q (%v), want it empty after a check", b, err)
 	}
 }

@@ -48,6 +48,17 @@ export type KillRequest = { id: string; serverId: string; ppid: number; starttim
 
 export type ServerErrorKind = 'unreachable' | 'other';
 
+/**
+ * The result of a connection check, as the server sheet shows it: the Killy server's three results,
+ * no answer at all (`unreachable`), or any other answer (`failed`).
+ */
+export type CheckResult =
+  | { kind: 'ok'; version: string }
+  | { kind: 'agent_disconnected' }
+  | { kind: 'no_response' }
+  | { kind: 'unreachable' }
+  | { kind: 'failed' };
+
 export class ServerError extends Error {
   constructor(readonly kind: ServerErrorKind) {
     super(kind);
@@ -70,6 +81,8 @@ export interface KillyClient {
   updateServer(id: string, patch: { name?: string; notify?: boolean }): Promise<void>;
   /** Unlinks this phone from the server. Nothing is sent again, as for updateServer. */
   removeServer(id: string): Promise<void>;
+  /** Asks whether a command reaches the server's agent and comes back. It never throws. */
+  check(id: string): Promise<CheckResult>;
   /** Streams the state to onState, reconnecting on its own, until the returned function is called. */
   events(onState: (s: State) => void): () => void;
 }
@@ -200,6 +213,31 @@ export function createKillyClient({ baseURL, fetch, deviceToken, random }: Clien
 
     async removeServer(id) {
       await changeServer('DELETE', id, undefined);
+    },
+
+    async check(id) {
+      const token = deviceToken();
+      if (token === null) {
+        return { kind: 'failed' };
+      }
+      let answer: Answer;
+      try {
+        answer = await request('POST', `/app/v1/servers/${encodeURIComponent(id)}/check`, undefined, token);
+      } catch {
+        return { kind: 'unreachable' };
+      }
+      if (answer.status !== 200) {
+        return { kind: 'failed' };
+      }
+      const result = field(answer.body, 'result');
+      const version = field(answer.body, 'version');
+      if (result === 'ok' && version) {
+        return { kind: 'ok', version };
+      }
+      if (result === 'agent_disconnected' || result === 'no_response') {
+        return { kind: result };
+      }
+      return { kind: 'failed' };
     },
 
     events(onState) {

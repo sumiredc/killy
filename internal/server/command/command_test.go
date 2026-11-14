@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -21,12 +22,14 @@ const (
 type fixture struct {
 	clock *clock.Fake
 	timer chan time.Time
-	r     *Router
+	// timers counts the timers the router started, one per command sent.
+	timers atomic.Int32
+	r      *Router
 }
 
 func newFixture() *fixture {
 	f := &fixture{clock: clock.NewFake(t0), timer: make(chan time.Time, 8)}
-	f.r = New(f.clock, func(time.Duration) <-chan time.Time { return f.timer })
+	f.r = New(f.clock, func(time.Duration) <-chan time.Time { f.timers.Add(1); return f.timer })
 	return f
 }
 

@@ -81,6 +81,7 @@ func Run(ctx context.Context, opts RunOptions) error {
 		Token:   cfg.Token,
 		Client:  opts.StreamClient,
 		Killer:  opts.Killer,
+		Version: opts.Version,
 		Backoff: &Backoff{Rand: opts.Rand},
 		Log:     opts.Log,
 		Sleep:   opts.Sleep,

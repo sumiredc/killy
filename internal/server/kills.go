@@ -55,16 +55,28 @@ func (s *Server) postResult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var res protocol.CommandResult
-	if err := decodeJSON(w, r, &res); err != nil || res.ID == "" || res.Type != protocol.ResultKill || !protocol.IsAgentOutcome(res.Outcome) {
+	if err := decodeJSON(w, r, &res); err != nil || res.ID == "" || !validResult(res) {
 		writeError(w, http.StatusBadRequest, "invalid_request")
 		return
 	}
-	// Only the agent the kill was sent to can answer it.
+	// Only the agent the command was sent to can answer it, and only with a result of its kind.
 	if !s.Commands.Deliver(agent.ID, res) {
 		writeError(w, http.StatusNotFound, "command_not_found")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// validResult accepts a kill result with an outcome an agent may return, and a pong with the
+// agent's version.
+func validResult(res protocol.CommandResult) bool {
+	switch res.Type {
+	case protocol.ResultKill:
+		return protocol.IsAgentOutcome(res.Outcome)
+	case protocol.ResultPong:
+		return res.Version != ""
+	}
+	return false
 }
 
 // killRequest uses pointers so a missing field can be told from a zero value.

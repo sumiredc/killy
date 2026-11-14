@@ -71,6 +71,8 @@
   "connChecking": "Asking the agent…",
   "connOk": "Connected (agent {ver})",
   "connFail": "No response from the agent. Check that killy agent is running on the server.",
+  "connNoResponse": "Commands are not reaching the agent. Restart the agent.",
+  "connFailed": "The connection could not be checked. Try again in a while.",
   "remove": "Remove this server",
   "removeConfirm": "Tap again to remove",
   "removeHint": "Removing it does not stop the agent on the server.",

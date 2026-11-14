@@ -94,6 +94,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /app/v1/kills", s.postKill)
 	mux.HandleFunc("PATCH /app/v1/servers/{id}", s.patchServer)
 	mux.HandleFunc("DELETE /app/v1/servers/{id}", s.deleteServer)
+	mux.HandleFunc("POST /app/v1/servers/{id}/check", s.checkServer)
 	return mux
 }
 

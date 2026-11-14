@@ -153,6 +153,7 @@ func startClient(t *testing.T) *clientFixture {
 		Token:   issuedToken,
 		Client:  &http.Client{},
 		Killer:  f.killer,
+		Version: "1.2.3",
 		Backoff: &Backoff{Rand: func() float64 { return 0 }},
 		Log:     slog.New(slog.NewTextHandler(&f.logs, nil)),
 		Sleep: func(ctx context.Context, d time.Duration) {
@@ -234,11 +235,74 @@ func TestOtherEventsAreIgnored(t *testing.T) {
 	f := startClient(t)
 	waitConnections(t, f.server, 1)
 	f.server.commands <- ": hb\n\n"
-	f.server.commands <- "event: ping\ndata: {\"id\":\"x\"}\n\n"
+	f.server.commands <- "event: reboot\ndata: {\"id\":\"x\"}\n\n"
 	f.server.commands <- killEvent("16fd2706-8baf-433b-82eb-8c7fada847da")
-	f.result(t)
+	if r := f.result(t); r.Type != protocol.ResultKill {
+		t.Errorf("first result %+v, want the kill's: nothing is posted for an unknown event", r)
+	}
 	if n := f.killer.count(); n != 1 {
 		t.Errorf("killer called %d times, want 1", n)
+	}
+}
+
+func pingEvent(id string) string {
+	return "event: ping\ndata: {\"id\":\"" + id + "\"}\n\n"
+}
+
+func TestAPingIsAnsweredWithAPongCarryingTheVersionAndRunsNoKill(t *testing.T) {
+	f := startClient(t)
+	waitConnections(t, f.server, 1)
+	f.server.commands <- pingEvent("p-1")
+	if r := f.result(t); r != (protocol.CommandResult{ID: "p-1", Type: protocol.ResultPong, Version: "1.2.3"}) {
+		t.Errorf("result %+v, want pong p-1 with version 1.2.3", r)
+	}
+	if n := f.killer.count(); n != 0 {
+		t.Errorf("killer called %d times, want 0 for a ping", n)
+	}
+}
+
+func TestAPingWithoutAnIDGetsNoPong(t *testing.T) {
+	f := startClient(t)
+	waitConnections(t, f.server, 1)
+	f.server.commands <- "event: ping\ndata: {}\n\n"
+	f.server.commands <- "event: ping\ndata: not json\n\n"
+	select {
+	case r := <-f.server.got:
+		t.Errorf("posted %+v, want nothing for a ping without an id", r)
+	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+func TestAPingDuringASlowKillIsAnsweredWithoutWaitingForIt(t *testing.T) {
+	server := newCommandServer(t)
+	const slow = "16fd2706-8baf-433b-82eb-8c7fada847da"
+	k := &blockingKiller{slowID: slow, release: make(chan struct{})}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	c := &CommandClient{Server: server.URL, Token: issuedToken, Client: &http.Client{}, Killer: k, Version: "1.2.3",
+		Backoff: &Backoff{Rand: func() float64 { return 0 }}, Log: slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
+		Sleep: func(ctx context.Context, d time.Duration) {}}
+	go c.Run(ctx)
+	waitConnections(t, server, 1)
+	// The kill waits for its zombies (up to 5 s in the agent) while the ping comes in.
+	server.commands <- killEvent(slow)
+	server.commands <- pingEvent("p-1")
+	select {
+	case r := <-server.got:
+		if r != (protocol.CommandResult{ID: "p-1", Type: protocol.ResultPong, Version: "1.2.3"}) {
+			t.Errorf("first result %+v, want the pong while the kill still runs", r)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("the ping waited for the kill")
+	}
+	close(k.release)
+	select {
+	case r := <-server.got:
+		if r.ID != slow || r.Type != protocol.ResultKill {
+			t.Errorf("second result %+v, want the kill's", r)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("the kill never answered")
 	}
 }
 

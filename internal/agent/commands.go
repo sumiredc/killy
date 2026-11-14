@@ -51,8 +51,10 @@ type CommandClient struct {
 	Server string
 	Token  string
 	// Client must have no overall timeout: the stream stays open for as long as it can.
-	Client  *http.Client
-	Killer  Killer
+	Client *http.Client
+	Killer Killer
+	// Version is sent with every pong: the agent's own version, set at build time.
+	Version string
 	Backoff *Backoff
 	Log     *slog.Logger
 	// Sleep waits between attempts; it returns early when ctx is done.
@@ -126,7 +128,8 @@ func (c *CommandClient) stream(ctx context.Context) error {
 		line := sc.Text()
 		switch {
 		case line == "":
-			if event == "kill" {
+			switch event {
+			case "kill":
 				var cmd protocol.KillCommand
 				if err := json.Unmarshal([]byte(data), &cmd); err != nil {
 					c.Log.Error("kill command", "err", err)
@@ -134,6 +137,14 @@ func (c *CommandClient) stream(ctx context.Context) error {
 					// Each kill runs on its own: one can wait up to 5 s for its zombies to go.
 					c.kills.Add(1)
 					go func() { defer c.kills.Done(); c.kill(ctx, cmd) }()
+				}
+			case "ping":
+				var p protocol.PingCommand
+				if err := json.Unmarshal([]byte(data), &p); err != nil || p.ID == "" {
+					c.Log.Error("ping without an id", "data", data)
+				} else {
+					// Not waited for when the agent stops: a pong from a stopping agent means nothing.
+					go c.pong(ctx, p.ID)
 				}
 			}
 			event, data = "", ""
@@ -157,6 +168,14 @@ func (c *CommandClient) kill(ctx context.Context, cmd protocol.KillCommand) {
 	// Posted even when the agent is stopping: the phone is waiting for this outcome.
 	if err := c.postResult(context.WithoutCancel(ctx), res); err != nil {
 		c.Log.Error("post kill result", "id", cmd.ID, "outcome", o.Outcome, "err", err)
+	}
+}
+
+// pong answers a connection check. It touches nothing on the server: no Killer, no /proc, no
+// record of outcomes.
+func (c *CommandClient) pong(ctx context.Context, id string) {
+	if err := c.postResult(ctx, protocol.CommandResult{ID: id, Type: protocol.ResultPong, Version: c.Version}); err != nil {
+		c.Log.Error("post pong", "id", id, "err", err)
 	}
 }
 

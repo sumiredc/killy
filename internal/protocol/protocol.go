@@ -80,6 +80,20 @@ const (
 	ResultPong = "pong"
 )
 
+// PingCommand asks an agent to answer with a pong (PingCommand in docs/openapi.yaml). The Killy
+// server chooses the ID.
+type PingCommand struct {
+	ID string `json:"id"`
+}
+
+// Results of a connection check (CheckResponse in docs/openapi.yaml). CheckAgentDisconnected is
+// the same string as ReasonAgentDisconnected but means the check, not a kill.
+const (
+	CheckOK                = "ok"
+	CheckAgentDisconnected = "agent_disconnected"
+	CheckNoResponse        = "no_response"
+)
+
 // Reasons for a refused kill.
 const (
 	ReasonPidfdUnavailable = "pidfd_unavailable"
