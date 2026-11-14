@@ -24,10 +24,12 @@ type Memory struct {
 	FailLink bool
 	// FailLinksOfDevice and FailDevicesOfAgent make those queries alone fail.
 	FailLinksOfDevice, FailDevicesOfAgent bool
-	agents                                []AgentRow
-	devices                               []DeviceRow
-	links                                 []LinkRow
-	detections                            map[string]map[store.ParentKey]time.Time
+	// FailLinkChanges makes UpdateLink and UnlinkDevice alone fail.
+	FailLinkChanges bool
+	agents          []AgentRow
+	devices         []DeviceRow
+	links           []LinkRow
+	detections      map[string]map[store.ParentKey]time.Time
 }
 
 // AgentRow is what the agents table would hold.
@@ -255,7 +257,66 @@ func (m *Memory) DevicesOfAgent(_ context.Context, agentID string) ([]string, er
 	return ids, nil
 }
 
-// SetLink changes a link's name and switch directly, standing in for the PATCH of a later issue.
+// UpdateLink changes this device's link only; a nil name or notify leaves that field as it is.
+func (m *Memory) UpdateLink(_ context.Context, deviceID, agentID string, name *string, notify *bool) (store.Link, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Err != nil {
+		return store.Link{}, m.Err
+	}
+	if m.FailLinkChanges {
+		return store.Link{}, errors.New("memstore: connection lost")
+	}
+	if err := uuidColumn(agentID); err != nil {
+		return store.Link{}, err
+	}
+	for i, l := range m.links {
+		if l.DeviceID == deviceID && l.AgentID == agentID {
+			if name != nil {
+				m.links[i].Name = *name
+			}
+			if notify != nil {
+				m.links[i].Notify = *notify
+			}
+			return store.Link{AgentID: agentID, Name: m.links[i].Name, Notify: m.links[i].Notify}, nil
+		}
+	}
+	return store.Link{}, store.ErrNotFound
+}
+
+// UnlinkDevice removes this device's link only.
+func (m *Memory) UnlinkDevice(_ context.Context, deviceID, agentID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.Err != nil {
+		return m.Err
+	}
+	if m.FailLinkChanges {
+		return errors.New("memstore: connection lost")
+	}
+	if err := uuidColumn(agentID); err != nil {
+		return err
+	}
+	for i, l := range m.links {
+		if l.DeviceID == deviceID && l.AgentID == agentID {
+			m.links = slices.Delete(m.links, i, i+1)
+			return nil
+		}
+	}
+	return store.ErrNotFound
+}
+
+// uuidColumn fails as PostgreSQL does when a value that is not a UUID is compared with a uuid
+// column, so a handler that passes an unchecked path id to the store fails here too.
+func uuidColumn(v string) error {
+	if _, err := uuid.Parse(v); err != nil {
+		return errors.New(`memstore: invalid input syntax for type uuid: "` + v + `"`)
+	}
+	return nil
+}
+
+// SetLink changes a link's name and switch directly, for tests that set a link up without going
+// through PATCH /app/v1/servers/{id}.
 func (m *Memory) SetLink(deviceID, agentID, name string, notify bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
