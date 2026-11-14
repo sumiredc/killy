@@ -106,8 +106,8 @@ func TestACheckWithoutAStreamIsAgentDisconnectedAndSendsNothing(t *testing.T) {
 	if r := f.checkNow(t, agentA); r != agentGone {
 		t.Errorf("result %+v, want agent_disconnected", r)
 	}
-	if n := len(f.timer); n != 0 {
-		t.Errorf("%d timers waiting, want none", n)
+	if n := f.timers.Load(); n != 0 {
+		t.Errorf("%d pings started waiting, want none", n)
 	}
 }
 
