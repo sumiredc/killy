@@ -16,6 +16,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/skip2/go-qrcode"
 )
 
 // DefaultConfigPath is where the agent keeps its token and the URL of its Killy server.
@@ -38,6 +40,24 @@ type PairOptions struct {
 	Server   string
 	Hostname string
 	Client   *http.Client
+	// RenderQR draws the QR code of content as text; nil means TerminalQR.
+	RenderQR func(content string) (string, error)
+}
+
+// TerminalQR draws a QR code with block characters, two rows of modules per line, so it fits a
+// terminal and a phone camera can read it off the screen.
+func TerminalQR(content string) (string, error) {
+	q, err := qrcode.New(content, qrcode.Medium)
+	if err != nil {
+		return "", err
+	}
+	return q.ToSmallString(false), nil
+}
+
+// pairURL is what the QR code carries: the code and the Killy server it belongs to, never the
+// token. url.Values percent-encodes the server, so a URL with & or ? in it stays one value.
+func pairURL(code, server string) string {
+	return "killy://pair?" + url.Values{"code": {code}, "server": {server}}.Encode()
 }
 
 type pairingResponse struct {
@@ -65,7 +85,7 @@ func Pair(ctx context.Context, opts PairOptions, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	printCode(out, resp)
+	printCode(out, resp, cfg.Server, opts.RenderQR)
 	return nil
 }
 
@@ -92,7 +112,7 @@ func firstPair(ctx context.Context, opts PairOptions, out io.Writer) error {
 	if err := pending.commit(Config{Server: server, Token: resp.AgentToken}); err != nil {
 		return err
 	}
-	printCode(out, resp)
+	printCode(out, resp, server, opts.RenderQR)
 	return nil
 }
 
@@ -138,9 +158,20 @@ func requestCode(ctx context.Context, opts PairOptions, server, token string) (p
 	return resp, nil
 }
 
-func printCode(out io.Writer, resp pairingResponse) {
+// printCode shows the code, its QR code, how long it lasts and the agent ID. server is the URL
+// saved in agent.json, which is also where the app must be pointed for the QR code to be taken.
+func printCode(out io.Writer, resp pairingResponse, server string, renderQR func(string) (string, error)) {
+	if renderQR == nil {
+		renderQR = TerminalQR
+	}
 	fmt.Fprintf(out, "Pairing code: %s\n", resp.Code)
-	fmt.Fprintln(out, "Enter it in the Killy app (Settings → Add server) within 10 minutes. It works once.")
+	if qr, err := renderQR(pairURL(resp.Code, server)); err != nil {
+		// The code is issued already and can be typed, so pairing still succeeds.
+		fmt.Fprintf(out, "(The QR code could not be made: %v. Type the code instead.)\n", err)
+	} else {
+		fmt.Fprint(out, qr)
+	}
+	fmt.Fprintln(out, "Enter it in the Killy app (Settings → Add server) within 10 minutes, or scan the QR code. It works once.")
 	fmt.Fprintf(out, "Agent ID: %s\n", resp.AgentID)
 }
 
