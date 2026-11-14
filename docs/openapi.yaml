@@ -532,7 +532,12 @@ components:
           pattern: '^[A-Z0-9]{6}$'
         name:
           type: string
-          description: Display name for this phone; the hostname is used when omitted
+          maxLength: 100
+          description: |
+            Display name for this phone; the hostname is used when omitted or
+            blank. Saved without leading and trailing spaces. The 100
+            characters are counted before trimming. A name containing U+0000
+            is refused (`invalid_request`).
 
     Server:
       type: object
@@ -583,7 +588,11 @@ components:
       properties:
         name:
           type: string
-          description: An empty name keeps the previous one
+          maxLength: 100
+          description: |
+            An empty or blank name keeps the previous one. Saved without
+            leading and trailing spaces. The 100 characters are counted before
+            trimming. A name containing U+0000 is refused (`invalid_request`).
         notify: { type: boolean }
 
     CheckResponse:
