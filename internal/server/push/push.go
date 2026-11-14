@@ -3,8 +3,10 @@ package push
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"sync"
 	"time"
 
@@ -220,6 +222,20 @@ func (n *Notifier) send(agentID string) {
 
 func (n *Notifier) sendBatch(agentID string, msgs []Message, pairs []pair) {
 	tickets, err := n.sender.Send(n.ctx, msgs)
+	// Expo refuses a whole request with 400 for what one message carries (a token of another Expo
+	// project, PUSH_TOO_MANY_EXPERIENCE_IDS), and anyone can register a token. Each message is then
+	// sent alone, so one device's token cannot stop the pushes to the others.
+	var refused *RequestError
+	if len(msgs) > 1 && errors.As(err, &refused) && refused.Status == http.StatusBadRequest {
+		n.log.Warn("expo refused the request; sending its messages one at a time", "agent", agentID, "messages", len(msgs))
+		for i := range msgs {
+			if n.ctx.Err() != nil {
+				return // stopping: the rest would only fail
+			}
+			n.sendBatch(agentID, msgs[i:i+1], pairs[i:i+1])
+		}
+		return
+	}
 	if err == nil && len(tickets) != len(msgs) {
 		// A ticket cannot be matched to its pair, so none of them can be said to be accepted.
 		err = fmt.Errorf("%d tickets for %d messages", len(tickets), len(msgs))

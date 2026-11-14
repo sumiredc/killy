@@ -11,7 +11,7 @@ Linux サーバーに新しいゾンビの親が現れたことを、app を閉�
 ## 保証しないこと
 
 - push receipt を取りに行くこと。receipt にだけ出る `DeviceNotRegistered` には気づかず、その push token には新しい親が現れるたびに送り続ける（#19 の決定）
-- 通知を必ず 1 回だけにすること。Expo Push Service が受け付けた直後、記録する前に Killy server が止まると、その 1 件は再起動の後にもう一度送られる（[PRD: Duplicates and identity](../../../docs/PRD.md#duplicates-and-identity) の例外）
+- 通知を必ず 1 回だけにすること。Expo Push Service が受け付けた直後、記録する前に Killy server が止まると、その 1 件は再起動の後にもう一度送られる。Expo が受け付けたのに応答が失われたか遅れたときは失敗として数えるので、最大 3 回まで送り直される（[PRD: Duplicates and identity](../../../docs/PRD.md#duplicates-and-identity) の例外。応答の喪失は #19 のレビューの後に sumire が足した）
 - 端末に実際に表示されること。Expo が受け付けた後の配信は APNs・FCM と OS が行う
 - 通知の文面を app の言語に合わせること。文面は DESIGN の 1 つの形（`zombie ×<n> on <server>`）で、Killy server は phone の言語を知らない
 - 通知をタップしたときに、その親を battle の先頭にすること。battle は全サーバーの 1 列で、最も古く検出された親から戦う（[PRD: Not guaranteed](../../../docs/PRD.md#not-guaranteed) の「Choosing which server to fight」）
@@ -51,7 +51,7 @@ Linux サーバーに新しいゾンビの親が現れたことを、app を閉�
 5. WHEN Killy server が再起動した後に、通知済みの親が報告される THEN Killy server SHALL その親を通知しない
 6. IF 送信が失敗した THEN Killy server SHALL 通知済みを記録せず、後の snapshot で送り直し、成功したら記録する
 7. IF 同じ親と device の組への送信が、最初の送信を含めて 4 回失敗した THEN Killy server SHALL それ以上送らず、通知済みとして記録する
-8. THE Killy server SHALL push ticket の `DeviceNotRegistered` 以外のエラーを、その組の失敗として数え、要求そのものの失敗（通信の失敗、4xx・5xx）を、その要求に入れたすべての組の失敗として数える
+8. THE Killy server SHALL push ticket の `DeviceNotRegistered` 以外のエラーを、その組の失敗として数え、要求そのものの失敗（通信の失敗、4xx・5xx）を、その要求に入れたすべての組の失敗として数える。ただし 2 件以上を入れた要求を Expo が `400` で拒んだときは、数える前に 1 件ずつ送り直す（1 台の device の push token がほかの device への通知を止めないため。#19 のレビューの後に sumire が決めた）
 9. IF push ticket が `DeviceNotRegistered` を返した THEN Killy server SHALL その device の push token を消し、以後その device に送らない。その組は通知済みにも失敗にも数えない
 10. WHEN push token を消した device が `PATCH /app/v1/devices/me` で push token を登録し直す THEN Killy server SHALL その device にまた送る
 11. THE Killy server SHALL 失敗の回数を親と device の組ごとにメモリで数え、親が snapshot から消えたらその親の回数を消す。再起動の後は 0 から数え、上限は再起動の後も働く

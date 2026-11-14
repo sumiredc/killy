@@ -792,3 +792,82 @@ func TestAParentWhoseRowsAreGoneBeforeTheSnapshotChangesIsNotSentAgain(t *testin
 		t.Errorf("%d pushes, want 1: a parent already notified was sent again from an older snapshot", n)
 	}
 }
+
+// refuseMixed answers as Expo does when one token in a request is from another Expo project: the
+// whole request is refused with 400, while that token alone gets a ticket.
+func refuseMixed(bad string) func([]push.Message) ([]push.Ticket, error) {
+	return func(msgs []push.Message) ([]push.Ticket, error) {
+		if len(msgs) > 1 {
+			for _, m := range msgs {
+				if m.To == bad {
+					return nil, &push.RequestError{Status: http.StatusBadRequest}
+				}
+			}
+		}
+		return tickets(msgs, func(m push.Message) push.Ticket {
+			if m.To == bad {
+				return ticketError("InvalidCredentials")
+			}
+			return ok
+		}), nil
+	}
+}
+
+func TestARequestRefusedWith400IsSentAgainOneMessageAtATime(t *testing.T) {
+	s := newTestServer(t)
+	agentToken, agentID, phoneA, phoneB := s.twoPhones(t)
+	s.patchDevice(t, phoneA, `{"push_token":"`+tokenA+`"}`)
+	s.patchDevice(t, phoneB, `{"push_token":"`+tokenB+`"}`)
+	s.sender.setAnswer(refuseMixed(tokenB))
+	s.report(t, agentToken, parent100)
+	rows := s.mem.Notified(agentID)
+	if len(rows) != 1 || rows[0].DeviceID != s.deviceRow(t, 0).ID {
+		t.Fatalf("notified %+v, want phone A: one bad token must not hold back the others", rows)
+	}
+	for range push.MaxAttempts {
+		s.report(t, agentToken, parent100)
+	}
+	if a := s.sender.sentTo(tokenA); a != 2 {
+		t.Errorf("phone A got %d messages, want 2: the refused request and its own one", a)
+	}
+	// The refused request counts against nobody: phone B fails 4 times on its own after it.
+	if b := s.sender.sentTo(tokenB); b != 1+push.MaxAttempts {
+		t.Errorf("phone B got %d messages, want %d", b, 1+push.MaxAttempts)
+	}
+	if n := len(s.mem.Notified(agentID)); n != 2 {
+		t.Errorf("%d notified rows, want phone B given up after its own failures too", n)
+	}
+}
+
+func TestOnlyA400IsSentAgainOneAtATime(t *testing.T) {
+	for _, status := range []int{http.StatusTooManyRequests, http.StatusInternalServerError} {
+		t.Run(fmt.Sprint(status), func(t *testing.T) {
+			s := newTestServer(t)
+			agentToken, agentID, phoneA, phoneB := s.twoPhones(t)
+			s.patchDevice(t, phoneA, `{"push_token":"`+tokenA+`"}`)
+			s.patchDevice(t, phoneB, `{"push_token":"`+tokenB+`"}`)
+			s.sender.setAnswer(func(msgs []push.Message) ([]push.Ticket, error) {
+				return nil, &push.RequestError{Status: status}
+			})
+			s.report(t, agentToken, parent100)
+			if n := len(s.sender.requests()); n != 1 {
+				t.Errorf("%d requests, want 1: only a refusal of the request's content is split", n)
+			}
+			if n := len(s.mem.Notified(agentID)); n != 0 {
+				t.Errorf("%d notified rows, want 0", n)
+			}
+		})
+	}
+}
+
+func TestASingleMessageRefusedWith400IsNotSentAgainAtOnce(t *testing.T) {
+	s := newTestServer(t)
+	agentToken, _, _ := s.withPush(t, "Prod web", tokenA)
+	s.sender.setAnswer(func(msgs []push.Message) ([]push.Ticket, error) {
+		return nil, &push.RequestError{Status: http.StatusBadRequest}
+	})
+	s.report(t, agentToken, parent100)
+	if n := len(s.sender.requests()); n != 1 {
+		t.Errorf("%d requests, want 1", n)
+	}
+}

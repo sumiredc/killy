@@ -41,7 +41,7 @@ Killy is our entry to the **Kiroween 2026** hackathon in the **Frankenstein** ca
 - If the parent is already gone when a kill arrives, or has already been killed and is waiting to be reaped, no signal is sent and the outcome is "already gone". Two kills of the same parent arriving together send one signal: the first is "killed", the other "already gone".
 - A pairing code can be used once and expires 10 minutes after it is shown.
 - A parent is identified by server, PID and process start time, so a reused PID is treated as a new parent.
-- The phone is notified once each time a parent starts holding zombies (per server, PID and start time), not on every report, and a restart of the Killy server does not repeat it. If the parent leaves the report (its zombies were reaped or it exited) and later holds zombies again with the same PID and start time, that is a new episode and is notified again. The one exception to "once": if the Killy server stops right after Expo Push Service accepts a push and before the server records it, that push is sent once more after the restart.
+- The phone is notified once each time a parent starts holding zombies (per server, PID and start time), not on every report, and a restart of the Killy server does not repeat it. If the parent leaves the report (its zombies were reaped or it exited) and later holds zombies again with the same PID and start time, that is a new episode and is notified again. The exceptions to "once": if Expo Push Service accepts a push but the Killy server does not learn of it (the server stops before recording it, or Expo's answer is lost or comes too late), that push may be sent again: once after a restart, and up to 3 more times when answers keep being lost.
 
 ### Consistency
 

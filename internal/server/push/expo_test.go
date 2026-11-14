@@ -3,6 +3,7 @@ package push
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -261,4 +262,16 @@ func (f roundTrip) RoundTrip(r *http.Request) (*http.Response, error) { return f
 
 func jsonResponse(status int, body string) *http.Response {
 	return &http.Response{StatusCode: status, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(body))}
+}
+
+func TestAnAnswerOtherThan200TellsItsStatus(t *testing.T) {
+	_, ts := newExpoServer(t, func(w http.ResponseWriter, _ []Message) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(w, `{"errors":[{"code":"PUSH_TOO_MANY_EXPERIENCE_IDS"}]}`)
+	})
+	_, err := (&Expo{URL: ts.URL}).Send(context.Background(), messages(2))
+	var re *RequestError
+	if !errors.As(err, &re) || re.Status != http.StatusBadRequest {
+		t.Errorf("error %v, want a RequestError with status 400", err)
+	}
 }
