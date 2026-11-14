@@ -243,6 +243,45 @@ describe('opening the app from a killy://pair link', () => {
     await waitFor(() => expect(screen.queryByTestId('add-server-sheet')).toBeNull());
   });
 
+  test('a link straight to Settings with a code in it opens nothing: only killy://pair is checked and taken', async () => {
+    const server = await startApp('/settings?pairCode=K7Q4XP');
+    expect(await screen.findByTestId('settings-screen')).toBeOnTheScreen();
+    await act(settle);
+    expect(screen.queryByTestId('add-server-sheet')).toBeNull();
+    expect(sentToServer(server)).toEqual([]);
+  });
+
+  test('a refused link keeps what is in the code field and shows why', async () => {
+    await startApp();
+    const sheet = await openAddSheet();
+    await fireEvent.changeText(sheet.getByLabelText('Pairing code'), 'ABC');
+    await act(async () => {
+      router.push(`/pair?code=K7Q4XP&server=${encodeURIComponent('https://evil.example')}`);
+      await settle();
+    });
+    const open = within(await screen.findByTestId('add-server-sheet'));
+    expect(open.getByLabelText('Pairing code')).toHaveDisplayValue('ABC');
+    expect(open.getByText(/This QR code is for another Killy server/)).toBeOnTheScreen();
+  });
+
+  test('a link that arrives while a server is being added is taken once that claim fails', async () => {
+    const server = await startApp();
+    const claim = server.hold('POST /app/v1/pairings/claim');
+    const sheet = await openAddSheet();
+    await fireEvent.changeText(sheet.getByLabelText('Pairing code'), 'ZZZZZZ');
+    await fireEvent.press(sheet.getByRole('button', { name: 'Add' }));
+    expect(await screen.findByText('Adding…')).toBeOnTheScreen();
+    await act(async () => {
+      router.push(`/pair?code=A1B2C3&server=${encodeURIComponent(appServer)}`);
+      await settle();
+    });
+    // The running claim is not interrupted.
+    expect(screen.getByText('Adding…')).toBeOnTheScreen();
+    await act(() => claim.resolve(404, { error: 'code_unknown' }));
+    const open = within(await screen.findByTestId('add-server-sheet'));
+    expect(open.getByLabelText('Pairing code')).toHaveDisplayValue('A1B2C3');
+  });
+
   test('the sheet does not open again by itself once it was closed', async () => {
     await startApp(`/pair?code=K7Q4XP&server=${encodeURIComponent(appServer)}`);
     const sheet = within(await screen.findByTestId('add-server-sheet'));

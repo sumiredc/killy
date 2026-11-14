@@ -7,6 +7,7 @@ import type { Key } from '@/i18n';
 import { useI18n } from '@/i18n/context';
 import { ClaimError, type ClaimErrorKind } from '@/killy/client';
 import { useKilly } from '@/killy/context';
+import type { PairLink } from '@/killy/pair-link';
 import { type PairCheck, parsePairURL } from '@/killy/pair-url';
 import { KText } from '@/theme/KText';
 import { colors, fonts, radii } from '@/theme/tokens';
@@ -47,23 +48,25 @@ export function cleanCode(text: string): string {
  * Adding a server is one path whatever the code came from (typed, a scanned QR code, a killy://pair
  * link): it goes into the code field and Add sends the claim, so a display name can still be given.
  */
-export function AddServerSheet({ onClose, initialCode, initialError }: { onClose: () => void; initialCode?: string; initialError?: Key }) {
+export function AddServerSheet({ onClose, link }: { onClose: () => void; link?: PairLink | null }) {
   const { t } = useI18n();
   const { client, registration } = useKilly();
   const appServer = useServerURL();
-  const [code, setCode] = useState(cleanCode(initialCode ?? ''));
+  const [code, setCode] = useState(link?.ok ? link.code : '');
   const [name, setName] = useState('');
-  const [phase, setPhase] = useState<Phase>({ kind: 'form', error: initialError ?? null });
+  const [phase, setPhase] = useState<Phase>({ kind: 'form', error: link && !link.ok ? pairLinkError(link.reason) : null });
   const [scanning, setScanning] = useState(false);
-  // A new killy://pair link while the sheet is open is taken in place: remounting would present a
-  // second Modal over this one, which iOS refuses, leaving the screen unresponsive.
-  const [link, setLink] = useState({ code: initialCode, error: initialError });
-  if (link.code !== initialCode || link.error !== initialError) {
-    setLink({ code: initialCode, error: initialError });
-    if ((initialCode !== undefined || initialError !== undefined) && phase.kind === 'form') {
-      setCode(cleanCode(initialCode ?? ''));
-      setPhase({ kind: 'form', error: initialError ?? null });
-      setScanning(false);
+  const [taken, setTaken] = useState<number | null>(link?.id ?? null);
+  // A link that comes while the sheet is open is taken in place, once the form is back if a claim
+  // is running: a second sheet over this one is refused by iOS. A refused link keeps the field.
+  if (link && link.id !== taken && phase.kind === 'form') {
+    setTaken(link.id);
+    setScanning(false);
+    if (link.ok) {
+      setCode(link.code);
+      setPhase({ kind: 'form', error: null });
+    } else {
+      setPhase({ kind: 'form', error: pairLinkError(link.reason) });
     }
   }
   const [, requestCameraPermission] = useCameraPermissions();

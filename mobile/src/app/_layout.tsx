@@ -14,6 +14,7 @@ import { ServerURLProvider } from '@/config-context';
 import { I18nProvider } from '@/i18n/context';
 import { BattleProvider } from '@/killy/battle-context';
 import { KillyProvider } from '@/killy/context';
+import { PairLinkProvider } from '@/killy/pair-link';
 import { colors, fonts } from '@/theme/tokens';
 
 SplashScreen.preventAutoHideAsync();
@@ -48,7 +49,9 @@ export default function RootLayout() {
           <I18nProvider>
             <KillyProvider>
               <BattleProvider>
-                <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+                <PairLinkProvider>
+                  <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+                </PairLinkProvider>
               </BattleProvider>
             </KillyProvider>
           </I18nProvider>
