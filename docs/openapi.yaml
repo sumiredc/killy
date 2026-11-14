@@ -303,6 +303,7 @@ paths:
               schema: { $ref: '#/components/schemas/CheckResponse' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/ServerNotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
 
   /app/v1/kills:
     post:

@@ -89,3 +89,25 @@ func (s *Server) writeLinkChangeError(w http.ResponseWriter, what, agentID strin
 	s.Log.Error(what, "agent", agentID, "err", err)
 	writeError(w, http.StatusServiceUnavailable, "unavailable")
 }
+
+// checkResponse is CheckResponse in docs/openapi.yaml: the result and, for ok, the agent's version.
+// Nothing about timing is measured or returned.
+type checkResponse struct {
+	Result  string `json:"result"`
+	Version string `json:"version,omitempty"`
+}
+
+// checkServer is the app's POST /app/v1/servers/{id}/check: a ping over the agent's command
+// stream, so a passing check means a kill can get through too.
+func (s *Server) checkServer(w http.ResponseWriter, r *http.Request) {
+	device, ok := s.authDevice(w, r)
+	if !ok {
+		return
+	}
+	agentID, ok := s.linkedServer(w, r, device.ID)
+	if !ok {
+		return
+	}
+	res := s.Commands.Check(r.Context(), agentID)
+	writeJSON(w, http.StatusOK, checkResponse{Result: res.Result, Version: res.Version})
+}
