@@ -37,7 +37,7 @@ func (s *Server) registerDevice(w http.ResponseWriter, r *http.Request) {
 	pushToken := ""
 	if req.PushToken != nil {
 		pushToken = *req.PushToken
-		if pushToken == "" || len(pushToken) > maxPushTokenLen {
+		if !validPushToken(pushToken) {
 			writeError(w, http.StatusBadRequest, "invalid_request")
 			return
 		}
@@ -170,4 +170,36 @@ func (s *Server) authDevice(w http.ResponseWriter, r *http.Request) (store.Devic
 		return store.Device{}, false
 	}
 	return device, true
+}
+
+// devicePatch is DevicePatch in docs/openapi.yaml; a missing or null field is left as it is.
+type devicePatch struct {
+	PushToken *string `json:"push_token"`
+	Notify    *bool   `json:"notify"`
+}
+
+// patchDevice is the app's PATCH /app/v1/devices/me: the push token and the app-wide switch.
+// It sends no new state (neither is in it) and no push: the next snapshot does that.
+func (s *Server) patchDevice(w http.ResponseWriter, r *http.Request) {
+	device, ok := s.authDevice(w, r)
+	if !ok {
+		return
+	}
+	var req devicePatch
+	if err := decodeJSON(w, r, &req); err != nil || (req.PushToken != nil && !validPushToken(*req.PushToken)) {
+		writeError(w, http.StatusBadRequest, "invalid_request")
+		return
+	}
+	if err := s.Store.UpdateDevice(r.Context(), device.ID, req.PushToken, req.Notify); err != nil {
+		s.Log.Error("update device", "device", device.ID, "err", err)
+		writeError(w, http.StatusServiceUnavailable, "unavailable")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// validPushToken is the rule for a push token wherever it comes in (registration and PATCH): not
+// empty, at most maxPushTokenLen bytes.
+func validPushToken(t string) bool {
+	return t != "" && len(t) <= maxPushTokenLen
 }

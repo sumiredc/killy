@@ -67,7 +67,7 @@ flowchart LR
 | 項目 | 選択 | 理由 |
 |---|---|---|
 | 起こし方 | `Wake(agentID)` は待たずに戻る。その agent の送り手が動いていなければ goroutine を 1 つ始め、動いていれば「もう一度」の印だけを付ける。送り手は印が無くなるまで、`Live.Agent(agentID)` の最新の親で 1 回ずつ送る | snapshot の応答を Expo で待たせない（#19 の完了条件 10）。同じ agent の 2 つの snapshot で同じ組を同時に送ると、記録する前に二度送るため、agent ごとに 1 つずつにする。合図を 1 つにまとめるのは `Broker` と同じ考え（どうせ最新の親を丸ごと見る） |
-| 送る相手 | `PushTargets(agentID)`（push token があり、`devices.notify` と `links.notify` が両方 true の device と、その device での表示名）から、`NotifiedOf(agentID)` にある組を除く | ARCHITECTURE Notifications の規則。後から紐付けた device と switch を on に戻した device は、まだ記録が無いので、次の snapshot で送られる（#19 の決定、Requirement 2.14） |
+| 送る相手 | `PushTargets(agentID)`（push token があり、`devices.notify` と `links.notify` が両方 true の device と、その device での表示名）から、`NotifyState(agentID)` の通知済みの組を除く。`NotifyState` に first_detections の行が無い親も、その回は送らない。DB を `Live.Agent` より先に読む | ARCHITECTURE Notifications の規則。後から紐付けた device と switch を on に戻した device は、まだ記録が無いので、次の snapshot で送られる（#19 の決定、Requirement 2.14）。snapshot の報告は DB を先に変え、その後で `Live` を変える。その間に読むと、消えた親の記録はもう無いのに、古い snapshot にはその親が残っていて、もう一度送ってしまう。その報告がもう一度起こすので、見落としは無い。DB を後に読むと、間に親が消えて戻ったとき、古い回をもう一度送る |
 | 文面 | `{"to": <push token>, "title": "Killy", "body": "zombie ×<n> on <name>\n……！"}`。`<n>` は送る時点のその親のゾンビの数。`data` は付けない | DESIGN: Push notification と killy-character.md（system-log の行の後に Killy の記号だけ）。タップは常に Battle タブを開くので、親を app に渡す必要が無い |
 | 音と優先度 | `"sound": "default"`、`"priority": "high"`（M2 の spec の確認で sumire が決めた） | 音が無いと iOS では鳴らずに届く。Android の既定の優先度（normal）は端末の省電力中に配信が遅れうるので、30 秒（PRD: Timeliness）を守りやすい high にする |
 | まとめ方 | 1 回の送信で、全部の組を 100 件ずつの配列にして送る。ticket は送った順に並んで返る | Expo の push API の上限は 1 要求 100 件で、`data` の ticket は送った順（[Expo: Sending notifications](https://docs.expo.dev/push-notifications/sending-notifications/)） |
@@ -88,13 +88,13 @@ type Sender interface {
 // Store is what the notifier reads and writes; *store.Store (PostgreSQL) in production.
 type Store interface {
 	PushTargets(ctx context.Context, agentID string) ([]store.PushTarget, error)
-	NotifiedOf(ctx context.Context, agentID string) ([]store.Notified, error)
+	NotifyState(ctx context.Context, agentID string) (store.NotifyState, error)
 	RecordNotified(ctx context.Context, agentID string, pairs []store.Notified) error
 	ClearPushToken(ctx context.Context, deviceID, pushToken string) error
 }
 ```
 
-`push.New(clock, store, live, sender, log)` を `cmd/killy/server.go` で作り、`Server.Pushes` に入れる。`live` は `Agent(agentID) (live.Agent, bool)` を持つ interface で受ける。
+`push.New(store, live, sender, log)` を `cmd/killy/server.go` で作り、`Server.Pushes` に入れる。`live` は `Agent(agentID) (live.Agent, bool)` を持つ interface で受ける。
 
 ### Store の追加（`internal/server/store`・`memstore`、Requirement 2）
 
@@ -121,8 +121,8 @@ erDiagram
 |---|---|
 | `UpdateDevice(ctx, deviceID, pushToken *string, notify *bool) error` | nil の欄は変えない。`pushToken` があれば、同じ transaction の中で、同じ push token を持つ別の device の `push_token` を NULL にする（Requirement 2.16）。`server.Store` に足す（M2 の spec の確認で sumire が決めた） |
 | `PushTargets(ctx, agentID) ([]store.PushTarget, error)` | `links` と `devices` を結び、`push_token IS NOT NULL AND devices.notify AND links.notify` の device の `{DeviceID, PushToken, Name}` を返す |
-| `NotifiedOf(ctx, agentID) ([]store.Notified, error)` | その agent の通知済みの `{Parent ParentKey, DeviceID}` を返す |
-| `RecordNotified(ctx, agentID, pairs) error` | 対応する first_detections と links の行がある組だけを入れ、すでにある組は何もしない（`ON CONFLICT DO NOTHING`）。送っている間に親が消えた、または紐付けが外れた組は、外部キーで失敗させずに捨てる |
+| `NotifyState(ctx, agentID) (store.NotifyState, error)` | その agent の first_detections の行（親ごとの最初の検出時刻）と、通知済みの `{Parent ParentKey, FirstDetectedAt, DeviceID}` を、1 つの文で読んで返す |
+| `RecordNotified(ctx, agentID, pairs) error` | 対応する first_detections（最初の検出時刻まで同じ）と links の行がある組だけを入れ、すでにある組は何もしない（`ON CONFLICT DO NOTHING`）。送っている間に親が消えた（消えて戻ったものも含む）、または紐付けが外れた組は、外部キーで失敗させずに捨てる。消えて戻った親の新しい回に、前の回の記録が付かないようにするため |
 | `ClearPushToken(ctx, deviceID, pushToken) error` | `push_token` が送った token と同じときだけ NULL にする。送っている間に app が登録し直した新しい token を消さないため |
 
 `memstore` にも同じ規則を入れる：`DeviceRow` に `Notify`（初期値 true）を足し、first_detections の行を消すときと、紐付けを消すとき（#16 で足す `UnlinkDevice`）に通知済みの行も消す。テストが記録を見るための `Notified()` を足す。
@@ -184,6 +184,7 @@ erDiagram
 | Expo への要求が失敗した（通信、4xx・5xx、10 秒） | 入れたすべての組の失敗として数え、記録しない。次の snapshot で送り直し、4 回目の失敗で通知済みとして諦める。ログに出す |
 | ticket が `DeviceNotRegistered` | その device の push token を、送った値と同じときだけ消す。app が次に起動して登録し直すまで送らない |
 | 通知済みを記録する DB の書き込みが失敗した | その組を、Expo が受け付けた組として `push.Notifier` のメモリに持ち、もう送らない。次に起こされたときに記録だけをやり直す。記録できる前に Killy server が止まると、再起動後に一度だけまた送られる（PRD の例外と同じ形）。ログに出す |
+| `DeviceNotRegistered` の push token を DB から消せない | その組の失敗として数える。消せないままだと同じ token に送り続けるため、4 回で諦める上限の内に収める |
 | 送る相手を DB から引けない | その回は何も送らない。次の snapshot で起こされたときにまた試す |
 | `PATCH /app/v1/devices/me` の DB の失敗 | `503`（`unavailable`）。app は switch を元に戻して理由を出す |
 | app が push token を取れない（許可が無い、シミュレーター、通信の失敗） | 送らない。battle とサーバーの追加はそのまま使える |
@@ -193,7 +194,7 @@ erDiagram
 
 - **書く順**：各 Acceptance Criteria のテストを先に書き、期待した理由の赤を確かめてから実装する
 - **DB**：テストは PostgreSQL を使わず、`internal/server/memstore` で書く。通知済みの外部キーの削除（first_detections と links）は memstore が同じ規則で持つ。`store` の SQL と migration は、手元（`make db-up`）で `killy server` を動かし、migration が流れること、通知済みの記録が再起動後も残ること、親が消えると消えることを確かめる（#19 の完了条件 12）
-- **Expo**：`push.Sender` の偽物が、受けた message を記録し、決めた ticket か要求の失敗を返し、止まったままにもなれる。止まった偽物で snapshot の応答が遅れないことを確かめる。`push.Expo` そのものは `httptest.Server` で、宛先・ヘッダ（`Authorization` の有無）・100 件ずつの分け方・ticket の対応を確かめる
+- **Expo**：`push.Sender` の偽物が、受けた message を記録し、決めた ticket か要求の失敗を返し、止まったままにもなれる。止まった偽物で snapshot の応答が遅れないことを確かめる。`push.Expo` そのものは `httptest.Server` で、宛先・ヘッダ（`Authorization` の有無）・100 件を超える要求を送らないこと・ticket の対応を確かめる。100 件ずつに分けるのは `push.Notifier` で、`push.Sender` の偽物で確かめる
 - **再起動**：同じ memstore に新しい `Server` と `push.Notifier` を作り直して、再起動に当てる（失敗の回数は消え、通知済みは残る）
 - **組み合わせ**：アプリ全体の switch・サーバーの switch（#16 で足す `UpdateLink`）・push token の有無の 8 通りを表で回す
 - **並行**：`go test -race ./...`

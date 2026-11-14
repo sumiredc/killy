@@ -19,6 +19,7 @@ import (
 	"github.com/sumiredc/killy/internal/server/command"
 	"github.com/sumiredc/killy/internal/server/live"
 	"github.com/sumiredc/killy/internal/server/pairing"
+	"github.com/sumiredc/killy/internal/server/push"
 	"github.com/sumiredc/killy/internal/server/ratelimit"
 	"github.com/sumiredc/killy/internal/server/sse"
 	"github.com/sumiredc/killy/internal/server/store"
@@ -50,6 +51,9 @@ func runServer(args []string, stderr io.Writer) int {
 
 	c := clock.System{}
 	st := store.New(pool)
+	lv := live.New(c, st)
+	pushes := push.New(st, lv, &push.Expo{AccessToken: os.Getenv("EXPO_ACCESS_TOKEN")}, log)
+	defer pushes.Close()
 	srv := &server.Server{
 		Store:               st,
 		Codes:               pairing.New(c),
@@ -58,8 +62,9 @@ func runServer(args []string, stderr io.Writer) int {
 		FailedClaims:        ratelimit.New(server.FailedClaimLimit, server.FailedClaimPeriod, c),
 		Kills:               ratelimit.New(server.KillLimit, server.KillPeriod, c),
 		Commands:            command.New(c, time.After),
-		Live:                live.New(c, st),
+		Live:                lv,
 		Broker:              sse.NewBroker(),
+		Pushes:              pushes,
 		Log:                 log,
 	}
 	go func() {
