@@ -34,7 +34,7 @@
   - [x] 2.7 `go vet ./...`・`go test -race ./...` と、app の型検査・lint・テストを通す
     - _Requirements: 2.4_
 
-- [ ] 3. killy agent pair の QR を app で読み取ってサーバーを追加する（#18。前提：#6、#12、#15、#38）
+- [x] 3. killy agent pair の QR を app で読み取ってサーバーを追加する（#18。前提：#6、#12、#15、#38）
   - [x] 3.1 （新規）`pairURL` と `killy agent pair` の QR のテスト（初回と `--server` を省いた 2 回目で、QR に渡す文字列が表示したコードと保存した URL を含む `killy://pair?…` になる・`server` が percent-encode される・token を含まない）を書き、赤を確かめる
     - _Requirements: 3.1, 3.2, 3.3_
   - [x] 3.2 `go.mod` に `github.com/skip2/go-qrcode` を足し、`RenderQR`・`TerminalQR`・`printCode` を実装して、テストを緑にする
@@ -45,7 +45,7 @@
     - _Requirements: 3.4, 3.5, 3.6, 3.7, 3.10, 3.11_
   - [x] 3.5 deep link のテスト（`/pair?…` で開くと 3.3 と同じ確認の後に Add server sheet が開いてコード欄にコードが入る・別の `server` では要求が送られない）を書き、赤を確かめてから `pair` の route を実装する。ARCHITECTURE と ARCHITECTURE.ja.md の Pairing の QR の項に deep link を書き足す
     - _Requirements: 3.9_
-  - [ ] 3.6 development build を作り直したことと、実機で端末に出た QR を app のカメラで読み取ってサーバーを追加したことと、OS のカメラで読み取って app が開いたことを PR 本文に書く
+  - [ ] 3.6 （#73 に移した）development build を作り直したことと、実機で端末に出た QR を app のカメラで読み取ってサーバーを追加したことと、OS のカメラで読み取って app が開いたことを PR 本文に書く
     - _Requirements: 3.4, 3.5, 3.9_
   - [x] 3.7 `go vet ./...`・`go test -race ./...` と、app の型検査・lint・テストを通す
     - _Requirements: 3.1, 3.5_
