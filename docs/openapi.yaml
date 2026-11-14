@@ -507,7 +507,11 @@ components:
       properties:
         push_token:
           type: string
-          description: Optional; a phone without notifications can still pair and fight
+          minLength: 1
+          maxLength: 512
+          description: >-
+            Optional; a phone without notifications can still pair and fight. At most 512
+            bytes; an empty or longer one is refused (`invalid_request`).
 
     DeviceResponse:
       type: object
@@ -518,7 +522,13 @@ components:
     DevicePatch:
       type: object
       properties:
-        push_token: { type: string }
+        push_token:
+          type: string
+          minLength: 1
+          maxLength: 512
+          description: >-
+            The same rule as at registration: at most 512 bytes; an empty or longer one is
+            refused (`invalid_request`). A token another device had moves to this device.
         notify:
           type: boolean
           description: App-wide notification switch
