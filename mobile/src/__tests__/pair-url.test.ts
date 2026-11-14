@@ -12,6 +12,8 @@ describe('parsePairURL', () => {
     ['the QR of killy agent pair', qr('K7Q4XP', app)],
     ['the server and code in the other order', `killy://pair?server=${enc(app)}&code=K7Q4XP`],
     ['another parameter next to them', `${qr('K7Q4XP', app)}&v=2`],
+    ['a parameter named like a key every object has (constructor)', `${qr('K7Q4XP', app)}&constructor=x`],
+    ['a parameter named __proto__', `${qr('K7Q4XP', app)}&__proto__=x`],
   ])('accepts %s', (_, text) => {
     expect(parsePairURL(text, app)).toEqual({ ok: true, code: 'K7Q4XP' });
   });
@@ -39,6 +41,7 @@ describe('parsePairURL', () => {
     ['a broken percent escape', 'killy://pair?code=K7Q4XP&server=%E0%A4%A'],
     ['a broken percent escape in another parameter', `${qr('K7Q4XP', app)}&v=%E0%A4%A`],
     ['a fragment', `${qr('K7Q4XP', app)}#x`],
+    ['only a key every object has', `killy://pair?toString=x`],
   ])('refuses %s as invalid', (_, text) => {
     expect(parsePairURL(text, app)).toEqual({ ok: false, reason: 'invalid' });
   });

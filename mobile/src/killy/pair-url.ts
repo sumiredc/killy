@@ -18,7 +18,8 @@ export function parsePairURL(text: string, appServer: string): PairCheck {
   if (!text.startsWith(prefix) || text.includes('#')) {
     return invalid;
   }
-  const params: Record<string, string[]> = {};
+  // A Map, not an object: a key such as constructor or __proto__ must be just another key.
+  const params = new Map<string, string[]>();
   for (const pair of text.slice(prefix.length).split('&')) {
     const eq = pair.indexOf('=');
     const key = decode(eq < 0 ? pair : pair.slice(0, eq));
@@ -26,9 +27,9 @@ export function parsePairURL(text: string, appServer: string): PairCheck {
     if (key === null || value === null) {
       return invalid;
     }
-    (params[key] ??= []).push(value);
+    params.set(key, [...(params.get(key) ?? []), value]);
   }
-  return checkPairParams(params, appServer);
+  return checkPairParams({ code: params.get('code'), server: params.get('server') }, appServer);
 }
 
 /** The same checks for the params expo-router hands to the pair route, already decoded. */
