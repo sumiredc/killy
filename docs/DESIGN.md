@@ -116,7 +116,7 @@ Display name input; group with Hostname (ホスト名; mono, read-only: the host
 
 Connection results: checking (spinner + "エージェントに問い合わせています…"), OK (`green`, ✓, agent version), failure (light red, `!`, the message for the failing part as listed in PRD UC4).
 
-The notification switch is saved as soon as it is flipped and cannot be flipped again until the Killy server answers. The display name is saved when "完了" is pressed, only if it is not empty after trimming and differs from the current name; otherwise "完了" just closes. The sheet closes once the name or the removal is saved. When a change cannot be saved (no answer, or an error), the sheet stays open and a `red` line under the name field, the switch or the remove button gives the reason; the switch goes back to the value the Killy server has (not in the mock).
+The notification switch is saved as soon as it is flipped. While a change is on its way, nothing else in the sheet can be changed and the sheet cannot be closed, until the Killy server answers. The display name is saved when "完了" is pressed, only if it is not empty after trimming and differs from the current name; otherwise "完了" just closes. The sheet closes once the name or the removal is saved. When a change cannot be saved (no answer, or an error), the sheet stays open and a `red` line under the name field, the switch or the remove button gives the reason; the switch goes back to the value the Killy server has (not in the mock).
 
 ### When the Killy server cannot be reached
 

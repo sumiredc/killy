@@ -310,6 +310,28 @@ describe('the sheet cannot be closed while a change is being sent, so its failur
     expect(sheet.getByRole('button', { name: 'Done' })).toBeEnabled();
   });
 
+  test.each([
+    ['the name', 'PATCH /app/v1/servers/a1'],
+    ['the switch', 'PATCH /app/v1/servers/a1'],
+    ['Remove', 'DELETE /app/v1/servers/a1'],
+  ] as const)('while %s is being sent, no other change can start, so a save that closes the sheet loses nothing', async (control, route) => {
+    const { server } = await startWith([web]);
+    server.hold(route);
+    const sheet = await openSheet('Prod web');
+    if (control === 'the name') {
+      await fireEvent.changeText(sheet.getByLabelText('Display name'), 'Renamed');
+      await fireEvent.press(sheet.getByRole('button', { name: 'Done' }));
+    } else if (control === 'the switch') {
+      await fireEvent(sheet.getByRole('switch'), 'valueChange', false);
+    } else {
+      await fireEvent.press(sheet.getByRole('button', { name: 'Remove this server' }));
+      await fireEvent.press(sheet.getByRole('button', { name: 'Tap again to remove' }));
+    }
+    expect(sheet.getByRole('switch')).toBeDisabled();
+    expect(sheet.getByRole('button', { name: /^(Remove this server|Tap again to remove)$/ })).toBeDisabled();
+    expect(sheet.getByRole('button', { name: 'Done' })).toBeDisabled();
+  });
+
   test('Back closes the sheet when nothing is being sent', async () => {
     await startWith([web]);
     await openSheet('Prod web');

@@ -39,7 +39,8 @@ export function ServerSheet({ server, onClose }: { server: ServerState; onClose:
   const [removing, setRemoving] = useState(false);
   const [removeError, setRemoveError] = useState<Key | null>(null);
   const mounted = useRef(true);
-  // While a change is on its way the sheet stays open, so a failure has a place to show.
+  // While a change is on its way the sheet stays open and no other change can start, so a failure
+  // has a place to show and a save that closes the sheet leaves nothing behind.
   const sending = saving || notifySending || removing;
   const close = () => {
     if (!sending) onClose();
@@ -142,8 +143,8 @@ export function ServerSheet({ server, onClose }: { server: ServerState; onClose:
                 accessibilityLabel={t('notifyServer')}
                 value={notifySent ?? server.notify}
                 onValueChange={(v) => void toggleNotify(v)}
-                disabled={notifySending}
-                accessibilityState={{ disabled: notifySending }}
+                disabled={sending}
+                accessibilityState={{ disabled: sending }}
                 trackColor={{ false: colors.elev3, true: colors.purple }}
                 thumbColor="#FFFFFF"
                 ios_backgroundColor={colors.elev3}
@@ -155,7 +156,7 @@ export function ServerSheet({ server, onClose }: { server: ServerState; onClose:
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t(confirming ? 'removeConfirm' : 'remove')}
-            disabled={removing}
+            disabled={sending}
             onPress={() => void remove()}
             style={[styles.danger, confirming && styles.dangerConfirm]}>
             <KText style={[styles.dangerLabel, confirming && styles.dangerConfirmLabel]}>{t(confirming ? 'removeConfirm' : 'remove')}</KText>
