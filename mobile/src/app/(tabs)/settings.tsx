@@ -1,9 +1,11 @@
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AddServerSheet } from '@/components/AddServerSheet';
+import { AddServerSheet, pairLinkError } from '@/components/AddServerSheet';
 import { ServerSheet } from '@/components/ServerSheet';
+import type { Key } from '@/i18n';
 import { useI18n } from '@/i18n/context';
 import { useKilly } from '@/killy/context';
 import { serverRow } from '@/killy/server-row';
@@ -16,6 +18,16 @@ export default function SettingsScreen() {
   const { state } = useKilly();
   const [adding, setAdding] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  // Set by the pair route (a killy://pair link) to open the Add server sheet; cleared on close so
+  // it does not open again.
+  const { pairCode, pairError } = useLocalSearchParams<{ pairCode?: string; pairError?: string }>();
+  const linkError: Key | undefined =
+    pairError === 'other_server' || pairError === 'invalid' ? pairLinkError(pairError) : pairError !== undefined ? 'qrInvalid' : undefined;
+  const fromLink = pairCode !== undefined || pairError !== undefined;
+  const closeAdd = () => {
+    setAdding(false);
+    if (fromLink) router.setParams({ pairCode: undefined, pairError: undefined });
+  };
   const servers = state?.servers ?? [];
   // Looked up in every state, so the sheet shows the latest values and closes once the server is gone.
   const open = servers.find((s) => s.id === openId);
@@ -70,7 +82,7 @@ export default function SettingsScreen() {
           <KText style={styles.addButtonText}>{t('addServer')}</KText>
         </Pressable>
       </ScrollView>
-      {adding && <AddServerSheet onClose={() => setAdding(false)} />}
+      {(adding || fromLink) && <AddServerSheet onClose={closeAdd} initialCode={pairCode} initialError={linkError} />}
       {open !== undefined && <ServerSheet server={open} onClose={() => setOpenId(null)} />}
     </SafeAreaView>
   );

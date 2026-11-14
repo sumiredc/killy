@@ -108,7 +108,7 @@ When the OS blocks notifications for Killy, the app Notifications row shows "OS 
 4. Actions: "キャンセル" (text) and "追加する" (primary, enabled at 6 characters).
 5. Below the form: secondary button "デモサーバーを試す" / "Try the demo server", which adds the public demo server without a code (not in the mock). When no demo server is configured, the error box shows "デモサーバーは今使えません" / "The demo server is not available right now".
 
-States: waiting (spinner, "追加しています…" / "Adding…"), added (Killy with 🤍, "‹name› を追加しました", closes after ~1.3 s), error (red box above the actions with the reason and what to do: unknown, used or expired code; QR code for another Killy server; too many attempts, wait and try again; Killy server unreachable).
+States: waiting (spinner, "追加しています…" / "Adding…"), added (Killy with 🤍, "‹name› を追加しました", closes after ~1.3 s), error (red box above the actions with the reason and what to do: unknown, used or expired code; QR code for another Killy server; too many attempts, wait and try again; Killy server unreachable). A QR code or `killy://pair` link that is not a Killy pairing code, and a camera the OS does not allow, show in the same box; with no camera the code can still be typed (not in the mock).
 
 ### Server sheet
 

@@ -85,7 +85,7 @@ The agent needs permission to signal other users' processes: run it as root unde
 - **Later runs**: the same request with the agent token creates a new code for the same agent. No code is issued for an existing agent without its token.
 - **Claim**: a claim succeeds as soon as the code is valid; it does not wait for the agent. Without a display name, the hostname sent at registration is used.
 - **Links**: the display name and the per-server notification switch belong to the link between one device and one agent, so a change on one phone does not affect another.
-- **QR**: the app connects only to the Killy server it was built for. The `server` in a QR code must match it; otherwise the app shows an error and sends nothing, so a QR code cannot make the app send its device token elsewhere.
+- **QR**: the app connects only to the Killy server it was built for. The `server` in a QR code must match it; otherwise the app shows an error and sends nothing, so a QR code cannot make the app send its device token elsewhere. The match ignores the case of the scheme and host, a default port and a trailing `/`. A scanned code only fills the code field; the claim is sent by Add, as for a typed code. The app also opens from a `killy://pair?…` link (the phone's own camera reading the QR code); the link gets the same checks, then the Add server sheet opens with the code in its field. Any other `killy://` link is not handled.
 
 #### Rate limits
 
