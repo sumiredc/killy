@@ -4,16 +4,16 @@
 
 順序は #65 → #19 → #20。#21 の前提は #11 だけなので、#19・#20 と並行して進められる。Settings の App のグループと `mobile/src/prefs.ts` は、#20 と #21 の先に着手したほうが作る。
 
-- [ ] 1. EAS の project と push の認証情報を用意する（#65。前提：#11）
-  - [ ] 1.1 （sumire）`mobile/` で `eas init` を実行し、`extra.eas.projectId` を `app.json` に入れる。`npx expo config --type public` の出力にその値が出ることを PR 本文に書く
+- [x] 1. EAS の project と push の認証情報を用意する（#65。前提：#11）
+  - [x] 1.1 （sumire）`mobile/` で `eas init` を実行し、`extra.eas.projectId` を `app.json` に入れる。`npx expo config --type public` の出力にその値が出ることを PR 本文に書く
     - _Requirements: 1.1_
-  - [ ] 1.2 （sumire）APNs の key と FCM V1 の認証情報を `eas credentials` で EAS に登録し、値を伏せて #65 にコメントする。FCM の service account の JSON は手元から消すか `mobile/` の外に置く
+  - [x] 1.2 （sumire）APNs の key と FCM V1 の認証情報を `eas credentials` で EAS に登録し、値を伏せて #65 にコメントする。FCM の service account の JSON は手元から消すか `mobile/` の外に置く
     - _Requirements: 1.2, 1.5_
-  - [ ] 1.3 `app.json` の `android.googleServicesFile` から `google-services.json` を読めるようにし、リポジトリに入れるかを決めて PR 本文に書く。入れないときは、development build を作る人がどこから受け取るかを書く
+  - [x] 1.3 `app.json` の `android.googleServicesFile` から `google-services.json` を読めるようにし、リポジトリに入れるかを決めて PR 本文に書く。入れないときは、development build を作る人がどこから受け取るかを書く
     - _Requirements: 1.3_
-  - [ ] 1.4 `npx expo prebuild --clean` で development build を作り直し、iOS と Android で起動して 2 タブを切り替えられたことを PR 本文に書く
+  - [x] 1.4 `npx expo prebuild --clean` で development build を作り直し、iOS と Android で起動して 2 タブを切り替えられたことを PR 本文に書く
     - _Requirements: 1.4_
-  - [ ] 1.5 `git status` で `ios/`・`android/` と認証情報のファイルが入っていないことを確かめ、型検査・lint・テストを通す
+  - [x] 1.5 `git status` で `ios/`・`android/` と認証情報のファイルが入っていないことを確かめ、型検査・lint・テストを通す
     - _Requirements: 1.5, 1.6_
 
 - [ ] 2. Killy server が新しいゾンビの親を、親ごとに 1 回だけ push で通知する（#19。前提：#16。#15・#38・#39・#43 は済み）
