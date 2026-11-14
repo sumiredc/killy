@@ -1,0 +1,5 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "killy agent pair が表示する QR コードを読み取るために、カメラを使います。"
+  }
+}
