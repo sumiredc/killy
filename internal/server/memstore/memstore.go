@@ -28,18 +28,21 @@ type Memory struct {
 	FailLinkChanges bool
 	// FailUpdateDevice makes UpdateDevice alone fail.
 	FailUpdateDevice bool
-	// FailRecordNotified makes RecordNotified alone fail.
-	FailRecordNotified bool
-	agents             []AgentRow
-	devices            []DeviceRow
-	links              []LinkRow
-	detections         map[string]map[store.ParentKey]time.Time
+	// FailPushTargets, FailRecordNotified and FailClearPushToken make those calls alone fail.
+	FailPushTargets, FailRecordNotified, FailClearPushToken bool
+	// BeforeNotifiedOf, when set, runs at the start of every NotifiedOf call, outside the lock, so a
+	// test can change the store while a send is reading it.
+	BeforeNotifiedOf func()
+	agents           []AgentRow
+	devices          []DeviceRow
+	links            []LinkRow
+	detections       map[string]map[store.ParentKey]time.Time
 	// notified holds the notified_parents rows.
-	notified []NotifiedRow
+	notified []notifiedRow
 }
 
-// NotifiedRow is what the notified_parents table would hold.
-type NotifiedRow struct {
+// notifiedRow is what the notified_parents table would hold.
+type notifiedRow struct {
 	AgentID  string
 	Parent   store.ParentKey
 	DeviceID string
@@ -112,7 +115,7 @@ func (m *Memory) SyncFirstDetections(_ context.Context, agentID string, parents 
 	}
 	m.detections[agentID] = next
 	// ON DELETE CASCADE from first_detections.
-	m.notified = slices.DeleteFunc(m.notified, func(n NotifiedRow) bool {
+	m.notified = slices.DeleteFunc(m.notified, func(n notifiedRow) bool {
 		_, kept := next[n.Parent]
 		return n.AgentID == agentID && !kept
 	})
@@ -321,7 +324,7 @@ func (m *Memory) UnlinkDevice(_ context.Context, deviceID, agentID string) error
 		if l.DeviceID == deviceID && l.AgentID == agentID {
 			m.links = slices.Delete(m.links, i, i+1)
 			// ON DELETE CASCADE from links.
-			m.notified = slices.DeleteFunc(m.notified, func(n NotifiedRow) bool { return n.DeviceID == deviceID && n.AgentID == agentID })
+			m.notified = slices.DeleteFunc(m.notified, func(n notifiedRow) bool { return n.DeviceID == deviceID && n.AgentID == agentID })
 			return nil
 		}
 	}
@@ -382,6 +385,9 @@ func (m *Memory) PushTargets(_ context.Context, agentID string) ([]store.PushTar
 	if m.Err != nil {
 		return nil, m.Err
 	}
+	if m.FailPushTargets {
+		return nil, errors.New("memstore: connection lost")
+	}
 	var targets []store.PushTarget
 	for _, l := range m.links {
 		if l.AgentID != agentID || !l.Notify {
@@ -397,6 +403,9 @@ func (m *Memory) PushTargets(_ context.Context, agentID string) ([]store.PushTar
 }
 
 func (m *Memory) NotifiedOf(_ context.Context, agentID string) ([]store.Notified, error) {
+	if m.BeforeNotifiedOf != nil {
+		m.BeforeNotifiedOf()
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.Err != nil {
@@ -409,7 +418,8 @@ func (m *Memory) notifiedOf(agentID string) []store.Notified {
 	var out []store.Notified
 	for _, n := range m.notified {
 		if n.AgentID == agentID {
-			out = append(out, store.Notified{Parent: n.Parent, DeviceID: n.DeviceID})
+			// The SQL joins first_detections for the time; a row without one is gone by the cascade.
+			out = append(out, store.Notified{Parent: n.Parent, FirstDetectedAt: m.detections[agentID][n.Parent], DeviceID: n.DeviceID})
 		}
 	}
 	return out
@@ -427,13 +437,13 @@ func (m *Memory) RecordNotified(_ context.Context, agentID string, pairs []store
 	for _, p := range pairs {
 		// Only pairs whose parent and link still exist, as the SQL does instead of failing on the
 		// foreign keys; a pair already there is left as it is.
-		if _, ok := m.detections[agentID][p.Parent]; !ok {
+		if at, ok := m.detections[agentID][p.Parent]; !ok || !at.Equal(p.FirstDetectedAt) {
 			continue
 		}
 		if !slices.ContainsFunc(m.links, func(l LinkRow) bool { return l.DeviceID == p.DeviceID && l.AgentID == agentID }) {
 			continue
 		}
-		row := NotifiedRow{AgentID: agentID, Parent: p.Parent, DeviceID: p.DeviceID}
+		row := notifiedRow{AgentID: agentID, Parent: p.Parent, DeviceID: p.DeviceID}
 		if !slices.Contains(m.notified, row) {
 			m.notified = append(m.notified, row)
 		}
@@ -446,6 +456,9 @@ func (m *Memory) ClearPushToken(_ context.Context, deviceID, pushToken string) e
 	defer m.mu.Unlock()
 	if m.Err != nil {
 		return m.Err
+	}
+	if m.FailClearPushToken {
+		return errors.New("memstore: connection lost")
 	}
 	for i, d := range m.devices {
 		if d.ID == deviceID && d.PushToken == pushToken {

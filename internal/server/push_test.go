@@ -143,6 +143,9 @@ func TestARestartedServerDoesNotNotifyAgain(t *testing.T) {
 	s := newTestServer(t)
 	agentToken, _, _ := s.withPush(t, "Prod web", tokenA)
 	s.report(t, agentToken, parent100)
+	if n := s.sender.sentTo(tokenA); n != 1 {
+		t.Fatalf("%d pushes before the restart, want 1", n)
+	}
 	again := newTestServerOn(t, s.mem)
 	again.report(t, agentToken, parent100)
 	if n := again.sender.sentTo(tokenA); n != 0 {
@@ -643,5 +646,128 @@ func TestAPairWhoseParentLeavesWhileSendingIsNotRecorded(t *testing.T) {
 	release()
 	if rows := s.mem.Notified(agentID); len(rows) != 0 {
 		t.Errorf("notified %+v, want none: the parent was gone when Expo answered", rows)
+	}
+}
+
+func TestAParentThatLeavesAndComesBackWhileSendingIsNotifiedForTheNewEpisode(t *testing.T) {
+	s := newTestServer(t)
+	agentToken, _, _ := s.withPush(t, "Prod web", tokenA)
+	release := s.holdSends(t)
+	s.postAndWaitForSend(t, agentToken, parent100)
+	s.scans++
+	s.postSnapshot(t, agentToken, snapshotJSON(t0.Add(time.Duration(s.scans)*time.Second), ""))
+	s.clock.Advance(time.Second) // the parent comes back later, with a new first-detection time
+	s.scans++
+	s.postSnapshot(t, agentToken, snapshotJSON(t0.Add(time.Duration(s.scans)*time.Second), parent100))
+	release()
+	if n := s.sender.sentTo(tokenA); n != 2 {
+		t.Errorf("%d pushes, want 2: the record of the first episode must not land on the second", n)
+	}
+}
+
+func TestAParentThatLeavesWhileTheNotifierReadsTheStoreIsNotSentAgain(t *testing.T) {
+	s := newTestServer(t)
+	agentToken, _, _ := s.withPush(t, "Prod web", tokenA)
+	s.report(t, agentToken, parent100)
+	var once sync.Once
+	s.mem.BeforeNotifiedOf = func() {
+		once.Do(func() {
+			// The parent leaves, taking its notified rows with it, while the notifier is reading.
+			s.scans++
+			s.postSnapshot(t, agentToken, snapshotJSON(t0.Add(time.Duration(s.scans)*time.Second), ""))
+		})
+	}
+	s.report(t, agentToken, parent100)
+	if n := s.sender.sentTo(tokenA); n != 1 {
+		t.Errorf("%d pushes, want 1: a parent already notified was sent again from an older snapshot", n)
+	}
+}
+
+func TestATicketErrorCountsTowardsTheFourAttempts(t *testing.T) {
+	s := newTestServer(t)
+	agentToken, agentID, _ := s.withPush(t, "Prod web", tokenA)
+	s.sender.setAnswer(func(msgs []push.Message) ([]push.Ticket, error) {
+		return tickets(msgs, func(push.Message) push.Ticket { return ticketError("MessageRateExceeded") }), nil
+	})
+	for range push.MaxAttempts + 2 {
+		s.report(t, agentToken, parent100)
+	}
+	if n := s.sender.sentTo(tokenA); n != push.MaxAttempts {
+		t.Errorf("%d pushes, want %d", n, push.MaxAttempts)
+	}
+	if n := len(s.mem.Notified(agentID)); n != 1 {
+		t.Errorf("%d notified rows, want the pair given up and recorded", n)
+	}
+}
+
+func TestDeviceNotRegisteredIsNotCountedAsAFailure(t *testing.T) {
+	s := newTestServer(t)
+	agentToken, agentID, device := s.withPush(t, "Prod web", tokenA)
+	s.sender.setAnswer(func(msgs []push.Message) ([]push.Ticket, error) {
+		return tickets(msgs, func(push.Message) push.Ticket { return ticketError(push.DeviceNotRegistered) }), nil
+	})
+	for range push.MaxAttempts + 1 {
+		s.patchDevice(t, device, `{"push_token":"`+tokenA+`"}`)
+		s.report(t, agentToken, parent100)
+	}
+	if n := s.sender.sentTo(tokenA); n != push.MaxAttempts+1 {
+		t.Errorf("%d pushes, want %d: one each time the token was registered again", n, push.MaxAttempts+1)
+	}
+	if n := len(s.mem.Notified(agentID)); n != 0 {
+		t.Errorf("%d notified rows, want 0", n)
+	}
+}
+
+func TestAPushTokenThatCannotBeClearedIsSentToAtMostFourTimes(t *testing.T) {
+	s := newTestServer(t)
+	agentToken, agentID, _ := s.withPush(t, "Prod web", tokenA)
+	s.mem.FailClearPushToken = true
+	s.sender.setAnswer(func(msgs []push.Message) ([]push.Ticket, error) {
+		return tickets(msgs, func(push.Message) push.Ticket { return ticketError(push.DeviceNotRegistered) }), nil
+	})
+	for range push.MaxAttempts + 2 {
+		s.report(t, agentToken, parent100)
+	}
+	if n := s.sender.sentTo(tokenA); n != push.MaxAttempts {
+		t.Errorf("%d pushes, want %d: resends stay bounded", n, push.MaxAttempts)
+	}
+	if n := len(s.mem.Notified(agentID)); n != 1 {
+		t.Errorf("%d notified rows, want the pair given up and recorded", n)
+	}
+}
+
+func TestNothingIsSentWhenThePushTargetsCannotBeRead(t *testing.T) {
+	s := newTestServer(t)
+	agentToken, _, _ := s.withPush(t, "Prod web", tokenA)
+	s.mem.FailPushTargets = true
+	s.report(t, agentToken, parent100)
+	if n := s.sender.sentTo(tokenA); n != 0 {
+		t.Fatalf("%d pushes, want 0", n)
+	}
+	s.mem.FailPushTargets = false
+	s.report(t, agentToken, parent100)
+	if n := s.sender.sentTo(tokenA); n != 1 {
+		t.Errorf("%d pushes, want 1 once the store answers", n)
+	}
+}
+
+func TestAfterARestartTheFailuresAreCountedAgainAndTheLimitStillHolds(t *testing.T) {
+	s := newTestServer(t)
+	agentToken, agentID, _ := s.withPush(t, "Prod web", tokenA)
+	s.sender.setAnswer(failAll)
+	for range push.MaxAttempts - 1 {
+		s.report(t, agentToken, parent100)
+	}
+	again := newTestServerOn(t, s.mem)
+	again.scans = s.scans
+	again.sender.setAnswer(failAll)
+	for range push.MaxAttempts + 1 {
+		again.report(t, agentToken, parent100)
+	}
+	if n := again.sender.sentTo(tokenA); n != push.MaxAttempts {
+		t.Errorf("%d pushes after the restart, want %d: counting starts again and stops at the limit", n, push.MaxAttempts)
+	}
+	if n := len(again.mem.Notified(agentID)); n != 1 {
+		t.Errorf("%d notified rows, want the pair given up and recorded", n)
 	}
 }

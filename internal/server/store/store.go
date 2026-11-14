@@ -318,10 +318,12 @@ type PushTarget struct {
 	Name      string
 }
 
-// Notified is one parent a device was already notified of.
+// Notified is one parent a device was already notified of. FirstDetectedAt is the parent's
+// first-detection time, so a record meant for one episode of a parent cannot land on the next.
 type Notified struct {
-	Parent   ParentKey
-	DeviceID string
+	Parent          ParentKey
+	FirstDetectedAt time.Time
+	DeviceID        string
 }
 
 // PushTargets returns the devices linked to the agent that have a push token and both the
@@ -349,8 +351,11 @@ func (s *Store) PushTargets(ctx context.Context, agentID string) ([]PushTarget, 
 
 // NotifiedOf returns the agent's parents each device was already notified of.
 func (s *Store) NotifiedOf(ctx context.Context, agentID string) ([]Notified, error) {
-	rows, err := s.pool.Query(ctx,
-		"SELECT pid, starttime, device_id::text FROM notified_parents WHERE agent_id = $1", agentID)
+	rows, err := s.pool.Query(ctx, `
+		SELECT n.pid, n.starttime, f.detected_at, n.device_id::text
+		FROM notified_parents n
+		JOIN first_detections f ON f.agent_id = n.agent_id AND f.pid = n.pid AND f.starttime = n.starttime
+		WHERE n.agent_id = $1`, agentID)
 	if err != nil {
 		return nil, fmt.Errorf("list notified parents: %w", err)
 	}
@@ -358,7 +363,7 @@ func (s *Store) NotifiedOf(ctx context.Context, agentID string) ([]Notified, err
 	var got []Notified
 	for rows.Next() {
 		var n Notified
-		if err := rows.Scan(&n.Parent.PID, &n.Parent.StartTime, &n.DeviceID); err != nil {
+		if err := rows.Scan(&n.Parent.PID, &n.Parent.StartTime, &n.FirstDetectedAt, &n.DeviceID); err != nil {
 			return nil, err
 		}
 		got = append(got, n)
@@ -366,27 +371,29 @@ func (s *Store) NotifiedOf(ctx context.Context, agentID string) ([]Notified, err
 	return got, rows.Err()
 }
 
-// RecordNotified records the pairs as notified. A pair whose parent left the snapshot, or whose
-// device was unlinked, meanwhile is dropped; a pair already recorded is left as it is.
+// RecordNotified records the pairs as notified. A pair whose parent left the snapshot (or left
+// and came back, with a new first-detection time), or whose device was unlinked, meanwhile is
+// dropped; a pair already recorded is left as it is.
 func (s *Store) RecordNotified(ctx context.Context, agentID string, pairs []Notified) error {
 	if len(pairs) == 0 {
 		return nil
 	}
 	pids := make([]int32, len(pairs))
 	starts := make([]int64, len(pairs))
+	detected := make([]time.Time, len(pairs))
 	devices := make([]string, len(pairs))
 	for i, p := range pairs {
-		pids[i], starts[i], devices[i] = int32(p.Parent.PID), p.Parent.StartTime, p.DeviceID
+		pids[i], starts[i], detected[i], devices[i] = int32(p.Parent.PID), p.Parent.StartTime, p.FirstDetectedAt, p.DeviceID
 	}
 	// The joins drop the pairs whose rows are gone instead of failing on the foreign keys.
 	if _, err := s.pool.Exec(ctx, `
 		INSERT INTO notified_parents (agent_id, pid, starttime, device_id)
 		SELECT f.agent_id, f.pid, f.starttime, l.device_id
-		FROM unnest($2::integer[], $3::bigint[], $4::uuid[]) AS p(pid, starttime, device_id)
-		JOIN first_detections f ON f.agent_id = $1 AND f.pid = p.pid AND f.starttime = p.starttime
+		FROM unnest($2::integer[], $3::bigint[], $4::timestamptz[], $5::uuid[]) AS p(pid, starttime, detected_at, device_id)
+		JOIN first_detections f ON f.agent_id = $1 AND f.pid = p.pid AND f.starttime = p.starttime AND f.detected_at = p.detected_at
 		JOIN links l ON l.agent_id = $1 AND l.device_id = p.device_id
 		ON CONFLICT DO NOTHING`,
-		agentID, pids, starts, devices); err != nil {
+		agentID, pids, starts, detected, devices); err != nil {
 		return fmt.Errorf("record notified parents: %w", err)
 	}
 	return nil

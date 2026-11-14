@@ -80,13 +80,22 @@ type Notifier struct {
 	accepted map[pair]bool
 }
 
-// pair is one parent and one device. The first-detection time is in it so a parent that left and
-// came back with the same PID and start time counts as a new one.
+// pair is one parent and one device. The first-detection time (in microseconds, as PostgreSQL
+// keeps it) is in it so a parent that left and came back with the same PID and start time counts
+// as a new one.
 type pair struct {
 	agentID       string
 	parent        store.ParentKey
-	firstDetected time.Time
+	firstDetected int64
 	deviceID      string
+}
+
+func pairOf(agentID string, n store.Notified) pair {
+	return pair{agentID: agentID, parent: n.Parent, firstDetected: n.FirstDetectedAt.UnixMicro(), deviceID: n.DeviceID}
+}
+
+func (pr pair) row() store.Notified {
+	return store.Notified{Parent: pr.parent, FirstDetectedAt: time.UnixMicro(pr.firstDetected), DeviceID: pr.deviceID}
 }
 
 func New(st Store, lv Live, sender Sender, log *slog.Logger) *Notifier {
@@ -145,16 +154,10 @@ func (n *Notifier) Close() {
 // send pushes every parent of the agent's latest snapshot to every device that should hear of it
 // and has not yet.
 func (n *Notifier) send(agentID string) {
-	a, ok := n.live.Agent(agentID)
-	if !ok {
-		return
-	}
-	current := make(map[pair]bool)
-	for _, p := range a.Parents {
-		current[pair{agentID: agentID, parent: store.ParentKey{PID: p.PID, StartTime: p.StartTime}, firstDetected: p.FirstDetectedAt}] = true
-	}
-	n.forgetGone(agentID, current)
-
+	// The store is read before the snapshot. A snapshot applied in between can only make the
+	// records older than the snapshot read here, never newer: a parent that left takes its records
+	// with it, and reading them after the snapshot would make it look not yet notified. Such a
+	// snapshot also wakes the notifier again, so what is skipped now is looked at once more.
 	targets, err := n.store.PushTargets(n.ctx, agentID)
 	if err != nil {
 		n.log.Error("list push targets", "agent", agentID, "err", err)
@@ -165,9 +168,19 @@ func (n *Notifier) send(agentID string) {
 		n.log.Error("list notified parents", "agent", agentID, "err", err)
 		return
 	}
-	notified := make(map[store.Notified]bool, len(done))
+	a, ok := n.live.Agent(agentID)
+	if !ok {
+		return
+	}
+	current := make(map[pair]bool)
+	for _, p := range a.Parents {
+		current[pair{agentID: agentID, parent: store.ParentKey{PID: p.PID, StartTime: p.StartTime}, firstDetected: p.FirstDetectedAt.UnixMicro()}] = true
+	}
+	n.forgetGone(agentID, current)
+
+	notified := make(map[pair]bool, len(done))
 	for _, d := range done {
-		notified[d] = true
+		notified[pairOf(agentID, d)] = true
 	}
 	// Pairs Expo took on an earlier send whose record failed: record them now, never send them.
 	// Those recorded are added to notified.
@@ -178,8 +191,8 @@ func (n *Notifier) send(agentID string) {
 	for _, p := range a.Parents {
 		key := store.ParentKey{PID: p.PID, StartTime: p.StartTime}
 		for _, t := range targets {
-			pr := pair{agentID: agentID, parent: key, firstDetected: p.FirstDetectedAt, deviceID: t.DeviceID}
-			if notified[store.Notified{Parent: key, DeviceID: t.DeviceID}] || n.isAccepted(pr) {
+			pr := pair{agentID: agentID, parent: key, firstDetected: p.FirstDetectedAt.UnixMicro(), deviceID: t.DeviceID}
+			if notified[pr] || n.isAccepted(pr) {
 				continue
 			}
 			msgs = append(msgs, Message{
@@ -215,8 +228,13 @@ func (n *Notifier) sendBatch(agentID string, msgs []Message, pairs []pair) {
 			record = append(record, pr)
 		case tickets[i].Details.Error == DeviceNotRegistered:
 			// Neither notified nor a failure: the device gets nothing until the app registers again.
+			// If the token cannot be cleared it is sent to again, so that counts as a failure to keep
+			// the resends bounded.
 			if err := n.store.ClearPushToken(n.ctx, pr.deviceID, msgs[i].To); err != nil {
 				n.log.Error("clear push token", "device", pr.deviceID, "err", err)
+				if n.failed(pr) {
+					record = append(record, pr)
+				}
 			}
 		default:
 			if n.failed(pr) {
@@ -246,7 +264,7 @@ func (n *Notifier) record(agentID string, prs []pair) {
 	}
 	rows := make([]store.Notified, len(prs))
 	for i, pr := range prs {
-		rows[i] = store.Notified{Parent: pr.parent, DeviceID: pr.deviceID}
+		rows[i] = pr.row()
 	}
 	err := n.store.RecordNotified(n.ctx, agentID, rows)
 	n.mu.Lock()
@@ -262,14 +280,14 @@ func (n *Notifier) record(agentID string, prs []pair) {
 	}
 }
 
-func (n *Notifier) recordAccepted(agentID string, notified map[store.Notified]bool) {
+func (n *Notifier) recordAccepted(agentID string, notified map[pair]bool) {
 	n.mu.Lock()
 	var prs []pair
 	for pr := range n.accepted {
 		if pr.agentID != agentID {
 			continue
 		}
-		if notified[store.Notified{Parent: pr.parent, DeviceID: pr.deviceID}] {
+		if notified[pr] {
 			delete(n.accepted, pr)
 			continue
 		}
@@ -281,7 +299,7 @@ func (n *Notifier) recordAccepted(agentID string, notified map[store.Notified]bo
 	}
 	rows := make([]store.Notified, len(prs))
 	for i, pr := range prs {
-		rows[i] = store.Notified{Parent: pr.parent, DeviceID: pr.deviceID}
+		rows[i] = pr.row()
 	}
 	if err := n.store.RecordNotified(n.ctx, agentID, rows); err != nil {
 		n.log.Error("record notified parents", "agent", agentID, "pairs", len(prs), "err", err)
@@ -290,7 +308,7 @@ func (n *Notifier) recordAccepted(agentID string, notified map[store.Notified]bo
 	n.mu.Lock()
 	for _, pr := range prs {
 		delete(n.accepted, pr)
-		notified[store.Notified{Parent: pr.parent, DeviceID: pr.deviceID}] = true
+		notified[pr] = true
 	}
 	n.mu.Unlock()
 }
