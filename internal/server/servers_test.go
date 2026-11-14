@@ -95,8 +95,8 @@ func TestRenamingChangesTheNameOnThisPhoneOnly(t *testing.T) {
 	if sv, _ := s.serverIn(t, phoneB, agentID); sv.Name != "Renamed" {
 		t.Errorf("phone B sees %q, want Renamed", sv.Name)
 	}
-	if sv, _ := s.serverIn(t, phoneA, agentID); sv.Name != "Prod web" {
-		t.Errorf("phone A sees %q, want its own name Prod web", sv.Name)
+	if sv, _ := s.serverIn(t, phoneA, agentID); sv.Name != "Prod web" || !sv.Notify {
+		t.Errorf("phone A sees %+v, want its own name Prod web with notifications on", sv)
 	}
 }
 
@@ -180,8 +180,8 @@ func TestMutingKeepsTheServerAndItsParentsAndLeavesOtherPhonesOn(t *testing.T) {
 	if !found || sv.Notify || sv.Parents != 2 || sv.Name != "My box" {
 		t.Errorf("phone B sees %+v (found %v), want My box muted with its 2 parents", sv, found)
 	}
-	if sv, _ := s.serverIn(t, phoneA, agentID); !sv.Notify {
-		t.Errorf("phone A sees %+v, want notifications still on", sv)
+	if sv, _ := s.serverIn(t, phoneA, agentID); !sv.Notify || sv.Name != "Prod web" {
+		t.Errorf("phone A sees %+v, want Prod web with notifications still on", sv)
 	}
 }
 
@@ -197,13 +197,17 @@ func TestNotificationsCanBeTurnedBackOn(t *testing.T) {
 	}
 }
 
-func TestOnlyTheSwitchChangesWhenNoNameIsSent(t *testing.T) {
+func TestAPatchKeepsTheSettingItDoesNotSend(t *testing.T) {
 	s := newTestServer(t)
 	_, agentID, phoneA, _ := s.twoPhones(t)
 	s.patchServer(t, phoneA, agentID, `{"notify":false}`)
 	s.patchServer(t, phoneA, agentID, `{"name":"Renamed"}`)
 	if sv, _ := s.serverIn(t, phoneA, agentID); sv.Name != "Renamed" || sv.Notify {
-		t.Errorf("phone A sees %+v, want Renamed and still muted", sv)
+		t.Errorf("after a rename: %+v, want Renamed and still muted", sv)
+	}
+	s.patchServer(t, phoneA, agentID, `{"notify":true}`)
+	if sv, _ := s.serverIn(t, phoneA, agentID); sv.Name != "Renamed" || !sv.Notify {
+		t.Errorf("after turning notifications on: %+v, want still Renamed", sv)
 	}
 }
 
