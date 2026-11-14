@@ -44,7 +44,10 @@ func TestTheFirstPairPutsTheShownCodeAndTheSavedServerInTheQR(t *testing.T) {
 		t.Fatalf("Pair: %v", err)
 	}
 	saved := readConfig(t, path).Server
-	if want := wantPairURL("K7Q2ZP", saved); len(qr.contents) != 1 || qr.contents[0] != want {
+	if saved != killy.URL {
+		t.Fatalf("agent.json server %q, want %q (normalized)", saved, killy.URL)
+	}
+	if want := wantPairURL("K7Q2ZP", killy.URL); len(qr.contents) != 1 || qr.contents[0] != want {
 		t.Errorf("QR contents %q, want [%q]", qr.contents, want)
 	}
 }
