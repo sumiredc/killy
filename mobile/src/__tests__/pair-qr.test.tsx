@@ -9,7 +9,7 @@ import BattleScreen from '../app/(tabs)/index';
 import SettingsScreen from '../app/(tabs)/settings';
 import PairRoute from '../app/pair';
 import * as deps from '../killy/deps';
-import { FakeServer, settle } from '../testing/fake-server';
+import { FakeServer, type FakeStream, settle } from '../testing/fake-server';
 
 jest.mock('expo-localization', () => ({ getLocales: jest.fn(() => [{ languageCode: 'en' }]) }));
 
@@ -63,9 +63,12 @@ function qr(code: string, server = appServer) {
   return `killy://pair?code=${code}&server=${encodeURIComponent(server)}`;
 }
 
+// The event stream of the app the last startApp started.
+let appStream: FakeStream;
+
 async function startApp(initialUrl = '/', languageCode = 'en'): Promise<FakeServer> {
   const server = new FakeServer();
-  server.stream();
+  appStream = server.stream();
   jest.spyOn(config, 'buildServerURL').mockReturnValue(appServer);
   jest.mocked(Localization.getLocales).mockReturnValue([{ languageCode } as Localization.Locale]);
   jest.spyOn(deps, 'makeDeps').mockReturnValue({
@@ -280,6 +283,24 @@ describe('opening the app from a killy://pair link', () => {
     await act(() => claim.resolve(404, { error: 'code_unknown' }));
     const open = within(await screen.findByTestId('add-server-sheet'));
     expect(open.getByLabelText('Pairing code')).toHaveDisplayValue('A1B2C3');
+  });
+
+  test('a link while the Server sheet is open waits until it closes: only one sheet is ever open', async () => {
+    await startApp();
+    await act(() => appStream.send(`event: state\ndata: ${JSON.stringify({ servers: [{ id: 'a1', name: 'web-01', hostname: 'web-01', notify: true, disconnected: false, parents: [] }] })}\n\n`));
+    await fireEvent.press(screen.getByLabelText('Settings'));
+    await fireEvent.press(await screen.findByRole('button', { name: /^web-01/ }));
+    expect(await screen.findByTestId('server-sheet')).toBeOnTheScreen();
+    await act(async () => {
+      router.push(`/pair?code=A1B2C3&server=${encodeURIComponent(appServer)}`);
+      await settle();
+    });
+    expect(screen.getByTestId('server-sheet')).toBeOnTheScreen();
+    expect(screen.queryByTestId('add-server-sheet')).toBeNull();
+    await fireEvent.press(screen.getByRole('button', { name: 'Done' }));
+    const sheet = within(await screen.findByTestId('add-server-sheet'));
+    expect(screen.queryByTestId('server-sheet')).toBeNull();
+    expect(sheet.getByLabelText('Pairing code')).toHaveDisplayValue('A1B2C3');
   });
 
   test('the sheet does not open again by itself once it was closed', async () => {

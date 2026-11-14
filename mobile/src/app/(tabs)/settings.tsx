@@ -78,7 +78,8 @@ export default function SettingsScreen() {
           <KText style={styles.addButtonText}>{t('addServer')}</KText>
         </Pressable>
       </ScrollView>
-      {(adding || link !== null) && <AddServerSheet onClose={closeAdd} link={link} />}
+      {/* Not over the Server sheet: iOS presents one sheet at a time, so a link waits until it closes. */}
+      {(adding || link !== null) && open === undefined && <AddServerSheet onClose={closeAdd} link={link} />}
       {open !== undefined && <ServerSheet server={open} onClose={() => setOpenId(null)} />}
     </SafeAreaView>
   );
