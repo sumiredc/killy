@@ -1,4 +1,4 @@
-import { ClaimError, createKillyClient, KillError, RegisterError, ServerError } from '../killy/client';
+import { ClaimError, createKillyClient, KillError, RegisterError, ServerError, UpdateError } from '../killy/client';
 import { FakeServer } from '../testing/fake-server';
 
 const url = 'https://killy.example';
@@ -466,6 +466,43 @@ describe('check', () => {
   test('without a device token nothing is sent and the check failed', async () => {
     const server = new FakeServer();
     await expect(client(server, null).check('a1')).resolves.toEqual({ kind: 'failed' });
+    expect(server.requests).toEqual([]);
+  });
+});
+
+describe('updateDevice', () => {
+  test('a PATCH of this device with only the fields given, in the API names, and the device token', async () => {
+    const server = new FakeServer();
+    server.respond('PATCH /app/v1/devices/me', 204, null);
+    await expect(client(server).updateDevice({ pushToken: 'ExponentPushToken[x]' })).resolves.toBeUndefined();
+    await client(server).updateDevice({ notify: false });
+    expect(server.requests).toEqual([
+      expect.objectContaining({ method: 'PATCH', url: `${url}/app/v1/devices/me`, body: { push_token: 'ExponentPushToken[x]' }, authorization: 'Bearer dev-token' }),
+      expect.objectContaining({ method: 'PATCH', url: `${url}/app/v1/devices/me`, body: { notify: false }, authorization: 'Bearer dev-token' }),
+    ]);
+  });
+
+  test.each([
+    [400, { error: 'invalid_request' }],
+    [401, { error: 'unauthorized' }],
+    [503, { error: 'unavailable' }],
+    [200, {}],
+  ])('a %i answer is an error of kind other', async (status, body) => {
+    const server = new FakeServer();
+    server.respond('PATCH /app/v1/devices/me', status, body);
+    await expect(client(server).updateDevice({ notify: true })).rejects.toEqual(new UpdateError('other'));
+  });
+
+  test('no answer is unreachable, and it is not sent again', async () => {
+    const server = new FakeServer();
+    server.unreachable('PATCH /app/v1/devices/me');
+    await expect(client(server).updateDevice({ notify: true })).rejects.toEqual(new UpdateError('unreachable'));
+    expect(server.count('PATCH /app/v1/devices/me')).toBe(1);
+  });
+
+  test('without a device token nothing is sent', async () => {
+    const server = new FakeServer();
+    await expect(client(server, null).updateDevice({ notify: true })).rejects.toEqual(new UpdateError('not_registered'));
     expect(server.requests).toEqual([]);
   });
 });

@@ -14,6 +14,7 @@ import { ServerURLProvider } from '@/config-context';
 import { I18nProvider } from '@/i18n/context';
 import { BattleProvider } from '@/killy/battle-context';
 import { KillyProvider } from '@/killy/context';
+import { NotificationsProvider } from '@/killy/notifications-context';
 import { PairLinkProvider } from '@/killy/pair-link';
 import { colors, fonts } from '@/theme/tokens';
 
@@ -48,11 +49,13 @@ export default function RootLayout() {
         <ServerURLProvider url={config.url}>
           <I18nProvider>
             <KillyProvider>
-              <BattleProvider>
-                <PairLinkProvider>
-                  <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
-                </PairLinkProvider>
-              </BattleProvider>
+              <NotificationsProvider>
+                <BattleProvider>
+                  <PairLinkProvider>
+                    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+                  </PairLinkProvider>
+                </BattleProvider>
+              </NotificationsProvider>
             </KillyProvider>
           </I18nProvider>
         </ServerURLProvider>

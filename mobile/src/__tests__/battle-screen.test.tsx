@@ -9,6 +9,8 @@ import TabsLayout from '../app/(tabs)/_layout';
 import BattleScreen from '../app/(tabs)/index';
 import SettingsScreen from '../app/(tabs)/settings';
 import * as deps from '../killy/deps';
+import * as prefs from '../prefs';
+import { FakeNotifications, MemoryPrefs } from '../testing/fake-notifications';
 import type { ParentState, ServerState } from '../killy/types';
 import { FakeServer, type FakeStream, settle } from '../testing/fake-server';
 
@@ -32,11 +34,13 @@ afterEach(() => {
 async function startApp(server: FakeServer, languageCode = 'en') {
   jest.spyOn(config, 'buildServerURL').mockReturnValue('https://killy.example');
   jest.mocked(Localization.getLocales).mockReturnValue([{ languageCode } as Localization.Locale]);
+  jest.spyOn(prefs, 'makePrefs').mockReturnValue(new MemoryPrefs());
   jest.spyOn(deps, 'makeDeps').mockReturnValue({
     fetch: server.fetch,
     tokens: { get: async () => 'dev-token', set: async () => {} },
     random: () => 0,
     randomBytes: (n) => webcrypto.getRandomValues(new Uint8Array(n)),
+    notifications: new FakeNotifications(),
   });
   await renderRouter(routes, { initialUrl: '/' });
   await act(settle);

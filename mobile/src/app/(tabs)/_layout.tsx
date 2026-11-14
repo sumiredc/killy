@@ -1,12 +1,16 @@
 import { BlurView } from 'expo-blur';
-import { Tabs, usePathname } from 'expo-router';
+import { Tabs, usePathname, useRouter } from 'expo-router';
 import { StyleSheet } from 'react-native';
 
 import { useI18n } from '@/i18n/context';
 import { useBattle } from '@/killy/battle-context';
+import { useOpenBattleOnTap } from '@/killy/notifications-context';
 import { colors, fontFor } from '@/theme/tokens';
 
 export default function TabsLayout() {
+  // Drawn after the splash, so the tabs are there to move to.
+  const router = useRouter();
+  useOpenBattleOnTap(() => router.navigate('/'));
   const { t } = useI18n();
   const battle = useBattle();
   const onSettings = usePathname() === '/settings';

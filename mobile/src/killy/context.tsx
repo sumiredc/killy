@@ -4,6 +4,7 @@ import { useServerURL } from '@/config-context';
 
 import { createKillyClient, type KillyClient, RegisterError } from './client';
 import { makeDeps } from './deps';
+import type { NotificationsDeps } from './notifications';
 import type { State } from './types';
 
 /**
@@ -18,6 +19,7 @@ type Killy = {
   /** The latest state from the Killy server, or null before the first one arrives. */
   state: State | null;
   randomBytes: (n: number) => Uint8Array;
+  notifications: NotificationsDeps;
 };
 
 const KillyContext = createContext<Killy | null>(null);
@@ -74,7 +76,7 @@ export function KillyProvider({ children }: { children: ReactNode }) {
     return client.events(setState);
   }, [client, registration]);
 
-  return <KillyContext.Provider value={{ client, registration, state, randomBytes: deps.randomBytes }}>{children}</KillyContext.Provider>;
+  return <KillyContext.Provider value={{ client, registration, state, randomBytes: deps.randomBytes, notifications: deps.notifications }}>{children}</KillyContext.Provider>;
 }
 
 export function useKilly(): Killy {

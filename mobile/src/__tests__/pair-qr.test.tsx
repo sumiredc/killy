@@ -9,6 +9,8 @@ import BattleScreen from '../app/(tabs)/index';
 import SettingsScreen from '../app/(tabs)/settings';
 import PairRoute from '../app/pair';
 import * as deps from '../killy/deps';
+import * as prefs from '../prefs';
+import { FakeNotifications, MemoryPrefs } from '../testing/fake-notifications';
 import { FakeServer, type FakeStream, settle } from '../testing/fake-server';
 
 jest.mock('expo-localization', () => ({ getLocales: jest.fn(() => [{ languageCode: 'en' }]) }));
@@ -71,11 +73,13 @@ async function startApp(initialUrl = '/', languageCode = 'en'): Promise<FakeServ
   appStream = server.stream();
   jest.spyOn(config, 'buildServerURL').mockReturnValue(appServer);
   jest.mocked(Localization.getLocales).mockReturnValue([{ languageCode } as Localization.Locale]);
+  jest.spyOn(prefs, 'makePrefs').mockReturnValue(new MemoryPrefs());
   jest.spyOn(deps, 'makeDeps').mockReturnValue({
     fetch: server.fetch,
     tokens: { get: async () => 'dev-token', set: async () => {} },
     random: () => 0,
     randomBytes: (n) => new Uint8Array(n),
+    notifications: new FakeNotifications(),
   });
   await renderRouter(routes, { initialUrl });
   await act(settle);
