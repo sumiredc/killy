@@ -231,7 +231,7 @@ function sameServer(a: string, b: string): boolean;
 |---|---|
 | `PATCH`・`DELETE`・check で DB に届かない | `503`（`unavailable`）。app は「エラーが返った」として扱う |
 | `PATCH`・`DELETE` の間に紐付けが消えた | `UpdateLink`・`UnlinkDevice` が `store.ErrNotFound` を返し、`404` |
-| ping を送るとき stream が命令を受け取らない（channel が埋まっている） | `RelayKill` と同じく、stream が無いのと同じに扱い、`agent_disconnected` |
+| ping を送るとき stream が命令を受け取らない（channel が埋まっている） | ping を送らずに `no_response`。agent はつながっているが、命令が agent に届いていない状態で、UC4 の「Commands are not reaching the agent. Restart the agent.」に当たる（#17 の後に sumire が決めた）。kill の `RelayKill` は今のまま `unknown`（`agent_disconnected`） |
 | ping を送った後に agent の stream が切れた | 待ちは 5 秒まで続き、その間に `pong` が届けば `ok`、届かなければ `no_response` |
 | 種類の違う結果・待っていない `id`・別の agent からの `pong` | `404`（`command_not_found`）。どの待ちも終わらない |
 | agent の `pong` の POST が失敗した | 記録して終わる。送り直さない（check は `no_response` になる） |

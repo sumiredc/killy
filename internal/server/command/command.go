@@ -59,21 +59,21 @@ func (r *Router) Check(ctx context.Context, agentID string) CheckResult {
 func (r *Router) startCheck(agentID string, now time.Time) *check {
 	c := &check{started: now, done: make(chan struct{})}
 	r.checks[agentID] = c
-	disconnected := func() *check {
-		c.result = CheckResult{Result: protocol.CheckAgentDisconnected}
+	end := func(result string) *check {
+		c.result = CheckResult{Result: result}
 		close(c.done)
 		return c
 	}
 	stream, ok := r.streams[agentID]
 	if !ok {
-		return disconnected()
+		return end(protocol.CheckAgentDisconnected)
 	}
 	id := uuid.NewV4().String()
 	select {
 	case stream <- Command{Event: "ping", Data: protocol.PingCommand{ID: id}}:
 	default:
-		// The stream is not taking commands; it is as good as gone.
-		return disconnected()
+		// The agent is connected but its stream is not taking commands: they are not reaching it.
+		return end(protocol.CheckNoResponse)
 	}
 	key := waitKey{agentID, id}
 	w := &wait{kind: protocol.ResultPong, deadline: now.Add(PingTimeout), done: make(chan struct{})}
