@@ -1,10 +1,14 @@
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
+import { useServerURL } from '@/config-context';
 import type { Key } from '@/i18n';
 import { useI18n } from '@/i18n/context';
 import { ClaimError, type ClaimErrorKind } from '@/killy/client';
 import { useKilly } from '@/killy/context';
+import type { PairLink } from '@/killy/pair-link';
+import { type PairCheck, parsePairURL } from '@/killy/pair-url';
 import { KText } from '@/theme/KText';
 import { colors, fonts, radii } from '@/theme/tokens';
 
@@ -23,6 +27,11 @@ const claimMessages: Record<ClaimErrorKind, Key> = {
   other: 'pairFailed',
 };
 
+/** The message for a pairing link from a QR code or a deep link that was not accepted. */
+export function pairLinkError(reason: Extract<PairCheck, { ok: false }>['reason']): Key {
+  return reason === 'other_server' ? 'qrOtherServer' : 'qrInvalid';
+}
+
 /**
  * Upper-case letters and digits only, at most 6: the form of a pairing code. Full-width letters
  * and digits, which a Japanese keyboard types, count as their ASCII forms.
@@ -35,12 +44,34 @@ export function cleanCode(text: string): string {
     .slice(0, 6);
 }
 
-export function AddServerSheet({ onClose }: { onClose: () => void }) {
+/**
+ * Adding a server is one path whatever the code came from (typed, a scanned QR code, a killy://pair
+ * link): it goes into the code field and Add sends the claim, so a display name can still be given.
+ */
+export function AddServerSheet({ onClose, link }: { onClose: () => void; link?: PairLink | null }) {
   const { t } = useI18n();
   const { client, registration } = useKilly();
-  const [code, setCode] = useState('');
+  const appServer = useServerURL();
+  const [code, setCode] = useState(link?.ok ? link.code : '');
   const [name, setName] = useState('');
-  const [phase, setPhase] = useState<Phase>({ kind: 'form', error: null });
+  const [phase, setPhase] = useState<Phase>({ kind: 'form', error: link && !link.ok ? pairLinkError(link.reason) : null });
+  const [scanning, setScanning] = useState(false);
+  const [taken, setTaken] = useState<number | null>(link?.id ?? null);
+  // A link that comes while the sheet is open is taken in place, once the form is back if a claim
+  // is running: a second sheet over this one is refused by iOS. A refused link keeps the field.
+  if (link && link.id !== taken && phase.kind === 'form') {
+    setTaken(link.id);
+    setScanning(false);
+    if (link.ok) {
+      setCode(link.code);
+      setPhase({ kind: 'form', error: null });
+    } else {
+      setPhase({ kind: 'form', error: pairLinkError(link.reason) });
+    }
+  }
+  const [, requestCameraPermission] = useCameraPermissions();
+  // onBarcodeScanned fires for every frame the code is in view; only the first read counts.
+  const scanned = useRef(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mounted = useRef(true);
 
@@ -54,6 +85,32 @@ export function AddServerSheet({ onClose }: { onClose: () => void }) {
 
   // Not while registration is still in progress: it settles within the request timeout.
   const ready = code.length === 6 && registration !== 'pending';
+
+  async function startScan() {
+    setPhase({ kind: 'form', error: null });
+    const permission = await requestCameraPermission();
+    if (!mounted.current) return;
+    if (!permission.granted) {
+      setPhase({ kind: 'form', error: 'cameraDenied' });
+      return;
+    }
+    scanned.current = false;
+    setScanning(true);
+  }
+
+  // Nothing is sent from here: a link for another Killy server must not reach any server.
+  function onScanned({ data }: { data: string }) {
+    if (scanned.current) return;
+    scanned.current = true;
+    setScanning(false);
+    const link = parsePairURL(data, appServer);
+    if (link.ok) {
+      setCode(link.code);
+      setPhase({ kind: 'form', error: null });
+    } else {
+      setPhase({ kind: 'form', error: pairLinkError(link.reason) });
+    }
+  }
 
   async function submit() {
     if (!ready || phase.kind !== 'form') {
@@ -87,7 +144,19 @@ export function AddServerSheet({ onClose }: { onClose: () => void }) {
             {t('addTitle')}
           </KText>
 
-          {phase.kind === 'form' ? (
+          {phase.kind === 'form' && scanning ? (
+            <View style={styles.scanner}>
+              <CameraView
+                style={styles.camera}
+                facing="back"
+                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                onBarcodeScanned={onScanned}
+              />
+              <Pressable accessibilityRole="button" accessibilityLabel={t('cameraClose')} onPress={() => setScanning(false)} style={styles.textButton}>
+                <KText style={styles.textButtonLabel}>{t('cameraClose')}</KText>
+              </Pressable>
+            </View>
+          ) : phase.kind === 'form' ? (
             <>
               <View style={styles.step}>
                 <KText kind="mono" style={styles.stepNumber}>
@@ -127,6 +196,9 @@ export function AddServerSheet({ onClose }: { onClose: () => void }) {
                 placeholder="K7Q4XP"
                 placeholderTextColor={colors.elev3}
               />
+              <Pressable accessibilityRole="button" accessibilityLabel={t('scanQr')} onPress={() => void startScan()} style={styles.ghost}>
+                <KText style={styles.ghostLabel}>{t('scanQr')}</KText>
+              </Pressable>
 
               <KText style={styles.label}>{t('nameLabel')}</KText>
               <TextInput
@@ -144,7 +216,7 @@ export function AddServerSheet({ onClose }: { onClose: () => void }) {
 
               {phase.error !== null && (
                 <View style={styles.error}>
-                  <KText style={styles.errorText}>{t(phase.error)}</KText>
+                  <KText style={styles.errorText}>{t(phase.error, { server: appServer })}</KText>
                 </View>
               )}
 
@@ -215,6 +287,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   codeInput: { fontFamily: fonts.mono, fontSize: 24, letterSpacing: 10, textAlign: 'center' },
+  // The secondary button of the sheet (`.ghost-btn` in the mock).
+  ghost: { minHeight: 44, marginTop: -2, marginBottom: 14, borderRadius: radii.input, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
+  ghostLabel: { color: colors.text, fontSize: 14 },
+  scanner: { alignItems: 'center', gap: 6, marginBottom: 6 },
+  camera: { width: '100%', aspectRatio: 1, borderRadius: radii.input, overflow: 'hidden' },
   error: { padding: 12, borderRadius: radii.input, backgroundColor: 'rgba(247,80,106,0.12)', marginBottom: 12 },
   errorText: { color: '#FF9AAA', fontSize: 13, lineHeight: 20 },
   actions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 },

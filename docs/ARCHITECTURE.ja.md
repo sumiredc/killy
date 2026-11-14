@@ -87,7 +87,7 @@ agent には、他のユーザーのプロセスに signal を送る権限が要
 - **2 回目以降**：同じ要求に agent token を付けると、同じ agent の新しいコードが作られる。token の無い要求では、既存の agent のコードは発行しない。
 - **claim**：コードが有効なら claim はすぐに成功し、agent を待たない。表示名が無ければ、登録時に送られた hostname を使う。
 - **紐付け**：表示名とサーバーごとの通知の switch は、1 台の device と 1 つの agent の紐付けに属する。そのため、ある phone での変更は他の phone に影響しない。
-- **QR**：app は、build に設定された Killy server にだけ接続する。QR コードの `server` はそれと一致しなければならず、違えば app はエラーを出して何も送らない。QR コードで、app の device token を別の宛先に送らせることはできない。
+- **QR**：app は、build に設定された Killy server にだけ接続する。QR コードの `server` はそれと一致しなければならず、違えば app はエラーを出して何も送らない。QR コードで、app の device token を別の宛先に送らせることはできない。一致は、scheme と host の大文字・小文字、既定の port、末尾の `/` の違いを無視して比べる。読み取ったコードはコードの入力欄に入れるだけで、claim は手で入れたコードと同じく「追加する」で送る。app は `killy://pair?…` の link（端末のカメラで QR コードを読み取ったとき）でも開き、同じ確認をした上で、Add server sheet をコードの入った状態で開く。それ以外の `killy://` の link は扱わない。
 
 #### 回数制限
 

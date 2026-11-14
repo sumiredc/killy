@@ -34,8 +34,19 @@
       ],
       "expo-localization",
       "expo-font",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Killy uses the camera to read the QR code shown by killy agent pair.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
     ],
+    "locales": {
+      "ja": "./locales/ja.json"
+    },
     "experiments": {
       "reactCompiler": true
     },

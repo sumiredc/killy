@@ -6,6 +6,7 @@ import { AddServerSheet } from '@/components/AddServerSheet';
 import { ServerSheet } from '@/components/ServerSheet';
 import { useI18n } from '@/i18n/context';
 import { useKilly } from '@/killy/context';
+import { usePairLinks } from '@/killy/pair-link';
 import { serverRow } from '@/killy/server-row';
 import { KText } from '@/theme/KText';
 import { colors, gutter, radii } from '@/theme/tokens';
@@ -16,6 +17,13 @@ export default function SettingsScreen() {
   const { state } = useKilly();
   const [adding, setAdding] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  // A killy://pair link, already checked by its route, opens the Add server sheet. Settings has no
+  // URL parameters of its own for this, so no other link can put a code in the field.
+  const { link, clear } = usePairLinks();
+  const closeAdd = () => {
+    setAdding(false);
+    clear();
+  };
   const servers = state?.servers ?? [];
   // Looked up in every state, so the sheet shows the latest values and closes once the server is gone.
   const open = servers.find((s) => s.id === openId);
@@ -70,7 +78,8 @@ export default function SettingsScreen() {
           <KText style={styles.addButtonText}>{t('addServer')}</KText>
         </Pressable>
       </ScrollView>
-      {adding && <AddServerSheet onClose={() => setAdding(false)} />}
+      {/* Not over the Server sheet: iOS presents one sheet at a time, so a link waits until it closes. */}
+      {(adding || link !== null) && open === undefined && <AddServerSheet onClose={closeAdd} link={link} />}
       {open !== undefined && <ServerSheet server={open} onClose={() => setOpenId(null)} />}
     </SafeAreaView>
   );

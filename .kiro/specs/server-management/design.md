@@ -218,8 +218,8 @@ function sameServer(a: string, b: string): boolean;
 
 | 項目 | 選択 | 理由 |
 |---|---|---|
-| 受け口 | `app.json` の scheme は `killy` なので、expo-router は `killy://pair?…` を route `/pair` に渡す。`src/app/pair.tsx` を足し、`useLocalSearchParams()` を `checkPairParams` で確かめてから、`router.replace` で Settings に移り、Add server sheet を開いてコード欄に入れる（`ok`）か、エラーの箱に理由を出す（`other_server`・`invalid`） | OS のカメラで読んで app が開いたときも、app のカメラで読んだときと同じに扱う（#15 の決定、#18）。扱わないと、一致する route の無い画面が出る |
-| Settings への渡し方 | `settings.tsx` が route の params（`pairCode` か `pairError`）を見て `AddServerSheet` を `initialCode`・`initialError` で開き、使った params は消す | 戻ったときに同じ sheet がまた開かないようにする |
+| 受け口 | `app.json` の scheme は `killy` なので、expo-router は `killy://pair?…` を route `/pair` に渡す。`src/app/pair.tsx` を足し、`useLocalSearchParams()` を `checkPairParams` で確かめてから Settings に移る。app が開いていない（root の stack に `(tabs)` が無い）ときは `<Redirect>`、開いているときは `router.dismissTo('/settings')` で、開いている tabs に戻る（#18 の PR で決めた） | OS のカメラで読んで app が開いたときも、app のカメラで読んだときと同じに扱う（#15 の決定、#18）。扱わないと、一致する route の無い画面が出る。app が開いているときに Settings を積み重ねると、2 つ目の Add server sheet を iOS が出せず、app が操作を受けなくなった（iOS シミュレーターで確かめた） |
+| Settings への渡し方 | 確かめた結果は URL の params ではなく、`mobile/src/killy/pair-link.tsx` の `PairLinkProvider`（app の状態）で Settings に渡す。Settings はそれがあれば Add server sheet を開き、sheet を閉じたら消す。sheet が開いている間に次の link が来たら、開き直さずに中身を置き換える。受け付けられない link は入力欄を変えず、エラーの箱に理由を出す。claim の途中に来た link は、claim が失敗して form に戻ってから入れ、claim が成功して sheet が閉じたときは捨てる。server sheet が開いている間に来た link は、server sheet を閉じてから Add server sheet を開く（#18 の PR で決めた） | Settings が自分の params からコードを入れると、`killy://settings?pairCode=…` が確認を通らずにコードを入れられた。開き直すと iOS が 2 つ目の Modal を出せない（server sheet の上でも同じ）。いずれもレビューで見つかった |
 | `killy://pair` 以外の deep link | 受け付けない。Add server sheet を開かず、Killy server に何も送らない。表示は expo-router の一致する route の無い画面のままにする（M2 の spec の確認で sumire が決めた） | #18 の制約（`killy://pair` 以外の URL は受け付けない）のとおり。ただし #18 が `pair` の route を足すのは、一致する route の無い画面を出さないためなので、pair 以外の deep link でその画面を出すことは、M2 の spec の確認で sumire が決めた |
 | 文書 | 同じ PR で、ARCHITECTURE（と ARCHITECTURE.ja.md）の Pairing の QR の項に、deep link も同じ確認をすることを書き足す（#18） | #18 |
 
