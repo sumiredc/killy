@@ -28,6 +28,7 @@ export type ClaimErrorKind =
   | 'rate_limited'
   | 'unreachable'
   | 'not_registered'
+  | 'demo_not_configured'
   | 'other';
 
 export class RegisterError extends Error {
@@ -86,6 +87,8 @@ export interface KillyClient {
   /** Saves this device's push token or app-wide notification switch. Nothing is sent again. */
   updateDevice(patch: { pushToken?: string; notify?: boolean }): Promise<void>;
   claim(code: string, name?: string): Promise<Server>;
+  /** Adds the public demo server, as a claim does but without a code. Errors are ClaimError. */
+  addDemoServer(): Promise<Server>;
   /** Sends a kill and returns its outcome. Without an answer it sends the same kill once more. */
   kill(req: KillRequest): Promise<KillResult>;
   /** Renames or mutes the server for this phone only. Nothing is sent again: the operator sees the error and retries. */
@@ -207,6 +210,23 @@ export function createKillyClient({ baseURL, fetch, deviceToken, random }: Clien
         default:
           throw new ClaimError('other');
       }
+    },
+
+    async addDemoServer() {
+      const token = deviceToken();
+      if (token === null) {
+        throw new ClaimError('not_registered');
+      }
+      let answer: Answer;
+      try {
+        answer = await request('POST', '/app/v1/demo', undefined, token);
+      } catch {
+        throw new ClaimError('unreachable');
+      }
+      if (answer.status === 200 && isServer(answer.body)) {
+        return answer.body;
+      }
+      throw new ClaimError(field(answer.body, 'error') === 'demo_not_configured' ? 'demo_not_configured' : 'other');
     },
 
     async kill({ id, serverId, ppid, starttime }) {

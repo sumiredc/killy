@@ -40,9 +40,25 @@ type machine struct {
 	parentZ bool
 	reaped  bool
 	signals int
+	// cgroup, when set, is the content of 100/cgroup.
+	cgroup string
+	// gate, when set, holds the first read of 100/stat until a second one comes (or 500 ms pass),
+	// so two kills that are not kept apart both read the parent before either signals.
+	gate     bool
+	arrivals int
+	opened   chan struct{}
 }
 
 func (m *machine) Open(name string) (fs.File, error) {
+	root := m.files()
+	// What was read is fixed before the wait, as a check reads the process before it signals.
+	if name == "100/stat" {
+		m.waitAtGate()
+	}
+	return root.Open(name)
+}
+
+func (m *machine) files() fstest.MapFS {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	state := "S"
@@ -58,7 +74,35 @@ func (m *machine) Open(name string) (fs.File, error) {
 	if !m.reaped {
 		root["101/stat"] = &fstest.MapFile{Data: []byte(stat(101, "Z", 100, 5001))}
 	}
-	return root.Open(name)
+	if m.cgroup != "" {
+		root["100/cgroup"] = &fstest.MapFile{Data: []byte(m.cgroup)}
+	}
+	return root
+}
+
+func (m *machine) waitAtGate() {
+	m.mu.Lock()
+	if !m.gate {
+		m.mu.Unlock()
+		return
+	}
+	m.arrivals++
+	if m.arrivals == 1 {
+		m.opened = make(chan struct{})
+		opened := m.opened
+		m.mu.Unlock()
+		select {
+		case <-opened:
+		case <-time.After(500 * time.Millisecond):
+		}
+		m.mu.Lock()
+		m.gate = false
+		m.mu.Unlock()
+		return
+	}
+	close(m.opened)
+	m.gate = false
+	m.mu.Unlock()
 }
 
 func stat(pid int, state string, ppid int, start int64) string {
@@ -158,27 +202,34 @@ func startRelay(t *testing.T, version string) *relay {
 		t.Fatalf("claim: %d", status)
 	}
 
-	store, err := kill.OpenFileStore(r.outcomes)
+	runAgent(t, srv, ts.URL, pair, r.machine, r.outcomes, version, false)
+	return r
+}
+
+// runAgent runs the agent's command client for the paired agent until the test ends, and waits
+// until its command stream is attached.
+func runAgent(t *testing.T, srv *server.Server, url string, pair map[string]string, m *machine, outcomes, version string, demo bool) {
+	t.Helper()
+	store, err := kill.OpenFileStore(outcomes)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { store.Close() })
-	killer := &kill.Killer{Proc: &proc.Scanner{Root: r.machine}, Pidfd: pidfds{r.machine}, Store: store, Clock: &instant{}, SelfPID: func() int { return 500 },
-		Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	killer := &kill.Killer{Proc: &proc.Scanner{Root: m}, Pidfd: pidfds{m}, Store: store, Clock: &instant{}, SelfPID: func() int { return 500 },
+		Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Demo: demo}
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	client := &agent.CommandClient{Server: ts.URL, Token: pair["agent_token"], Client: &http.Client{}, Killer: killer, Version: version,
+	client := &agent.CommandClient{Server: url, Token: pair["agent_token"], Client: &http.Client{}, Killer: killer, Version: version,
 		Backoff: &agent.Backoff{Rand: func() float64 { return 0 }}, Log: slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)),
 		Sleep: agent.SleepContext}
 	go client.Run(ctx)
 	deadline := time.Now().Add(3 * time.Second)
-	for !srv.Commands.Attached(r.agentID) {
+	for !srv.Commands.Attached(pair["agent_id"]) {
 		if time.Now().After(deadline) {
 			t.Fatal("the agent's command stream never attached")
 		}
 		time.Sleep(time.Millisecond)
 	}
-	return r
 }
 
 func TestTheSameKillIDTwiceSignalsOnceEndToEnd(t *testing.T) {
@@ -215,5 +266,79 @@ func TestACheckGoesToTheAgentAndBackAndChangesNothingEndToEnd(t *testing.T) {
 	}
 	if b, err := os.ReadFile(r.outcomes); err != nil || len(b) != 0 {
 		t.Errorf("outcomes file %q (%v), want it empty after a check", b, err)
+	}
+}
+
+// demoRelay is a Killy server offering a demo-mode agent as the public demo, whose parent 100 is in
+// summon's cgroup, and two phones that added it with "Try the demo server".
+type demoRelay struct {
+	url, agentID string
+	devices      [2]string
+	machine      *machine
+}
+
+func startDemoRelay(t *testing.T) *demoRelay {
+	t.Helper()
+	srv := newServer()
+	ts := httptest.NewServer(srv.Handler())
+	t.Cleanup(ts.Close)
+	var pair map[string]string
+	post(t, ts.URL+"/agent/v1/pairings", "", `{"hostname":"demo-linux-01"}`, &pair)
+	srv.DemoAgentID = pair["agent_id"]
+	r := &demoRelay{url: ts.URL, agentID: pair["agent_id"], machine: &machine{cgroup: "0::" + proc.SummonCgroup + "\n"}}
+	for i := range r.devices {
+		var dev map[string]string
+		post(t, ts.URL+"/app/v1/devices", "", `{}`, &dev)
+		r.devices[i] = dev["device_token"]
+		if status := post(t, ts.URL+"/app/v1/demo", r.devices[i], "", nil); status != http.StatusOK {
+			t.Fatalf("add the demo server: %d", status)
+		}
+	}
+	runAgent(t, srv, ts.URL, pair, r.machine, filepath.Join(t.TempDir(), "outcomes.jsonl"), "dev", true)
+	return r
+}
+
+// kill sends a kill of the demo parent with a new ID from phone i.
+func (r *demoRelay) kill(t *testing.T, i int, id string) string {
+	t.Helper()
+	var got map[string]any
+	body := `{"id":"` + id + `","server_id":"` + r.agentID + `","ppid":100,"starttime":5000}`
+	if status := post(t, r.url+"/app/v1/kills", r.devices[i], body, &got); status != http.StatusOK {
+		t.Errorf("kill from phone %d: %d", i, status)
+	}
+	return fmt.Sprint(got["outcome"])
+}
+
+func TestTwoVisitorsKillingTheSameDemoParentInTurnSignalOnce(t *testing.T) {
+	r := startDemoRelay(t)
+	first := r.kill(t, 0, "2a1f0c3e-5d6b-4c7a-8e9f-0a1b2c3d4e5f")
+	second := r.kill(t, 1, "7b8c9d0e-1f2a-4b3c-9d4e-5f6a7b8c9d0e")
+	if first != "killed" || second != "already_gone" {
+		t.Errorf("outcomes %s then %s, want killed then already_gone", first, second)
+	}
+	if n := r.machine.Signals(); n != 1 {
+		t.Errorf("SIGKILL sent %d times, want 1", n)
+	}
+}
+
+func TestTwoVisitorsKillingTheSameDemoParentAtOnceSignalOnce(t *testing.T) {
+	r := startDemoRelay(t)
+	r.machine.mu.Lock()
+	r.machine.gate = true
+	r.machine.mu.Unlock()
+	ids := [2]string{"3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f", "8d9e0f1a-2b3c-4d5e-af6a-7b8c9d0e1f2a"}
+	var outcomes [2]string
+	var wg sync.WaitGroup
+	for i := range 2 {
+		wg.Go(func() { outcomes[i] = r.kill(t, i, ids[i]) })
+	}
+	wg.Wait()
+	got := map[string]int{outcomes[0]: 1}
+	got[outcomes[1]]++
+	if got["killed"] != 1 || got["already_gone"] != 1 {
+		t.Errorf("outcomes %v, want one killed and one already_gone", outcomes)
+	}
+	if n := r.machine.Signals(); n != 1 {
+		t.Errorf("SIGKILL sent %d times, want 1", n)
 	}
 }

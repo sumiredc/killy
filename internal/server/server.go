@@ -74,6 +74,8 @@ type Server struct {
 	Live *live.State
 	// Broker tells each device's open event streams to send their state again.
 	Broker *sse.Broker
+	// DemoAgentID is the agent of the public demo (KILLY_DEMO_AGENT_ID); empty means none.
+	DemoAgentID string
 	// Pushes sends push notifications of the parents in applied snapshots; nil sends none.
 	Pushes interface{ Wake(agentID string) }
 	// HeartbeatInterval is how often a stream sends ": hb"; zero means sse.HeartbeatInterval.
@@ -92,6 +94,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /app/v1/devices", s.registerDevice)
 	mux.HandleFunc("PATCH /app/v1/devices/me", s.patchDevice)
 	mux.HandleFunc("POST /app/v1/pairings/claim", s.claimPairing)
+	mux.HandleFunc("POST /app/v1/demo", s.addDemoServer)
 	mux.HandleFunc("GET /app/v1/events", s.streamEvents)
 	mux.HandleFunc("GET /agent/v1/commands", s.streamCommands)
 	mux.HandleFunc("POST /agent/v1/results", s.postResult)

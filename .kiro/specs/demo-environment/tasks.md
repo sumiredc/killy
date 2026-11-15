@@ -36,16 +36,16 @@
   - [x] 2.8 `go vet ./...` と `go test -race ./...` を通し、Linux 上で `killy-agent-demo.service` として agent を動かし、`sh -c 'sleep 1 & exec sleep 600' &` で作った親が snapshot に入らないことと、その親の PID と start time で `curl` から `POST /app/v1/kills` を送って `not_demo` が返り、そのプロセスが生きていることを PR 本文に書く
     - _Requirements: 2.10, 2.13_
 
-- [ ] 3. app の「デモサーバーを試す」で公開デモのサーバーを追加する（#24。前提：#12、#23、#15、#38、#43）
-  - [ ] 3.1 `POST /app/v1/demo` のテスト（紐付く・2 回呼んでも 1 つで表示名と通知の設定が変わらない・紐付けた device にだけ `state` が届く・未設定と存在しない agent で `404` の `demo_not_configured` と紐付けなし・`401`）を書き、赤を確かめる
+- [x] 3. app の「デモサーバーを試す」で公開デモのサーバーを追加する（#24。前提：#12、#23、#15、#38、#43）
+  - [x] 3.1 `POST /app/v1/demo` のテスト（紐付く・2 回呼んでも 1 つで表示名と通知の設定が変わらない・紐付けた device にだけ `state` が届く・未設定と存在しない agent で `404` の `demo_not_configured` と紐付けなし・`401`）を書き、赤を確かめる
     - _Requirements: 3.2, 3.3, 3.4, 3.5, 3.6_
-  - [ ] 3.2 `Server.DemoAgentID`、`addDemoServer`、`cmd/killy/server.go` での `KILLY_DEMO_AGENT_ID` の読み込みを実装し、テストを緑にする
+  - [x] 3.2 `Server.DemoAgentID`、`addDemoServer`、`cmd/killy/server.go` での `KILLY_DEMO_AGENT_ID` の読み込みを実装し、テストを緑にする
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
-  - [ ] 3.3 `internal/relaytest` の形で、2 台の device が `POST /app/v1/demo` で紐付けた同じデモの親に、ID の違う kill を順に送るときと同時に送るときのテストを書き、`killed` と `already_gone` が 1 つずつで signal が 1 回であることを確かめる
+  - [x] 3.3 `internal/relaytest` の形で、2 台の device が `POST /app/v1/demo` で紐付けた同じデモの親に、ID の違う kill を順に送るときと同時に送るときのテストを書き、`killed` と `already_gone` が 1 つずつで signal が 1 回であることを確かめる
     - _Requirements: 3.14_
-  - [ ] 3.4 `KillyClient.addDemoServer` と Add server sheet のテスト（ボタンが出る・追加できた・`demo_not_configured`・届かない・`unauthorized`・`unavailable`・JSON でない応答・登録できていないときに何も送らない）を書き、赤を確かめる
+  - [x] 3.4 `KillyClient.addDemoServer` と Add server sheet のテスト（ボタンが出る・追加できた・`demo_not_configured`・届かない・`unauthorized`・`unavailable`・JSON でない応答・登録できていないときに何も送らない）を書き、赤を確かめる
     - _Requirements: 3.8, 3.9, 3.10, 3.11, 3.12_
-  - [ ] 3.5 `addDemoServer`、`ClaimErrorKind` の `demo_not_configured`、Add server sheet の「デモサーバーを試す」、`ja.json` と `en.json` の文言を実装し、テストを緑にする
+  - [x] 3.5 `addDemoServer`、`ClaimErrorKind` の `demo_not_configured`、Add server sheet の「デモサーバーを試す」、`ja.json` と `en.json` の文言を実装し、テストを緑にする
     - _Requirements: 3.8, 3.9, 3.10, 3.11, 3.12, 3.13_
-  - [ ] 3.6 `go vet ./...` と `go test -race ./...` と、app の型検査・lint・テストを通し、Linux 上で `killy-agent-demo.service` と `killy summon` を動かし、ローカルの Killy server を使って、実機かエミュレータで「デモサーバーを試す」から公開デモを追加し、デモの親を kill したことを PR 本文に書く
+  - [x] 3.6 `go vet ./...` と `go test -race ./...` と、app の型検査・lint・テストを通し、Linux 上で `killy-agent-demo.service` と `killy summon` を動かし、ローカルの Killy server を使って、実機かエミュレータで「デモサーバーを試す」から公開デモを追加し、デモの親を kill したことを PR 本文に書く
     - _Requirements: 3.15_
