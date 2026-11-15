@@ -6,12 +6,22 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/sumiredc/killy/internal/agent/kill"
 	"github.com/sumiredc/killy/internal/proc"
 )
 
+// parts builds the agent's scanner and killer as killy agent run does with args.
+func parts(t *testing.T, args ...string) (*proc.Scanner, *kill.Killer) {
+	t.Helper()
+	flags, err := parseAgentRunFlags(args, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return newAgentParts(flags, fstest.MapFS{}, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+}
+
 func TestDemoLimitsBothTheReportAndTheKillsToSummonsCgroup(t *testing.T) {
-	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	scanner, killer := newAgentParts(true, fstest.MapFS{}, nil, log)
+	scanner, killer := parts(t, "--demo")
 	if scanner.OnlyCgroup != proc.SummonCgroup {
 		t.Errorf("scanner.OnlyCgroup = %q, want %q", scanner.OnlyCgroup, proc.SummonCgroup)
 	}
@@ -24,8 +34,7 @@ func TestDemoLimitsBothTheReportAndTheKillsToSummonsCgroup(t *testing.T) {
 }
 
 func TestWithoutDemoNeitherIsLimited(t *testing.T) {
-	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	scanner, killer := newAgentParts(false, fstest.MapFS{}, nil, log)
+	scanner, killer := parts(t)
 	if scanner.OnlyCgroup != "" || killer.Demo {
 		t.Errorf("OnlyCgroup %q, Demo %v; want neither set", scanner.OnlyCgroup, killer.Demo)
 	}

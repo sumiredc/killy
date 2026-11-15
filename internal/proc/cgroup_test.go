@@ -94,3 +94,36 @@ func TestInCgroupTellsAMissingV2LineAndAMissingProcessApart(t *testing.T) {
 		t.Errorf("no process: err %v, want fs.ErrNotExist", err)
 	}
 }
+
+// reusedAfterCmdline is a /proc where process 100 exits after its cgroup is read, and PID 100 is
+// reused by a process outside summon's cgroup before its command line is read.
+type reusedAfterCmdline struct {
+	// Not embedded: fstest.MapFS has ReadFile, which fs.ReadFile would call instead of Open.
+	files      fstest.MapFS
+	cgroupRead bool
+}
+
+func (r *reusedAfterCmdline) Open(name string) (fs.File, error) {
+	switch {
+	case name == "100/cgroup":
+		r.cgroupRead = true
+	case r.cgroupRead && name == "100/cmdline":
+		return fstest.MapFS{name: {Data: []byte("someone-elses-secret\x00")}}.Open(name)
+	case r.cgroupRead && name == "100/stat":
+		return fstest.MapFS{name: {Data: []byte(statLine(fakeProc{pid: 100, comm: "other", state: 'S', ppid: 1, starttime: 777}))}}.Open(name)
+	}
+	return r.files.Open(name)
+}
+
+func TestScanInDemoModeDropsAParentWhosePIDWasReusedWhileItWasRead(t *testing.T) {
+	root := &reusedAfterCmdline{files: demoRoot()}
+	parents, err := (&Scanner{Root: root, OnlyCgroup: SummonCgroup}).Scan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range parents {
+		if p.PID == 100 {
+			t.Errorf("reported %+v: the command line read belongs to another process", p)
+		}
+	}
+}

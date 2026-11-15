@@ -118,10 +118,19 @@ func (s *Scanner) Scan() ([]protocol.Parent, error) {
 			}
 		}
 		slices.Sort(children)
+		cmd := s.cmd(st)
+		// The cgroup and the command line are read by PID. If the parent exited and its PID went
+		// to another process in between, the command line is that process's: in demo mode it must
+		// not be reported, so the start time is read again and must not have changed.
+		if s.OnlyCgroup != "" {
+			if again, err := s.Stat(ppid); err != nil || again.StartTime != st.StartTime {
+				continue
+			}
+		}
 		parents = append(parents, protocol.Parent{
 			PID:       ppid,
 			StartTime: st.StartTime,
-			Cmd:       s.cmd(st),
+			Cmd:       cmd,
 			Zombies:   children,
 		})
 	}
