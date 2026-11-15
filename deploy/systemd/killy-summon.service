@@ -1,0 +1,17 @@
+# Demo machine only: keeps demo parents that hold zombies alive, for the public demo to kill.
+# The parents inherit this unit's cgroup (/system.slice/killy-summon.service), which is what
+# killy agent run --demo checks before it reports or kills one.
+[Unit]
+Description=Killy demo summoner
+Documentation=https://github.com/sumiredc/killy
+
+[Service]
+ExecStart=/usr/local/bin/killy summon
+# Neither summon nor its parents need privileges; the unit, not the user, sets the cgroup.
+DynamicUser=yes
+# No Delegate=: a parent in a sub-cgroup would not match demo mode's exact check.
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
