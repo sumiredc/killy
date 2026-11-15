@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: killy-server
+  labels: { app: killy-server }
+spec:
+  # One instance: live state, SSE streams and pending commands are in memory.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: { app: killy-server }
+  template:
+    metadata:
+      labels: { app: killy-server }
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: server
+          # The overlays pin the digest in images[].
+          image: 10.1.1.10:5000/killy/server
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: KILLY_DATABASE_URL
+              valueFrom:
+                secretKeyRef: { name: killy-db, key: KILLY_DATABASE_URL }
+          # killy server listens only after the migrations have run, so an open port means ready.
+          startupProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: killy
+spec:
+  selector: { app: killy-server }
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: killy
+  annotations:
+    # SSE: send each event at once and keep idle streams open (heartbeat every 20 s).
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  ingressClassName: nginx
+  rules:
+    # Each overlay replaces the host.
+    - host: host.invalid
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: killy
+                port: { name: http }

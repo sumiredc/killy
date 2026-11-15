@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "SealedSecret ciphertext: only the cluster's sealed-secrets controller can decrypt it"
+paths = ['''^deploy/overlays/[^/]+/sealedsecret\.yaml$''']

@@ -1,0 +1,5 @@
+# Findings that are not secrets. Each line is a gitleaks fingerprint (commit:file:rule:line).
+# Test fixtures: base64 of "not-a-real-token", "secret-token-for-tests-only-12345678", "not-a-device-token".
+f8c6db68a4e358695af9cd938bfc3047ac2ddfe1:internal/server/snapshots_test.go:generic-api-key:83
+6ef545d772f49301442b300d4e5acf28aeeef6c4:internal/agent/pair_test.go:generic-api-key:20
+c9cb16413aee1203e9166e22b86c8f027abfd8db:internal/server/devices_test.go:generic-api-key:309

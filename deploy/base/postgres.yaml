@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  labels: { app: postgres }
+spec:
+  replicas: 1
+  serviceName: postgres
+  selector:
+    matchLabels: { app: postgres }
+  template:
+    metadata:
+      labels: { app: postgres }
+    spec:
+      # The local-path volume lives on the storage node, which only admits pods with this toleration.
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: storage
+          effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/storage
+                    operator: Exists
+      automountServiceAccountToken: false
+      containers:
+        - name: postgres
+          # docker.io images are pulled through the cluster's mirror.
+          image: postgres:18.7@sha256:2ea8630df176ad090ec92136dee850397c5af8781e4bcf2e4162593691c61bbc
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: killy
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: killy-db, key: POSTGRES_PASSWORD }
+          # Over TCP: during first-run initialisation the image runs a temporary server on the unix
+          # socket only, which pg_isready over the socket would already report as ready.
+          readinessProbe:
+            exec:
+              command: [pg_isready, -h, 127.0.0.1, -U, postgres, -d, killy]
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 512Mi }
+          volumeMounts:
+            # PostgreSQL 18 images keep PGDATA in /var/lib/postgresql/18/docker, under this mount.
+            - name: data
+              mountPath: /var/lib/postgresql
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        # Written out because the API server adds it; Argo CD would otherwise show a lasting diff.
+        volumeMode: Filesystem
+        storageClassName: local-path
+        resources:
+          requests: { storage: 5Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  selector: { app: postgres }
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
