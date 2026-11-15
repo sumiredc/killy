@@ -117,7 +117,8 @@ function LanguageRow() {
   return (
     <View style={styles.row}>
       <KText style={[styles.rowTitle, styles.rowMain]}>{t('language')}</KText>
-      <View style={styles.segmented} accessibilityRole="radiogroup" accessibilityLabel={t('language')}>
+      {/* Buttons with a selected state, as the mock's aria-pressed buttons; no radio roles. */}
+      <View style={styles.segmented}>
         {languages.map((l) => {
           const selected = l.lang === lang;
           return (
