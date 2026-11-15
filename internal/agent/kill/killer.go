@@ -48,6 +48,8 @@ type Killer struct {
 	Store   OutcomeStore
 	Clock   Clock
 	SelfPID func() int
+	// Demo, set by killy agent run --demo, kills only parents in proc.SummonCgroup.
+	Demo bool
 	// Log receives the outcomes that could not be stored. Nil means slog.Default().
 	Log *slog.Logger
 
@@ -166,6 +168,19 @@ func (k *Killer) check(cmd protocol.KillCommand) ([]proc.Stat, *protocol.Outcome
 	if k.protected(cmd.PPID) {
 		o := refused(protocol.ReasonProtected)
 		return nil, &o
+	}
+	// The public demo kills only what killy summon started. Only root can move a process into
+	// that cgroup, so an ordinary process cannot pass this. A parent whose cgroup cannot be read
+	// is not killed: where it came from is not known.
+	if k.Demo {
+		in, err := k.Proc.InCgroup(cmd.PPID, proc.SummonCgroup)
+		switch {
+		case gone(err):
+			return nil, &protocol.Outcome{Outcome: protocol.AlreadyGone}
+		case err != nil || !in:
+			o := refused(protocol.ReasonNotDemo)
+			return nil, &o
+		}
 	}
 	return zombies, nil
 }

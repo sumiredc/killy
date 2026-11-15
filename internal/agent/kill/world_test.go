@@ -33,9 +33,15 @@ type world struct {
 	// keepZombies leaves the zombies of a killed parent in the table; by default they are reaped
 	// at once, as init does after they are reparented to it.
 	keepZombies bool
-	// afterOpen and beforeSend run outside the lock, so they may change the table.
-	afterOpen  func()
-	beforeSend func()
+	// cgroup is the content of <pid>/cgroup for the processes that have one; cgroupErr makes
+	// reading it fail.
+	cgroup    map[int]string
+	cgroupErr map[int]error
+	// afterOpen, beforeSend and beforeCgroup (before each read of a cgroup file) run outside the
+	// lock, so they may change the table.
+	afterOpen    func()
+	beforeSend   func()
+	beforeCgroup func()
 }
 
 type identity struct {
@@ -44,7 +50,7 @@ type identity struct {
 }
 
 func newWorld(ps ...proc.Stat) *world {
-	w := &world{procs: map[int]*proc.Stat{}, fds: map[Pidfd]identity{}, nextFD: 3, statErr: map[int]error{}}
+	w := &world{procs: map[int]*proc.Stat{}, fds: map[Pidfd]identity{}, nextFD: 3, statErr: map[int]error{}, cgroup: map[int]string{}, cgroupErr: map[int]error{}}
 	w.add(proc.Stat{PID: 1, Comm: "init", State: 'S', PPID: 0, StartTime: 1})
 	for _, p := range ps {
 		w.add(p)
@@ -110,12 +116,24 @@ func (w *world) sendCount() int {
 
 // Open serves /proc. Reads of <pid>/stat are logged so tests can check the order of the steps.
 func (w *world) Open(name string) (fs.File, error) {
+	if strings.HasSuffix(name, "/cgroup") && w.beforeCgroup != nil {
+		w.beforeCgroup()
+	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	root := fstest.MapFS{}
 	for _, p := range w.procs {
 		root[fmt.Sprintf("%d/stat", p.PID)] = &fstest.MapFile{Data: []byte(statLine(*p))}
 		root[fmt.Sprintf("%d/cmdline", p.PID)] = &fstest.MapFile{Data: []byte(p.Comm + "\x00")}
+		if c, ok := w.cgroup[p.PID]; ok {
+			root[fmt.Sprintf("%d/cgroup", p.PID)] = &fstest.MapFile{Data: []byte(c)}
+		}
+	}
+	if pidText, ok := strings.CutSuffix(name, "/cgroup"); ok {
+		w.events = append(w.events, "read "+name)
+		if pid, err := strconv.Atoi(pidText); err == nil && w.cgroupErr[pid] != nil {
+			return nil, &fs.PathError{Op: "open", Path: name, Err: w.cgroupErr[pid]}
+		}
 	}
 	if pidText, ok := strings.CutSuffix(name, "/stat"); ok {
 		w.events = append(w.events, "read "+name)

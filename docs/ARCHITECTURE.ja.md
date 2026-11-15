@@ -70,7 +70,7 @@ agent は 15 秒ごとと、親の集合が変わったときにすぐ、snapsho
 4. 次のどれかに当てはまれば、拒否する（outcome `refused` と理由。signal は送らない）。
    - そのプロセスにゾンビの子がもういない（`not_a_zombie_parent`）
    - `ppid` が 1、agent 自身、または agent の祖先である（`protected`）
-   - demo mode で、そのプロセスの cgroup（`/proc/<ppid>/cgroup` の `0::` の行。cgroup v2）が `/system.slice/killy-summon.service` と完全には一致しない（`not_demo`）。一致は完全一致で比べる。利用者が自分で作った同じ名前の unit は `/user.slice/…` の下にあり、数に入らない
+   - demo mode で、そのプロセスの cgroup（`/proc/<ppid>/cgroup` の `0::` の行。cgroup v2）が `/system.slice/killy-summon.service` と完全には一致しない（`not_demo`）。一致は完全一致で比べる。利用者が自分で作った同じ名前の unit は `/user.slice/…` の下にあり、数に入らない。cgroup のファイルが読めないときは、プロセスがもう無ければ `already_gone`、それ以外は `not_demo` にする。`0::` の行が無いファイル（cgroup v1 だけの system）も `not_demo` にする。由来を確かめられない親は kill しない
 5. pidfd を通して `SIGKILL` を送る（`pidfd_send_signal`）。手順 2 の後に PID が再利用されても、pidfd は元のプロセスを指したままなので、signal は新しいプロセスに届かない。手順 3 の後にプロセスが終わって回収されていたら（`ESRCH`）→ `already_gone`。終わっていてもまだ回収されていなければ、kernel は signal を受け付け（効果は無い）、outcome は手順 6 で決まる。手順 3 から送るまでのこの隙間は塞げないので、受け入れる。それ以外のエラーなら → `signal_failed` と errno。
 6. 元のゾンビがすべて消えるまで最大 5 秒待つ → 消えれば outcome `killed` と回収された数。消えなければ `zombies_remain`。
 7. outcome を `id` に結びつけて `/var/lib/killy/outcomes.jsonl`（追記のみ、mode 0600、期限なし。agent の再起動後も同じ `id` を見分けられる）に保存し、POST する。書き込みに失敗したら、ログに出して outcome はそのまま POST する。書き込みは繰り返さない。outcome はメモリには残るので、agent が再起動する前に同じ `id` が届けば、二度目の signal を送らずにその outcome を返す。PRD は、書き込みに失敗した `id` と、手順 5 から 7 の間に agent が止まった `id` が、もう一度処理されうることを受け入れている。
