@@ -1,10 +1,19 @@
+import Animated, { type SharedValue, useAnimatedProps } from 'react-native-reanimated';
 import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
+
+import { killyBlink } from '@/killy/idle';
+
+const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
 
 /**
  * Killy, ported from killySVG in mock/art.js without redrawing. Faces right, has no mouth.
- * `ghost`, `eye`, `scythe` and `arm` stay separate elements so later motion can move them.
+ * `ghost`, `eye`, `scythe` and `arm` stay separate elements so later motion can move them. Given
+ * the idle clock, the eyes blink; each is squashed towards its own centre, as the mock's scaleY
+ * with transform-box fill-box.
  */
-export function Killy({ width }: { width: number }) {
+export function Killy({ width, clock }: { width: number; clock?: SharedValue<number> }) {
+  const near = useAnimatedProps(() => ({ ry: 7.2 * (clock ? killyBlink(clock.value) : 1) }));
+  const far = useAnimatedProps(() => ({ ry: 6.6 * (clock ? killyBlink(clock.value) : 1) }));
   return (
     <Svg width={width} height={(width * 150) / 200} viewBox="0 0 200 150" testID="killy-art">
       <Defs>
@@ -24,8 +33,8 @@ export function Killy({ width }: { width: number }) {
           d="M80 16 C102 16 116 34 116 56 C116 74 112 88 108 100 Q100 112 92 102 Q84 114 74 104 Q64 116 54 106 Q40 113 26 106 Q14 101 8 88 Q28 95 40 84 C46 77 46 66 46 56 C46 34 58 16 80 16 Z"
           fill="url(#killyBody)"
         />
-        <Ellipse testID="killy-eye" cx="88" cy="56" rx="4.8" ry="7.2" fill="#000" />
-        <Ellipse testID="killy-eye" cx="105" cy="55" rx="3.8" ry="6.6" fill="#000" />
+        <AnimatedEllipse testID="killy-eye" cx="88" cy="56" rx="4.8" ry="7.2" fill="#000" animatedProps={near} />
+        <AnimatedEllipse testID="killy-eye" cx="105" cy="55" rx="3.8" ry="6.6" fill="#000" animatedProps={far} />
       </G>
 
       <G testID="killy-scythe">

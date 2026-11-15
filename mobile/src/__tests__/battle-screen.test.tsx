@@ -2,6 +2,7 @@ import { webcrypto } from 'node:crypto';
 
 import { act, fireEvent, renderRouter, screen, within } from 'expo-router/testing-library';
 import * as Localization from 'expo-localization';
+import { StyleSheet } from 'react-native';
 
 import * as config from '../config';
 import RootLayout from '../app/_layout';
@@ -419,8 +420,8 @@ describe('the arena', () => {
     await battleWith([server('a', 'web-01', [parent(3801, pids(4), t1)])]);
     await laidOut();
     const back = screen.getAllByTestId('zombie')[3];
-    const height = (48 * 80) / 56;
-    expect(back).toHaveStyle({ transform: [{ translateY: (height * (1 - 0.84)) / 2 }, { scale: 0.84 }] });
+    expect(back).toHaveStyle({ transformOrigin: '50% 100%' });
+    expect(StyleSheet.flatten(back.props.style).transform?.[0]).toEqual({ scale: 0.84 });
   });
 
   test('in an empty state Killy stays, and there is no necromancer, zombie or counter', async () => {
@@ -439,3 +440,4 @@ describe('the arena', () => {
     expect(screen.getAllByTestId('tab-icon-settings').length).toBeGreaterThan(0);
   });
 });
+

@@ -1,8 +1,7 @@
 import Svg, { Circle, G, Path, Rect } from 'react-native-svg';
 
-/** Where the strings end, in the 56 × 80 viewBox: zombieSVG's `.head-pt` and `.hand`. */
-export const head = { x: 28, y: 5 };
-export const hand = { x: 3.5, y: 46.5 };
+import { hand, head } from './points';
+
 
 /**
  * A zombie process, from zombieSVG in mock/art.js, facing left. `dead` swaps face-normal for

@@ -10,6 +10,7 @@ import { parentKey, type Shown } from '@/killy/battle';
 import { useBattle } from '@/killy/battle-context';
 import type { KillErrorKind } from '@/killy/client';
 import { useKilly } from '@/killy/context';
+import { useIdleMotion } from '@/killy/motion';
 import { useHoldToKill } from '@/killy/hold';
 import { KText } from '@/theme/KText';
 import { colors, gutter, radii } from '@/theme/tokens';
@@ -76,6 +77,7 @@ export default function BattleScreen() {
   };
   const shown = battle.shown && outcome(battle.shown);
   const [size, setSize] = useState<Size | null>(null);
+  const clock = useIdleMotion();
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']} testID="battle-screen">
@@ -130,8 +132,8 @@ export default function BattleScreen() {
             label={t('counter', { i: battle.cleared + 1, n: battle.cleared + battle.queue.length })}
           />
         )}
-        {current && size && <Enemies size={size} zombies={current.parent.zombies} />}
-        <KillyOnStage />
+        {current && size && <Enemies size={size} zombies={current.parent.zombies} clock={clock} />}
+        <KillyOnStage clock={clock} />
         </View>
       </View>
 
