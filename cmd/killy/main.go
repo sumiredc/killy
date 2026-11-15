@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/sumiredc/killy/internal/summon"
 )
 
 const usage = `usage: killy <command> [arguments]
@@ -16,6 +18,15 @@ commands:
 `
 
 func main() {
+	// A process killy summon started as a demo parent or its zombie child is this binary again;
+	// it does its part instead of reading the command line, which shows the demo command.
+	switch os.Getenv(summon.RoleEnv) {
+	case summon.RoleParent:
+		summon.RunParent()
+		os.Exit(0)
+	case summon.RoleZombie:
+		os.Exit(0)
+	}
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 
@@ -30,8 +41,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	case "server":
 		return runServer(args[1:], stderr)
 	case "summon":
-		fmt.Fprintf(stderr, "killy %s: not implemented yet\n", args[0])
-		return 1
+		return runSummon(args[1:], stderr)
 	case "-h", "-help", "--help", "help":
 		fmt.Fprint(stderr, usage)
 		return 0
