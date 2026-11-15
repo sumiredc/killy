@@ -1,21 +1,24 @@
 import { Geist_400Regular, Geist_500Medium } from '@expo-google-fonts/geist';
 import { GeistMono_400Regular, GeistMono_600SemiBold } from '@expo-google-fonts/geist-mono';
 import { ZenKakuGothicNew_400Regular, ZenKakuGothicNew_700Bold } from '@expo-google-fonts/zen-kaku-gothic-new';
+import { getLocales } from 'expo-localization';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { buildServerURL, ConfigError } from '@/config';
 import { ServerURLProvider } from '@/config-context';
+import { initialLanguage, type Lang } from '@/i18n';
 import { I18nProvider } from '@/i18n/context';
 import { BattleProvider } from '@/killy/battle-context';
 import { KillyProvider } from '@/killy/context';
 import { NotificationsProvider } from '@/killy/notifications-context';
 import { PairLinkProvider } from '@/killy/pair-link';
+import { makePrefs } from '@/prefs';
 import { colors, fonts } from '@/theme/tokens';
 
 SplashScreen.preventAutoHideAsync();
@@ -30,14 +33,26 @@ export default function RootLayout() {
     ZenKakuGothicNew_700Bold,
   });
   const config = useMemo(() => readConfig(), []);
+  const [prefs] = useState(makePrefs);
+  // The saved language, read before anything is drawn so the phone's language never shows first.
+  // Without one, or when it cannot be read now (iOS while the phone is locked), the phone's
+  // language is used and the saved one is left as it is.
+  const [lang, setLang] = useState<Lang | null>(null);
+  useEffect(() => {
+    const fallback = () => initialLanguage(getLocales());
+    prefs.language.get().then(
+      (saved) => setLang(saved ?? fallback()),
+      () => setLang(fallback()),
+    );
+  }, [prefs]);
   // A font that fails to load falls back to the system font; the app still opens.
-  const ready = loaded || fontError !== null;
+  const ready = (loaded || fontError !== null) && lang !== null;
   useEffect(() => {
     if (ready) {
       SplashScreen.hideAsync();
     }
   }, [ready]);
-  if (!ready) {
+  if (!ready || lang === null) {
     return null;
   }
   return (
@@ -47,7 +62,7 @@ export default function RootLayout() {
         <ConfigErrorScreen message={config.error} />
       ) : (
         <ServerURLProvider url={config.url}>
-          <I18nProvider>
+          <I18nProvider initial={lang} save={(l) => prefs.language.set(l)}>
             <KillyProvider>
               <NotificationsProvider>
                 <BattleProvider>

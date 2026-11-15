@@ -34,3 +34,14 @@ describe('prefs', () => {
     await expect(makePrefs().notify.get()).resolves.toBeNull();
   });
 });
+
+test('the language is kept in expo-secure-store, and anything but ja or en counts as nothing saved', async () => {
+  await expect(makePrefs().language.get()).resolves.toBeNull();
+  await makePrefs().language.set('ja');
+  expect(SecureStore.setItemAsync).toHaveBeenCalledWith('language', 'ja');
+  await expect(makePrefs().language.get()).resolves.toBe('ja');
+  await makePrefs().language.set('en');
+  await expect(makePrefs().language.get()).resolves.toBe('en');
+  await SecureStore.setItemAsync('language', 'fr');
+  await expect(makePrefs().language.get()).resolves.toBeNull();
+});

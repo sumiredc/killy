@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AddServerSheet } from '@/components/AddServerSheet';
 import { ServerSheet } from '@/components/ServerSheet';
+import type { Lang } from '@/i18n';
 import { useI18n } from '@/i18n/context';
 import { useKilly } from '@/killy/context';
 import { useNotifications } from '@/killy/notifications-context';
@@ -12,7 +13,6 @@ import { serverRow } from '@/killy/server-row';
 import { KText } from '@/theme/KText';
 import { colors, gutter, radii } from '@/theme/tokens';
 
-// The settings screen. The language row of the App group comes with #21.
 export default function SettingsScreen() {
   const { t } = useI18n();
   const { state } = useKilly();
@@ -92,7 +92,10 @@ export default function SettingsScreen() {
         </Pressable>
         <KText style={styles.groupTitle}>{t('app')}</KText>
         <View style={styles.group}>
-          <NotificationsRow />
+          <LanguageRow />
+          <View style={styles.rowDivider}>
+            <NotificationsRow />
+          </View>
         </View>
         <NotificationsError />
       </ScrollView>
@@ -100,6 +103,37 @@ export default function SettingsScreen() {
       {(adding || link !== null) && open === undefined && <AddServerSheet onClose={closeAdd} link={link} />}
       {open !== undefined && <ServerSheet server={open} onClose={() => setOpenId(null)} />}
     </SafeAreaView>
+  );
+}
+
+// Each language is named in itself, so it can be found whatever the app is in now.
+const languages: { lang: Lang; name: string }[] = [
+  { lang: 'ja', name: '日本語' },
+  { lang: 'en', name: 'English' },
+];
+
+function LanguageRow() {
+  const { t, lang, setLang } = useI18n();
+  return (
+    <View style={styles.row}>
+      <KText style={[styles.rowTitle, styles.rowMain]}>{t('language')}</KText>
+      <View style={styles.segmented} accessibilityRole="radiogroup" accessibilityLabel={t('language')}>
+        {languages.map((l) => {
+          const selected = l.lang === lang;
+          return (
+            <Pressable
+              key={l.lang}
+              accessibilityRole="button"
+              accessibilityLabel={l.name}
+              accessibilityState={{ selected }}
+              onPress={() => setLang(l.lang)}
+              style={[styles.segment, selected && styles.segmentSelected]}>
+              <KText style={[styles.segmentText, selected && styles.segmentTextSelected]}>{l.name}</KText>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
   );
 }
 
@@ -165,6 +199,12 @@ const styles = StyleSheet.create({
   rowTitle: { color: colors.text, fontSize: 15 },
   blocked: { color: colors.text, fontSize: 12.5, marginTop: 4 },
   link: { color: colors.purple300, fontSize: 12.5, marginTop: 2 },
+  // DESIGN Settings tab: segmented 日本語 / English on elev-2, the chosen one in purple (mock/style.css).
+  segmented: { flexDirection: 'row', padding: 3, borderRadius: 10, backgroundColor: colors.elev2 },
+  segment: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8 },
+  segmentSelected: { backgroundColor: colors.purple },
+  segmentText: { color: colors.muted, fontSize: 13 },
+  segmentTextSelected: { color: '#FFFFFF' },
   errorLine: { color: colors.red, fontSize: 13, lineHeight: 20, marginTop: 6, marginHorizontal: 4 },
   badge: { paddingVertical: 3, paddingHorizontal: 9, borderRadius: radii.pill, backgroundColor: 'rgba(144,70,255,0.2)' },
   badgeText: { color: colors.purple100, fontSize: 13 },
