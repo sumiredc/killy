@@ -2,6 +2,7 @@ import { BlurView } from 'expo-blur';
 import { Tabs, usePathname, useRouter } from 'expo-router';
 import { StyleSheet } from 'react-native';
 
+import { BattleIcon, SettingsIcon } from '@/art/TabIcons';
 import { useI18n } from '@/i18n/context';
 import { useBattle } from '@/killy/battle-context';
 import { useOpenBattleOnTap } from '@/killy/notifications-context';
@@ -28,12 +29,12 @@ export default function TabsLayout() {
         ),
         tabBarActiveTintColor: colors.purple300,
         tabBarInactiveTintColor: colors.muted,
-        tabBarIcon: () => null,
       }}>
       <Tabs.Screen
         name="index"
         options={{
           title: battleLabel,
+          tabBarIcon: ({ color }) => <BattleIcon color={color} />,
           tabBarAccessibilityLabel: battleLabel,
           tabBarLabelStyle: { fontFamily: fontFor(battleLabel, 'mono'), fontSize: 12 },
           // While Settings is open, how many zombie processes are waiting (DESIGN: Settings tab).
@@ -43,7 +44,12 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="settings"
-        options={{ title: settings, tabBarAccessibilityLabel: settings, tabBarLabelStyle: { fontFamily: fontFor(settings, 'mono'), fontSize: 12 } }}
+        options={{
+          title: settings,
+          tabBarIcon: ({ color }) => <SettingsIcon color={color} />,
+          tabBarAccessibilityLabel: settings,
+          tabBarLabelStyle: { fontFamily: fontFor(settings, 'mono'), fontSize: 12 },
+        }}
         listeners={{
           // Not while a kill is in flight: its outcome belongs on the battle screen.
           tabPress: (e) => {

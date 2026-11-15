@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Backdrop, Enemies, Ground, KillyOnStage, ParentCounter } from '@/components/Arena';
 import type { Key } from '@/i18n';
 import { useI18n } from '@/i18n/context';
+import { counter, type Size } from '@/killy/arena';
 import { parentKey, type Shown } from '@/killy/battle';
 import { useBattle } from '@/killy/battle-context';
 import type { KillErrorKind } from '@/killy/client';
@@ -27,7 +30,20 @@ const errors: Record<KillErrorKind, Key> = {
   other: 'killFailed',
 };
 
-// The battle screen. The arena's art and the kill sequence come with #26–#28; this is the text.
+function Result({ shown }: { shown: { lines: string[]; ok: boolean } }) {
+  return (
+    <View style={styles.result} testID="kill-result">
+      {shown.lines.map((line) => (
+        <KText key={line} kind="mono" style={shown.ok ? styles.resultOk : styles.resultBad}>
+          {line}
+        </KText>
+      ))}
+    </View>
+  );
+}
+
+// The battle screen: the arena (DESIGN: Battle tab), the kill button and the All clear card.
+// The motion comes with #27, #83, #28 and #84.
 export default function BattleScreen() {
   const { t } = useI18n();
   const { registration, state } = useKilly();
@@ -59,6 +75,7 @@ export default function BattleScreen() {
     }
   };
   const shown = battle.shown && outcome(battle.shown);
+  const [size, setSize] = useState<Size | null>(null);
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']} testID="battle-screen">
@@ -67,9 +84,11 @@ export default function BattleScreen() {
           <KText style={styles.noticeText}>{t('deviceRateLimited')}</KText>
         </View>
       )}
-      <View style={styles.arena}>
+      <View style={styles.arena} testID="arena" onLayout={(e) => setSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}>
+        {size && <Backdrop size={size} />}
+        {size && <Ground size={size} />}
         {current ? (
-          <View>
+          <View style={styles.info}>
             <View style={styles.chip}>
               <KText kind="mono" style={styles.chipText} testID="battle-server">
                 {current.server.name}
@@ -79,7 +98,9 @@ export default function BattleScreen() {
               <KText kind="monoSemiBold" style={styles.count} testID="battle-zombies">
                 {current.parent.zombies.length}
               </KText>
-              <KText style={styles.countLabel}>{t('zLabel')}</KText>
+              <KText kind="mono" style={styles.countLabel}>
+                {t('zLabel')}
+              </KText>
             </View>
             <KText kind="mono" style={styles.pid}>
               {t('whoParent', { pid: current.parent.pid })}
@@ -87,24 +108,25 @@ export default function BattleScreen() {
             <KText kind="mono" style={styles.cmd} numberOfLines={2}>
               {current.parent.cmd}
             </KText>
+            {shown && <Result shown={shown} />}
           </View>
         ) : (
-          <View>
+          <View style={styles.empty}>
             <KText kind="monoSemiBold" style={styles.title}>
               {t(servers.length === 0 ? 'emptyNoServerTitle' : 'emptyNoneTitle')}
             </KText>
             <KText style={styles.text}>{t(servers.length === 0 ? 'emptyNoServerText' : 'emptyNoneText')}</KText>
+            {shown && <Result shown={shown} />}
           </View>
         )}
-        {shown && (
-          <View style={styles.result} testID="kill-result">
-            {shown.lines.map((line) => (
-              <KText key={line} kind="mono" style={shown.ok ? styles.resultOk : styles.resultBad}>
-                {line}
-              </KText>
-            ))}
-          </View>
+        {current && (
+          <ParentCounter
+            value={counter(battle.cleared, battle.queue.length)}
+            label={t('counter', { i: battle.cleared + 1, n: battle.cleared + battle.queue.length })}
+          />
         )}
+        {current && size && <Enemies size={size} zombies={current.parent.zombies} />}
+        <KillyOnStage />
       </View>
 
       <Pressable
@@ -168,27 +190,31 @@ const styles = StyleSheet.create({
   // Registration failed with 429: said where the app opens, until the next start tries again.
   notice: { padding: 12, borderRadius: radii.input, backgroundColor: 'rgba(247,80,106,0.12)', marginBottom: 12 },
   noticeText: { color: '#FF9AAA', fontSize: 13, lineHeight: 20 },
-  arena: {
-    flex: 1,
-    backgroundColor: colors.elev1,
-    borderColor: colors.line,
+  // The mock's `.arena`; everything in it is placed absolutely, as there.
+  arena: { flex: 1, backgroundColor: colors.elev1, borderColor: colors.line, borderWidth: 1, borderRadius: radii.card, overflow: 'hidden' },
+  info: { position: 'absolute', top: 20, left: 20, right: 70, zIndex: 1 },
+  chip: {
+    alignSelf: 'flex-start',
+    marginBottom: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: radii.pill,
     borderWidth: 1,
-    borderRadius: radii.card,
-    padding: 20,
-    justifyContent: 'space-between',
+    borderColor: 'rgba(191,158,255,0.35)',
+    backgroundColor: 'rgba(144,70,255,0.14)',
   },
-  chip: { alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 12, borderRadius: radii.pill, backgroundColor: 'rgba(144,70,255,0.25)' },
-  chipText: { color: colors.purple100, fontSize: 13 },
-  countRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 10 },
-  count: { color: colors.text, fontSize: 56 },
-  countLabel: { color: colors.muted, fontSize: 14 },
-  pid: { color: colors.purple300, fontSize: 14, marginTop: 4 },
-  cmd: { color: colors.muted, fontSize: 13, marginTop: 4 },
-  title: { color: colors.text, fontSize: 18, marginBottom: 8 },
-  text: { color: colors.muted, fontSize: 14, lineHeight: 20 },
-  result: { gap: 4 },
-  resultOk: { color: colors.green, fontSize: 13 },
-  resultBad: { color: colors.red, fontSize: 13, lineHeight: 19 },
+  chipText: { color: colors.purple100, fontSize: 12.5 },
+  countRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  count: { color: colors.text, fontSize: 56, lineHeight: 60, letterSpacing: -2 },
+  countLabel: { color: colors.muted, fontSize: 15 },
+  pid: { color: colors.purple300, fontSize: 12.5, lineHeight: 20, marginTop: 10 },
+  cmd: { color: colors.muted, fontSize: 12.5, lineHeight: 20 },
+  empty: { position: 'absolute', top: 24, left: 20, right: 20, gap: 8, zIndex: 1 },
+  title: { color: colors.text, fontSize: 22 },
+  text: { color: colors.muted, fontSize: 14, lineHeight: 22 },
+  result: { gap: 4, marginTop: 8 },
+  resultOk: { color: colors.green, fontSize: 12.5, lineHeight: 20 },
+  resultBad: { color: colors.red, fontSize: 12.5, lineHeight: 20 },
   kill: { marginTop: 12, minHeight: 64, borderRadius: radii.button, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 },
   killDisabled: { backgroundColor: colors.elev3 },
   killLabel: { color: '#FFFFFF', fontSize: 16 },

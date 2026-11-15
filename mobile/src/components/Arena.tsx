@@ -1,0 +1,250 @@
+import { StyleSheet, View } from 'react-native';
+import Svg, { Circle, Defs, Line, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
+
+import { HoodIcon } from '@/art/HoodIcon';
+import { Killy } from '@/art/Killy';
+import { Necromancer } from '@/art/Necromancer';
+import { Zombie } from '@/art/Zombie';
+import {
+  type Counter,
+  GROUND_HEIGHT,
+  KILLY_WIDTH,
+  MOON_SIZE,
+  moonAt,
+  NECROMANCER_WIDTH,
+  necromancerAt,
+  onGround,
+  type Size,
+  slots,
+  strings,
+  ZOMBIE_HEIGHT,
+  ZOMBIE_WIDTH,
+  zombieBox,
+} from '@/killy/arena';
+import { KText } from '@/theme/KText';
+import { colors } from '@/theme/tokens';
+
+// The mock's `.stars`: position as a fraction of the arena, radius in px, opacity.
+const stars = [
+  { x: 0.18, y: 0.42, r: 0.6, o: 0.53 },
+  { x: 0.42, y: 0.3, r: 0.5, o: 0.4 },
+  { x: 0.58, y: 0.48, r: 0.7, o: 0.47 },
+  { x: 0.3, y: 0.58, r: 0.5, o: 0.33 },
+  { x: 0.88, y: 0.26, r: 0.6, o: 0.4 },
+  { x: 0.12, y: 0.7, r: 0.5, o: 0.27 },
+];
+
+// erfc(d / 30√2) / 2 for the halo stops, d in px past the shadow's spread edge.
+const shadowFalloff = [
+  [-10, 0.631],
+  [0, 0.5],
+  [15, 0.309],
+  [30, 0.159],
+  [45, 0.067],
+  [60, 0.023],
+] as const;
+
+/** The sky behind everything: purple glow, stars and the moon (the mock's `.arena` background, `.stars`, `.moon`). */
+export function Backdrop({ size }: { size: Size }) {
+  const moon = moonAt(size);
+  const r = MOON_SIZE / 2;
+  const mc = { x: moon.x + r, y: moon.y + r };
+  // The mock's box-shadow (blur 60, spread 10, 25% purple-300): a Gaussian with sigma 30 around
+  // the spread edge, 10px outside the rim. Its strength at d px past that edge is erfc(d / 30√2) / 2;
+  // the stops below sample it, times the moon's 85% opacity.
+  const halo = r + 10 + 60;
+  return (
+    <Svg style={StyleSheet.absoluteFill} width={size.width} height={size.height} pointerEvents="none">
+      <Defs>
+        <RadialGradient
+          id="arenaGlow"
+          gradientUnits="userSpaceOnUse"
+          cx={size.width * 0.7}
+          cy={size.height * 0.7}
+          rx={size.width * 0.9}
+          ry={size.height * 0.45}
+          fx={size.width * 0.7}
+          fy={size.height * 0.7}
+        >
+          <Stop offset="0" stopColor={colors.purple} stopOpacity="0.22" />
+          <Stop offset="0.7" stopColor={colors.purple} stopOpacity="0" />
+        </RadialGradient>
+        <RadialGradient id="moonHalo" gradientUnits="userSpaceOnUse" cx={mc.x} cy={mc.y} r={halo} fx={mc.x} fy={mc.y}>
+          {shadowFalloff.map(([d, k]) => (
+            <Stop key={d} offset={(r + 10 + d) / halo} stopColor={colors.purple300} stopOpacity={0.25 * 0.85 * k} />
+          ))}
+        </RadialGradient>
+        {/* CSS `radial-gradient(circle at 38% 36%, …)` reaches the farthest corner of the 150px box. */}
+        <RadialGradient
+          id="moonFace"
+          gradientUnits="userSpaceOnUse"
+          cx={moon.x + MOON_SIZE * 0.38}
+          cy={moon.y + MOON_SIZE * 0.36}
+          r={Math.hypot(MOON_SIZE * 0.62, MOON_SIZE * 0.64)}
+          fx={moon.x + MOON_SIZE * 0.38}
+          fy={moon.y + MOON_SIZE * 0.36}
+        >
+          <Stop offset="0" stopColor="#f3edff" />
+          <Stop offset="0.55" stopColor="#cdb8ff" />
+          <Stop offset="1" stopColor="#9f7ae6" />
+        </RadialGradient>
+      </Defs>
+      <Rect x="0" y="0" width={size.width} height={size.height} fill="url(#arenaGlow)" />
+      {stars.map((s) => (
+        <Circle key={`${s.x},${s.y}`} cx={size.width * s.x} cy={size.height * s.y} r={s.r} fill="#fff" opacity={s.o} />
+      ))}
+      <Circle cx={mc.x} cy={mc.y} r={halo} fill="url(#moonHalo)" />
+      <Circle testID="moon" cx={mc.x} cy={mc.y} r={r} fill="url(#moonFace)" opacity="0.85" />
+      <Circle cx={moon.x + MOON_SIZE * 0.7} cy={moon.y + MOON_SIZE * 0.64} r="9" fill="rgb(120,90,190)" opacity={0.35 * 0.85} />
+      <Circle cx={moon.x + MOON_SIZE * 0.34} cy={moon.y + MOON_SIZE * 0.7} r="6" fill="rgb(120,90,190)" opacity={0.25 * 0.85} />
+    </Svg>
+  );
+}
+
+/** The darker band the characters stand on. */
+export function Ground({ size }: { size: Size }) {
+  return (
+    <Svg style={styles.ground} width={size.width} height={GROUND_HEIGHT} pointerEvents="none">
+      <Rect x="0" y="0" width={size.width} height={GROUND_HEIGHT} fill="url(#groundFill)" />
+      <Defs>
+        <LinearGradient id="groundFill" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#211c29" />
+          <Stop offset="1" stopColor="#15121a" />
+        </LinearGradient>
+      </Defs>
+      <Line x1="0" y1="0.5" x2={size.width} y2="0.5" stroke={colors.line} strokeWidth="1" />
+    </Svg>
+  );
+}
+
+/** One hood per parent, or one hood and `× remaining` from five parents on. */
+export function ParentCounter({ value, label }: { value: Counter; label: string }) {
+  return (
+    <View style={styles.counter} accessibilityRole="image" accessibilityLabel={label} testID="parent-counter">
+      {value.kind === 'compact' ? (
+        <>
+          <View style={styles.current} testID="hood-current">
+            <HoodIcon current />
+          </View>
+          <KText kind="mono" style={styles.times} testID="hood-times">
+            {`× ${value.remaining}`}
+          </KText>
+        </>
+      ) : (
+        value.hoods.map((h, i) => (
+          <View
+            // The hoods are a row of identical icons; their order is all that tells them apart.
+            key={i}
+            testID={`hood-${h}`}
+            style={h === 'current' ? styles.current : h === 'done' ? styles.done : undefined}
+          >
+            <HoodIcon current={h === 'current'} />
+          </View>
+        ))
+      )}
+    </View>
+  );
+}
+
+/** The necromancer, its zombies on the ground and the strings between them. */
+export function Enemies({ size, zombies }: { size: Size; zombies: number[] }) {
+  const ground = onGround(zombies);
+  const necro = necromancerAt(size);
+  const last = zombieBox(slots.length - 1, size);
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none" testID="enemies">
+      <Svg style={StyleSheet.absoluteFill} width={size.width} height={size.height} testID="strings">
+        {strings(ground.shown.length, size).map((l) => (
+          <Line key={`${l.x2},${l.y2}`} {...l} stroke={colors.purple300} strokeWidth="1" opacity="0.6" testID="string" />
+        ))}
+      </Svg>
+      <View style={[styles.necromancer, { left: necro.x, top: necro.y }]} testID="necromancer">
+        <Necromancer width={NECROMANCER_WIDTH} />
+      </View>
+      {ground.shown.map((pid, i) => {
+        const box = zombieBox(i, size);
+        return (
+          <View
+            key={pid}
+            testID="zombie"
+            style={[
+              styles.zombie,
+              {
+                left: box.left,
+                top: box.top,
+                zIndex: i < 3 ? 9 : 5,
+                // Scale towards the bottom centre, as the mock's transform-origin 50% 100%.
+                transform: [{ translateY: (ZOMBIE_HEIGHT * (1 - box.scale)) / 2 }, { scale: box.scale }],
+              },
+            ]}
+          >
+            <Zombie width={ZOMBIE_WIDTH} />
+            <KText kind="mono" style={styles.pid} testID="zombie-pid">
+              {pid}
+            </KText>
+          </View>
+        );
+      })}
+      {ground.more > 0 && (
+        <View style={[styles.more, { left: last.left, bottom: size.height - last.top + 4 }]} testID="zombies-more">
+          <KText kind="mono" style={styles.moreText}>{`+${ground.more}`}</KText>
+        </View>
+      )}
+    </View>
+  );
+}
+
+/** Killy, bottom-left, facing right. */
+export function KillyOnStage() {
+  return (
+    <View style={styles.killy} pointerEvents="none" testID="killy">
+      <Killy width={KILLY_WIDTH} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  ground: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  counter: {
+    position: 'absolute',
+    top: 20,
+    right: 18,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 5,
+    zIndex: 1,
+  },
+  current: { transform: [{ translateY: -2 }] },
+  done: { opacity: 0.22 },
+  times: { alignSelf: 'center', color: colors.text, fontSize: 14 },
+  necromancer: { position: 'absolute', width: NECROMANCER_WIDTH, zIndex: 10 },
+  zombie: { position: 'absolute', width: ZOMBIE_WIDTH, alignItems: 'center' },
+  // Under the feet, 10px wider than the zombie on each side; the mock puts its bottom edge 16px below them.
+  pid: {
+    position: 'absolute',
+    top: ZOMBIE_HEIGHT + 2,
+    left: -10,
+    right: -10,
+    textAlign: 'center',
+    fontSize: 10,
+    color: colors.muted,
+  },
+  more: {
+    position: 'absolute',
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(191,158,255,0.35)',
+    backgroundColor: 'rgba(144,70,255,0.14)',
+    zIndex: 9,
+  },
+  moreText: { fontSize: 11, color: colors.purple100 },
+  killy: {
+    position: 'absolute',
+    left: 0,
+    bottom: 36,
+    width: KILLY_WIDTH,
+    zIndex: 11,
+  },
+});

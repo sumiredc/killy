@@ -15,6 +15,8 @@ export type Battle = {
   /** Whether the queue was empty after the last state or outcome. */
   empty: boolean;
   killed: { parents: number; zombies: number };
+  /** Parents this battle has put away, killed or already gone, for the parent counter. */
+  cleared: number;
   allClear: { parents: number; zombies: number } | null;
 };
 
@@ -30,7 +32,7 @@ export function parentKey(serverId: string, p: { pid: number; starttime: number 
 }
 
 export function newBattle(): Battle {
-  return { hidden: new Set(), empty: true, killed: { parents: 0, zombies: 0 }, allClear: null };
+  return { hidden: new Set(), empty: true, killed: { parents: 0, zombies: 0 }, cleared: 0, allClear: null };
 }
 
 /**
@@ -76,7 +78,7 @@ export function onState(b: Battle, state: State): Battle {
   const hidden = new Set([...b.hidden].filter((k) => reported.has(k)));
   const empty = buildQueue(state, hidden).length === 0;
   const starts = b.empty && !empty && b.allClear === null;
-  return { ...b, hidden, empty, killed: starts ? { parents: 0, zombies: 0 } : b.killed };
+  return starts ? { ...b, hidden, empty, killed: { parents: 0, zombies: 0 }, cleared: 0 } : { ...b, hidden, empty };
 }
 
 /**
@@ -101,10 +103,10 @@ export function applyOutcome(
   const empty = buildQueue(state, hidden).length === 0;
   const allClear = empty ? killed : null;
   const result: Shown = res.outcome === 'killed' ? { kind: 'killed', pid, reaped: res.reaped ?? 0 } : { kind: 'already_gone', pid };
-  return { battle: { hidden, empty, killed, allClear }, result };
+  return { battle: { hidden, empty, killed, cleared: b.cleared + 1, allClear }, result };
 }
 
 /** Closing All clear starts a new battle. */
 export function closeAllClear(b: Battle): Battle {
-  return { ...b, killed: { parents: 0, zombies: 0 }, allClear: null };
+  return { ...b, killed: { parents: 0, zombies: 0 }, cleared: 0, allClear: null };
 }

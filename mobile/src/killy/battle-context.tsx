@@ -15,6 +15,8 @@ type BattleView = {
   /** The last kill request's failure, shown under the kill button until the next kill starts. */
   error: KillErrorKind | null;
   allClear: Battle['allClear'];
+  /** Parents this battle has put away (killed or already gone), for the parent counter. */
+  cleared: number;
   /** Zombies waiting in the queue, for the Battle tab's badge. */
   waiting: number;
   /** Kills the parent at the front of the queue, if it is still the one with this key. */
@@ -73,7 +75,7 @@ export function BattleProvider({ children }: { children: ReactNode }) {
 
   return (
     <BattleContext.Provider
-      value={{ queue, busy, shown, error, allClear: battle.allClear, waiting, kill, closeAllClear: () => setBattle(closeAllClear(current$.current)) }}>
+      value={{ queue, busy, shown, error, allClear: battle.allClear, cleared: battle.cleared, waiting, kill, closeAllClear: () => setBattle(closeAllClear(current$.current)) }}>
       {children}
     </BattleContext.Provider>
   );
