@@ -57,6 +57,8 @@ spec:
         name: data
       spec:
         accessModes: [ReadWriteOnce]
+        # Written out because the API server adds it; Argo CD would otherwise show a lasting diff.
+        volumeMode: Filesystem
         storageClassName: local-path
         resources:
           requests: { storage: 5Gi }
