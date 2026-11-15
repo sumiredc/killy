@@ -1,16 +1,15 @@
+import Animated, { type SharedValue, useAnimatedProps } from 'react-native-reanimated';
 import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg';
 
-/** The control-bar anchors in the 150 × 150 viewBox, left to right (parentSVG's `.anchor`). */
-export const anchors = [
-  { x: 12, y: 96 },
-  { x: 44, y: 96 },
-  { x: 75, y: 109 },
-  { x: 106, y: 96 },
-  { x: 138, y: 96 },
-] as const;
+import { necroGlow } from '@/killy/idle';
 
-/** A parent process: the necromancer from parentSVG in mock/art.js, facing left. */
-export function Necromancer({ width }: { width: number }) {
+import { anchors } from './points';
+
+const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
+
+/** A parent process: the necromancer from parentSVG in mock/art.js, facing left. Given the idle clock, its eyes pulse. */
+export function Necromancer({ width, clock }: { width: number; clock?: SharedValue<number> }) {
+  const glow = useAnimatedProps(() => ({ opacity: clock ? necroGlow(clock.value) : 1 }));
   return (
     <Svg width={width} height={width} viewBox="0 0 150 150" testID="necromancer-art">
       <Path
@@ -23,8 +22,8 @@ export function Necromancer({ width }: { width: number }) {
       <Path d="M90 18 Q100 36 94 62" fill="none" stroke="#1e1a25" strokeWidth="2.4" strokeLinecap="round" />
       <Path d="M58 70 Q66 96 64 126 M92 70 Q84 96 86 126" fill="none" stroke="#1e1a25" strokeWidth="2" />
       <Ellipse cx="61" cy="42" rx="15" ry="18" fill="#000" transform="rotate(-8 61 42)" />
-      <Ellipse testID="necromancer-glow" cx="54" cy="43" rx="3.4" ry="4.6" fill="#bf9eff" />
-      <Ellipse testID="necromancer-glow" cx="66" cy="42" rx="2.6" ry="4.2" fill="#bf9eff" />
+      <AnimatedEllipse testID="necromancer-glow" cx="54" cy="43" rx="3.4" ry="4.6" fill="#bf9eff" animatedProps={glow} />
+      <AnimatedEllipse testID="necromancer-glow" cx="66" cy="42" rx="2.6" ry="4.2" fill="#bf9eff" animatedProps={glow} />
 
       <Rect x="8" y="91" width="134" height="6" rx="3" fill="#6b5a8e" />
       <Rect x="72" y="80" width="6" height="30" rx="3" fill="#6b5a8e" />

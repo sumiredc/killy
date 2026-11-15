@@ -60,6 +60,10 @@
     ],
     "setupFiles": [
       "./jest.setup.js"
+    ],
+    "resolver": "react-native-reanimated/jest/resolver",
+    "setupFilesAfterEnv": [
+      "./jest.setup-after-env.js"
     ]
   }
 }

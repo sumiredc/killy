@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import Animated, { type SharedValue, useAnimatedProps, useAnimatedStyle, useDerivedValue } from 'react-native-reanimated';
 import Svg, { Circle, Defs, G, Line, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { HoodIcon } from '@/art/HoodIcon';
@@ -15,12 +16,13 @@ import {
   necromancerAt,
   onGround,
   type Size,
+  type Line as ArenaLine,
   slots,
-  strings,
   ZOMBIE_HEIGHT,
   ZOMBIE_WIDTH,
   zombieBox,
 } from '@/killy/arena';
+import { killyBob, necroFloat, necroWork, puppet, stringsAt } from '@/killy/idle';
 import { KText } from '@/theme/KText';
 import { colors } from '@/theme/tokens';
 
@@ -154,46 +156,56 @@ export function ParentCounter({ value, label }: { value: Counter; label: string 
   );
 }
 
-/** The necromancer, its zombies on the ground and the strings between them. */
-export function Enemies({ size, zombies }: { size: Size; zombies: number[] }) {
+const AnimatedLine = Animated.createAnimatedComponent(Line);
+
+/** One marionette string, redrawn each frame from the idle poses (the mock's drawThreads). */
+function StringLine({ lines, index }: { lines: SharedValue<ArenaLine[]>; index: number }) {
+  const props = useAnimatedProps(() => lines.value[index]);
+  return <AnimatedLine animatedProps={props} stroke={colors.purple300} strokeWidth="1" opacity="0.6" testID="string" />;
+}
+
+/** A zombie in slot i, doing its puppet jerk around its feet. */
+function ZombieOnGround({ pid, index, size, clock }: { pid: number; index: number; size: Size; clock: SharedValue<number> }) {
+  const box = zombieBox(index, size);
+  const jerk = useAnimatedStyle(() => {
+    const p = puppet(clock.value, index);
+    return { transform: [{ scale: box.scale }, { translateY: p.y }, { rotate: `${p.rotate}deg` }] };
+  });
+  return (
+    <Animated.View testID="zombie" style={[styles.zombie, { left: box.left, top: box.top, zIndex: index < 3 ? 9 : 5 }, jerk]}>
+      <Zombie width={ZOMBIE_WIDTH} />
+      <KText kind="mono" style={styles.pid} testID="zombie-pid">
+        {pid}
+      </KText>
+    </Animated.View>
+  );
+}
+
+/** The necromancer, its zombies on the ground and the strings between them, all moving with the idle clock. */
+export function Enemies({ size, zombies, clock }: { size: Size; zombies: number[]; clock: SharedValue<number> }) {
   const ground = onGround(zombies);
   const necro = necromancerAt(size);
   const last = zombieBox(slots.length - 1, size);
+  const count = ground.shown.length;
+  const lines = useDerivedValue(() => stringsAt(clock.value, count, size));
+  const float = useAnimatedStyle(() => ({ transform: [{ translateY: necroFloat(clock.value) }] }));
+  const work = useAnimatedStyle(() => ({ transform: [{ rotate: `${necroWork(clock.value)}deg` }] }));
   return (
     // Above the info block, as the mock's `.party` (z-index 2) is above `.info` (1).
     <View style={styles.enemies} pointerEvents="none" testID="enemies">
       <Svg style={StyleSheet.absoluteFill} width={size.width} height={size.height} testID="strings">
-        {strings(ground.shown.length, size).map((l) => (
-          <Line key={`${l.x2},${l.y2}`} {...l} stroke={colors.purple300} strokeWidth="1" opacity="0.6" testID="string" />
+        {Array.from({ length: 2 * count }, (_, i) => (
+          <StringLine key={i} lines={lines} index={i} />
         ))}
       </Svg>
-      <View style={[styles.necromancer, { left: necro.x, top: necro.y }]} testID="necromancer">
-        <Necromancer width={NECROMANCER_WIDTH} />
-      </View>
-      {ground.shown.map((pid, i) => {
-        const box = zombieBox(i, size);
-        return (
-          <View
-            key={pid}
-            testID="zombie"
-            style={[
-              styles.zombie,
-              {
-                left: box.left,
-                top: box.top,
-                zIndex: i < 3 ? 9 : 5,
-                // Scale towards the bottom centre, as the mock's transform-origin 50% 100%.
-                transform: [{ translateY: (ZOMBIE_HEIGHT * (1 - box.scale)) / 2 }, { scale: box.scale }],
-              },
-            ]}
-          >
-            <Zombie width={ZOMBIE_WIDTH} />
-            <KText kind="mono" style={styles.pid} testID="zombie-pid">
-              {pid}
-            </KText>
-          </View>
-        );
-      })}
+      <Animated.View style={[styles.necromancer, { left: necro.x, top: necro.y }, float]} testID="necromancer">
+        <Animated.View style={[styles.work, work]} testID="necromancer-work">
+          <Necromancer width={NECROMANCER_WIDTH} clock={clock} />
+        </Animated.View>
+      </Animated.View>
+      {ground.shown.map((pid, i) => (
+        <ZombieOnGround key={pid} pid={pid} index={i} size={size} clock={clock} />
+      ))}
       {ground.more > 0 && (
         <View style={[styles.more, { left: last.left, bottom: size.height - last.top + 4 }]} testID="zombies-more">
           <KText kind="mono" style={styles.moreText}>{`+${ground.more}`}</KText>
@@ -203,12 +215,13 @@ export function Enemies({ size, zombies }: { size: Size; zombies: number[] }) {
   );
 }
 
-/** Killy, bottom-left, facing right. */
-export function KillyOnStage() {
+/** Killy, bottom-left, facing right, bobbing and blinking with the idle clock. */
+export function KillyOnStage({ clock }: { clock: SharedValue<number> }) {
+  const bob = useAnimatedStyle(() => ({ transform: [{ translateY: killyBob(clock.value) }] }));
   return (
-    <View style={styles.killy} pointerEvents="none" testID="killy">
-      <Killy width={KILLY_WIDTH} />
-    </View>
+    <Animated.View style={[styles.killy, bob]} pointerEvents="none" testID="killy">
+      <Killy width={KILLY_WIDTH} clock={clock} />
+    </Animated.View>
   );
 }
 
@@ -228,7 +241,10 @@ const styles = StyleSheet.create({
   times: { alignSelf: 'center', color: colors.text, fontSize: 14 },
   enemies: { ...StyleSheet.absoluteFill, zIndex: 2 },
   necromancer: { position: 'absolute', width: NECROMANCER_WIDTH, zIndex: 10 },
-  zombie: { position: 'absolute', width: ZOMBIE_WIDTH, alignItems: 'center' },
+  // The mock turns the figure around 50% across and 20% down.
+  work: { transformOrigin: '50% 20%' },
+  // Scaled, lifted and tilted around its feet: the mock's transform-origin 50% 100%.
+  zombie: { position: 'absolute', width: ZOMBIE_WIDTH, alignItems: 'center', transformOrigin: '50% 100%' },
   // Under the feet, 10px wider than the zombie on each side; the mock puts its bottom edge 16px below them.
   pid: {
     position: 'absolute',

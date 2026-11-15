@@ -2,8 +2,6 @@
 // size, so the layout and the strings can be checked without drawing. Sizes are DESIGN's pixels;
 // positions are fractions of the arena, as in the mock's CSS.
 
-import { anchors } from '@/art/Necromancer';
-import { hand, head } from '@/art/Zombie';
 
 export type Size = { width: number; height: number };
 export type Point = { x: number; y: number };
@@ -29,6 +27,7 @@ export const slots = [
 
 /** The top-left corner of the necromancer: centred at 63% of the width, top at 27% of the height. */
 export function necromancerAt(arena: Size): Point {
+  'worklet';
   return {
     x: arena.width * 0.63 - NECROMANCER_WIDTH / 2,
     y: arena.height * 0.27,
@@ -42,51 +41,13 @@ export function moonAt(arena: Size): Point {
 
 /** The box of the zombie in slot i before its depth scale, which shrinks it towards its bottom centre. */
 export function zombieBox(i: number, arena: Size): { left: number; top: number; scale: number } {
+  'worklet';
   const slot = slots[i];
   return {
     left: arena.width * slot.left,
     top: arena.height - slot.bottom - ZOMBIE_HEIGHT,
     scale: slot.s,
   };
-}
-
-/** A point given in the zombie's viewBox, in arena coordinates, for the zombie in slot i. */
-export function zombiePoint(i: number, arena: Size, p: Point): Point {
-  const box = zombieBox(i, arena);
-  const k = ZOMBIE_WIDTH / zombieViewBox.width;
-  const cx = box.left + ZOMBIE_WIDTH / 2;
-  const bottom = box.top + ZOMBIE_HEIGHT;
-  return {
-    x: cx + (p.x * k - ZOMBIE_WIDTH / 2) * box.scale,
-    y: bottom - (ZOMBIE_HEIGHT - p.y * k) * box.scale,
-  };
-}
-
-/** The control-bar anchors in arena coordinates (the necromancer's viewBox is 1:1 at 150px). */
-export function anchorPoints(arena: Size): Point[] {
-  const at = necromancerAt(arena);
-  const k = NECROMANCER_WIDTH / 150;
-  return anchors.map((a) => ({ x: at.x + a.x * k, y: at.y + a.y * k }));
-}
-
-/**
- * The marionette strings for `count` zombies on the ground: one from the anchor nearest each
- * zombie's head, one from the nearest other anchor to its front hand. "Nearest" is by x, as in
- * the mock's drawThreads.
- */
-export function strings(count: number, arena: Size): Line[] {
-  const from = anchorPoints(arena);
-  const nearest = (p: Point, skip?: Point) =>
-    from.filter((a) => a !== skip).reduce((best, a) => (Math.abs(a.x - p.x) < Math.abs(best.x - p.x) ? a : best));
-  const lines: Line[] = [];
-  for (let i = 0; i < Math.min(count, slots.length); i++) {
-    const h = zombiePoint(i, arena, head);
-    const f = zombiePoint(i, arena, hand);
-    const a1 = nearest(h);
-    const a2 = nearest(f, a1);
-    lines.push({ x1: a1.x, y1: a1.y, x2: h.x, y2: h.y }, { x1: a2.x, y1: a2.y, x2: f.x, y2: f.y });
-  }
-  return lines;
 }
 
 /** The zombies drawn on the ground: the first six, and how many more the `+N` chip stands for. */
