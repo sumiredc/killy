@@ -60,13 +60,38 @@ func ParseStat(b []byte) (Stat, error) {
 	return Stat{PID: pid, Comm: string(b[open+1 : end]), State: rest[0][0], PPID: ppid, StartTime: starttime}, nil
 }
 
+// SummonCgroup is the cgroup v2 path of killy-summon.service: demo mode reports and kills only
+// processes in exactly this cgroup.
+const SummonCgroup = "/system.slice/killy-summon.service"
+
+// ErrNoUnifiedCgroup means /proc/<pid>/cgroup has no "0::" line (a cgroup v1 only system).
+var ErrNoUnifiedCgroup = errors.New("no cgroup v2 line")
+
 // Scanner reads processes from Root, which is /proc in production (os.DirFS("/proc")).
 type Scanner struct {
 	Root fs.FS
+	// OnlyCgroup, when set, makes Scan return only parents whose cgroup v2 path is exactly this.
+	OnlyCgroup string
+}
+
+// InCgroup reports whether pid's cgroup v2 path is exactly path. When the process does not exist
+// the error matches fs.ErrNotExist or ESRCH; without a "0::" line it is ErrNoUnifiedCgroup.
+func (s *Scanner) InCgroup(pid int, path string) (bool, error) {
+	b, err := fs.ReadFile(s.Root, strconv.Itoa(pid)+"/cgroup")
+	if err != nil {
+		return false, err
+	}
+	for line := range strings.SplitSeq(string(b), "\n") {
+		if p, ok := strings.CutPrefix(line, "0::"); ok {
+			// Exactly: a user unit of the same name, or a cgroup below it, is not summon's.
+			return p == path, nil
+		}
+	}
+	return false, ErrNoUnifiedCgroup
 }
 
 // Scan returns every process that has at least one child in state Z, ordered by PID, with its
-// zombies ordered by PID. Zombies of PID 1 are left out: init reaps them, and PID 1 may not be killed.
+// zombies ordered by PID; with OnlyCgroup, only those in that cgroup. Zombies of PID 1 are left out: init reaps them, and PID 1 may not be killed.
 // A process that disappears while it is being read is skipped. Scan fails only when Root cannot be listed.
 func (s *Scanner) Scan() ([]protocol.Parent, error) {
 	stats, err := s.readAll()
@@ -84,6 +109,13 @@ func (s *Scanner) Scan() ([]protocol.Parent, error) {
 		st, ok := stats[ppid]
 		if !ok {
 			continue
+		}
+		// Checked before the command line is read, so a process outside the cgroup is neither
+		// reported nor read. One whose cgroup cannot be read is left out too.
+		if s.OnlyCgroup != "" {
+			if in, err := s.InCgroup(ppid, s.OnlyCgroup); err != nil || !in {
+				continue
+			}
 		}
 		slices.Sort(children)
 		parents = append(parents, protocol.Parent{

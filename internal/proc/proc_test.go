@@ -23,6 +23,8 @@ type fakeProc struct {
 	ppid      int
 	starttime int64
 	cmdline   string
+	// cgroup is the content of <pid>/cgroup; the file is left out when it is empty.
+	cgroup string
 }
 
 // statLine writes a stat line in the layout of realStat with the given values in fields 1-4 and 22.
@@ -44,6 +46,9 @@ func fakeRoot(ps ...fakeProc) fstest.MapFS {
 	for _, p := range ps {
 		root[fmt.Sprintf("%d/stat", p.pid)] = &fstest.MapFile{Data: []byte(statLine(p))}
 		root[fmt.Sprintf("%d/cmdline", p.pid)] = &fstest.MapFile{Data: []byte(p.cmdline)}
+		if p.cgroup != "" {
+			root[fmt.Sprintf("%d/cgroup", p.pid)] = &fstest.MapFile{Data: []byte(p.cgroup)}
+		}
 	}
 	return root
 }

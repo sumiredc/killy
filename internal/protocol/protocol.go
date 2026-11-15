@@ -100,6 +100,8 @@ const (
 	ReasonPIDReused        = "pid_reused"
 	ReasonNotAZombieParent = "not_a_zombie_parent"
 	ReasonProtected        = "protected"
+	// ReasonNotDemo: a demo-mode agent kills only parents in killy-summon.service's cgroup.
+	ReasonNotDemo = "not_demo"
 )
 
 // IsUUIDv4 reports whether s is a UUID v4 in lower case: 8-4-4-4-12 hex digits, version digit 4,
