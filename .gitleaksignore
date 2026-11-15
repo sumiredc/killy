@@ -3,3 +3,6 @@
 f8c6db68a4e358695af9cd938bfc3047ac2ddfe1:internal/server/snapshots_test.go:generic-api-key:83
 6ef545d772f49301442b300d4e5acf28aeeef6c4:internal/agent/pair_test.go:generic-api-key:20
 c9cb16413aee1203e9166e22b86c8f027abfd8db:internal/server/devices_test.go:generic-api-key:309
+# Firebase API key for Android: a client setting, not a secret (673330b). Restricted in Google Cloud
+# to the FCM Registration API and the Firebase Installations API (#30).
+673330b821394d335c9c4d995fc9855733f3d593:mobile/firebase/google-services.json:gcp-api-key:18
