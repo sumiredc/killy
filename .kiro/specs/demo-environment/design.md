@@ -83,7 +83,7 @@ func (s *Summoner) Run(ctx context.Context, ticks <-chan time.Time) // ticks ご
 | 回収 | 親を起動するたびに goroutine で `Wait` し、戻ったら生きている数を減らす。`Tick` と数は mutex で守る | 回収しないと summon 自身が自分の cgroup の中で「ゾンビを持つ親」になり、公開デモの敵として現れ、kill されるとデモが止まる（#22、D18 c） |
 | 親の作り方 | `ExecStart` は `/proc/self/exe`（killy 自身）を、`argv` をコマンド名にして起動し、役を環境変数 `KILLY_SUMMON_ROLE=parent` で伝える。`main` は `run` の前にこの変数を見て、`parent` なら `summon.RunParent`、`zombie` ならすぐに終了する（M2 の spec の確認で sumire が決めた） | `/proc/<pid>/cmdline` が `node evil_daemon.js` のように読める。デモ機に node や python を入れずに済む。agent が summon 由来を確かめるのは cgroup で、この変数は確認に使わない（#22、#23） |
 | ゾンビの作り方 | 親（`RunParent`）は、`/proc/self/exe` を `KILLY_SUMMON_ROLE=zombie` で起動し、`Wait` しない。子はすぐに終了してゾンビになる | Go は fork だけをできないので、子も exec で作る。外のコマンドに頼らない |
-| 親ごとのゾンビ | 数と上限は #22 のとおり PR で決めて PR 本文に書く。案：起動時に 2〜4 体（`Pick` で選ぶ）、その後 30 秒ごとに 1 体ずつ足し、6 体で止める | 数はどの文書にも無く、#22 が PR で決めることにしている。案の理由：DESIGN の battle 画面のゾンビの枠が 6 つで、それを超えると `+N` の表示になる。デモの途中で「新しいゾンビが現れる」動き（PRD UC3 の代替フロー）も見せられる。上限で、デモ機のプロセス表を 3 × 6 = 18 体までに抑える |
+| 親ごとのゾンビ | 起動時に 2〜4 体（`Pick` で選ぶ）、その後 30 秒ごとに 1 体ずつ足し、6 体で止める（#22 の PR で決めた。`FirstZombies`・`ExtraFirstZombies`・`MaxZombies`・`ZombieInterval`） | 数はどの文書にも無く、#22 が PR で決めることにしている。案の理由：DESIGN の battle 画面のゾンビの枠が 6 つで、それを超えると `+N` の表示になる。デモの途中で「新しいゾンビが現れる」動き（PRD UC3 の代替フロー）も見せられる。上限で、デモ機のプロセス表を 3 × 6 = 18 体までに抑える |
 | 親の寿命 | 親は自分では終わらない。kill されるか、summon の service が止まると終わる | 生きている親が 3 つで止まり、kill されるたびに次の間隔で補われる |
 | summon は signal を送らない | summon のコードは親にもゾンビにも signal を送らない。service を止めると systemd が cgroup ごと止める（既定の `KillMode=control-group`） | signal を送る呼び出しを agent の 1 か所に保つ（agent-process-control の Requirement 2.16）。止めるのは systemd に任せる |
 | 失敗 | 親やゾンビを起動できなければログに出し、次の間隔でまた試す | summon が止まるとデモが止まる |

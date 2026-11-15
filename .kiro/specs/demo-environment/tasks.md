@@ -2,20 +2,20 @@
 
 各トップレベルのタスクが 1 つの issue と 1 つの PR に当たる。テストは実装より先に書き、期待した理由で赤になることを確かめる。完了条件の正は各 issue。各 PR で `go vet ./...` と `go test -race ./...` を通し、app を変える PR では `cd mobile && npm run typecheck && npm run lint && npm test` も通す。
 
-- [ ] 1. killy summon がデモ用のゾンビの親を作り続ける（#22。前提：#7、#15、#38）
-  - [ ] 1.1 `internal/summon` に `Summoner`・`Process`・`Commands`・`MaxParents`・`Interval` の最小のスタブを置く
+- [x] 1. killy summon がデモ用のゾンビの親を作り続ける（#22。前提：#7、#15、#38）
+  - [x] 1.1 `internal/summon` に `Summoner`・`Process`・`Commands`・`MaxParents`・`Interval` の最小のスタブを置く
     - _Requirements: 1.1_
-  - [ ] 1.2 偽物の `Start` で、生きている親が 3 つのときの `Tick` が親を作らず、1 つ終わって 2 つになった後の `Tick` で作るテストと、`Pick` を差し替えて 2 つ以上の候補からコマンド名が選ばれるテストを書き、赤を確かめる
+  - [x] 1.2 偽物の `Start` で、生きている親が 3 つのときの `Tick` が親を作らず、1 つ終わって 2 つになった後の `Tick` で作るテストと、`Pick` を差し替えて 2 つ以上の候補からコマンド名が選ばれるテストを書き、赤を確かめる
     - _Requirements: 1.2, 1.3, 1.4_
-  - [ ] 1.3 `Tick`・`Alive`・`Run` と、親を起動するたびの `Wait` による回収を実装し、テストを緑にする
+  - [x] 1.3 `Tick`・`Alive`・`Run` と、親を起動するたびの `Wait` による回収を実装し、テストを緑にする
     - _Requirements: 1.2, 1.3, 1.4, 1.6_
-  - [ ] 1.4 `//go:build linux` のテスト（`TestMain` が `KILLY_SUMMON_ROLE` で親とゾンビの役をする）で、本物の親にテストから `SIGKILL` を送り、親が回収されて test のプロセスの子として状態 `Z` で残らないことを確かめるテストを書き、赤を確かめる
+  - [x] 1.4 `//go:build linux` のテスト（`TestMain` が `KILLY_SUMMON_ROLE` で親とゾンビの役をする）で、本物の親にテストから `SIGKILL` を送り、親が回収されて test のプロセスの子として状態 `Z` で残らないことを確かめるテストを書き、赤を確かめる
     - _Requirements: 1.6_
-  - [ ] 1.5 `ExecStart`（`/proc/self/exe` を argv を変えて起動）、`RunParent`（ゾンビを作って `wait()` しない。数と上限は PR で決める。案は design）、`main` の役の振り分け、`killy summon` の入口（`every(ctx, summon.Interval)`）を実装し、1.4 を緑にする。親ごとのゾンビの数と上限を PR 本文に書く
+  - [x] 1.5 `ExecStart`（`/proc/self/exe` を argv を変えて起動）、`RunParent`（ゾンビを作って `wait()` しない。数と上限は PR で決める。案は design）、`main` の役の振り分け、`killy summon` の入口（`every(ctx, summon.Interval)`）を実装し、1.4 を緑にする。親ごとのゾンビの数と上限を PR 本文に書く
     - _Requirements: 1.1, 1.3, 1.5, 1.6_
-  - [ ] 1.6 `deploy/systemd/killy-summon.service`（`/usr/local/bin/killy summon`）を作る
+  - [x] 1.6 `deploy/systemd/killy-summon.service`（`/usr/local/bin/killy summon`）を作る
     - _Requirements: 1.7_
-  - [ ] 1.7 `go vet ./...` と `go test -race ./...` を通し、Linux 上で `killy-summon.service` の親の `/proc/<pid>/cgroup` の `0::` の行が `0::/system.slice/killy-summon.service` であることと、summon と `killy agent run` で Killy server の snapshot にデモの親が 3 つまで入ったことを PR 本文に書く
+  - [x] 1.7 `go vet ./...` と `go test -race ./...` を通し、Linux 上で `killy-summon.service` の親の `/proc/<pid>/cgroup` の `0::` の行が `0::/system.slice/killy-summon.service` であることと、summon と `killy agent run` で Killy server の snapshot にデモの親が 3 つまで入ったことを PR 本文に書く
     - _Requirements: 1.8, 1.9_
 
 - [ ] 2. demo mode の agent は summon が作った親だけを kill する（#23。前提：#4、#22、#15、#38）
