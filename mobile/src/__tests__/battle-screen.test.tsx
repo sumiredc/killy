@@ -345,3 +345,97 @@ describe('tabs', () => {
     expect(screen.getByTestId('kill-result')).toHaveTextContent('Not killed: constructor');
   });
 });
+
+describe('the arena', () => {
+  /** The arena draws its scene once it knows its size; jest has no layout, so the test gives it one. */
+  async function laidOut() {
+    await fireEvent(screen.getByTestId('arena'), 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 358, height: 600 } } });
+  }
+  const pids = (n: number) => Array.from({ length: n }, (_, i) => 3802 + i);
+
+  test('six zombies are all drawn with their PIDs, and no +N', async () => {
+    await battleWith([server('a', 'web-01', [parent(3801, pids(6), t1)])]);
+    await laidOut();
+    expect(screen.getAllByTestId('zombie')).toHaveLength(6);
+    expect(screen.getAllByTestId('zombie-pid').map((p) => p.props.children)).toEqual(pids(6));
+    expect(screen.queryByTestId('zombies-more')).toBeNull();
+    expect(screen.getAllByTestId('string')).toHaveLength(12);
+  });
+
+  test.each([
+    [7, '+1'],
+    [9, '+3'],
+  ])('%i zombies: the first six are drawn with %s, and the big count is the real one', async (n, more) => {
+    await battleWith([server('a', 'web-01', [parent(3801, pids(n), t1)])]);
+    await laidOut();
+    expect(screen.getAllByTestId('zombie-pid').map((p) => p.props.children)).toEqual(pids(6));
+    expect(within(screen.getByTestId('zombies-more')).getByText(more)).toBeOnTheScreen();
+    expect(screen.getByTestId('battle-zombies')).toHaveTextContent(String(n));
+  });
+
+  test('with four parents in the battle, one of them put away, there are four hoods and the cleared one is at 22%', async () => {
+    const { s } = await battleWith([
+      server('a', 'web-01', [parent(3801, [3802], t1), parent(4100, [4101], t2), parent(4200, [4201], t3), parent(4300, [4301], t3)]),
+    ]);
+    s.respond('POST /app/v1/kills', 200, { outcome: 'already_gone' });
+    await hold(1000);
+    const c = within(screen.getByTestId('parent-counter'));
+    expect(c.getAllByTestId(/^hood-(done|current|waiting)$/).map((h) => h.props.testID)).toEqual([
+      'hood-done',
+      'hood-current',
+      'hood-waiting',
+      'hood-waiting',
+    ]);
+    expect(c.getByTestId('hood-done')).toHaveStyle({ opacity: 0.22 });
+    expect(c.queryByTestId('hood-times')).toBeNull();
+    expect(screen.getByTestId('parent-counter').props.accessibilityLabel).toBe('parent process 2 of 4');
+  });
+
+  test('with five parents in the battle, one of them killed, there is one hood and × the number still in the queue', async () => {
+    const { s } = await battleWith([
+      server('a', 'web-01', [
+        parent(3801, [3802], t1),
+        parent(4100, [4101], t2),
+        parent(4200, [4201], t3),
+        parent(4300, [4301], t3),
+        parent(4400, [4401], t3),
+      ]),
+    ]);
+    s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 1 });
+    await hold(1000);
+    const c = within(screen.getByTestId('parent-counter'));
+    expect(c.getAllByTestId(/^hood-(done|current|waiting)$/).map((h) => h.props.testID)).toEqual(['hood-current']);
+    expect(c.getByTestId('hood-times')).toHaveTextContent('× 4');
+  });
+
+  test('Killy is 164px wide at the bottom-left, its feet 36px up; the enemies are drawn over the info block', async () => {
+    await battleWith([server('a', 'web-01', [parent(3801, [3802], t1)])]);
+    await laidOut();
+    expect(screen.getByTestId('killy')).toHaveStyle({ position: 'absolute', left: 0, bottom: 36, width: 164 });
+    expect(screen.getByTestId('enemies')).toHaveStyle({ zIndex: 2 });
+  });
+
+  test('a back-row zombie is scaled towards its feet, so they stay on its slot', async () => {
+    await battleWith([server('a', 'web-01', [parent(3801, pids(4), t1)])]);
+    await laidOut();
+    const back = screen.getAllByTestId('zombie')[3];
+    const height = (48 * 80) / 56;
+    expect(back).toHaveStyle({ transform: [{ translateY: (height * (1 - 0.84)) / 2 }, { scale: 0.84 }] });
+  });
+
+  test('in an empty state Killy stays, and there is no necromancer, zombie or counter', async () => {
+    await battleWith([server('a', 'web-01', [])]);
+    await laidOut();
+    expect(screen.getByTestId('killy')).toBeOnTheScreen();
+    expect(screen.queryByTestId('necromancer')).toBeNull();
+    expect(screen.queryByTestId('zombie')).toBeNull();
+    expect(screen.queryByTestId('parent-counter')).toBeNull();
+  });
+
+  test('the tabs have their icons: a ghost for Battle and a gear for Settings', async () => {
+    await battleWith([]);
+    // React Navigation draws each icon twice, for the active and the inactive look.
+    expect(screen.getAllByTestId('tab-icon-battle').length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId('tab-icon-settings').length).toBeGreaterThan(0);
+  });
+});
