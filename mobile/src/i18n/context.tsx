@@ -1,7 +1,6 @@
-import { getLocales } from 'expo-localization';
 import { createContext, type ReactNode, useContext, useState } from 'react';
 
-import { initialLanguage, type Key, type Lang, t } from '.';
+import { type Key, type Lang, t } from '.';
 
 type I18n = {
   lang: Lang;
@@ -11,8 +10,17 @@ type I18n = {
 
 const I18nContext = createContext<I18n | null>(null);
 
-export function I18nProvider({ children }: { children: ReactNode }) {
-  const [lang, setLang] = useState<Lang>(() => initialLanguage(getLocales()));
+/**
+ * The app language. It starts as initial, which RootLayout read before drawing anything, and a
+ * change is shown at once and then saved with save. A save that fails is not shown: the chosen
+ * language stays for this run.
+ */
+export function I18nProvider({ children, initial, save }: { children: ReactNode; initial: Lang; save: (lang: Lang) => Promise<void> }) {
+  const [lang, setLangState] = useState<Lang>(initial);
+  const setLang = (l: Lang) => {
+    setLangState(l);
+    save(l).catch(() => {});
+  };
   return (
     <I18nContext.Provider value={{ lang, setLang, t: (key, params) => t(lang, key, params) }}>{children}</I18nContext.Provider>
   );

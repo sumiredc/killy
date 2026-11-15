@@ -1,4 +1,5 @@
 import type { NotificationPermission, NotificationsDeps } from '../killy/notifications';
+import type { Lang } from '../i18n';
 import type { Prefs } from '../prefs';
 
 /**
@@ -67,10 +68,39 @@ export class FakeNotifications implements NotificationsDeps {
   }
 }
 
-/** Prefs in memory. `failRead` makes every get reject, as when iOS keeps the store locked. */
+/**
+ * Prefs in memory. `failRead` makes every get reject, as when iOS keeps the store locked;
+ * `failWrite` makes every set reject. `holdLanguage` keeps the language read waiting until it is
+ * called.
+ */
 export class MemoryPrefs implements Prefs {
-  saved: { notify?: boolean } = {};
+  saved: { notify?: boolean; language?: Lang } = {};
   failRead = false;
+  failWrite = false;
+  private waiting: (() => void) | null = null;
+  private held = false;
+
+  /** Keeps the next language reads waiting; returns the function that lets them finish. */
+  holdLanguage(): () => void {
+    this.held = true;
+    return () => {
+      this.held = false;
+      this.waiting?.();
+    };
+  }
+
+  language = {
+    get: async () => {
+      if (this.held) await new Promise<void>((resolve) => (this.waiting = resolve));
+      if (this.failRead) throw new Error('locked');
+      return this.saved.language ?? null;
+    },
+    set: async (v: Lang) => {
+      if (this.failWrite) throw new Error('full');
+      this.saved.language = v;
+    },
+  };
+
   notify = {
     get: async () => {
       if (this.failRead) throw new Error('locked');
