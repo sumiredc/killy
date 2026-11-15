@@ -24,6 +24,8 @@ type Memory struct {
 	FailLink bool
 	// FailLinksOfDevice and FailDevicesOfAgent make those queries alone fail.
 	FailLinksOfDevice, FailDevicesOfAgent bool
+	// FailAgentByID makes AgentByID alone fail, as PostgreSQL does for a value that is not a uuid.
+	FailAgentByID bool
 	// FailLinkChanges makes UpdateLink and UnlinkDevice alone fail.
 	FailLinkChanges bool
 	// FailUpdateDevice makes UpdateDevice alone fail.
@@ -195,6 +197,9 @@ func (m *Memory) AgentByID(_ context.Context, id string) (store.Agent, error) {
 	defer m.mu.Unlock()
 	if m.Err != nil {
 		return store.Agent{}, m.Err
+	}
+	if m.FailAgentByID {
+		return store.Agent{}, errors.New("memstore: invalid input syntax for type uuid")
 	}
 	for _, a := range m.agents {
 		if a.ID == id {

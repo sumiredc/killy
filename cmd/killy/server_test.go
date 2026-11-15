@@ -124,3 +124,18 @@ func TestServeShutsDownPromptlyWithAStreamOpen(t *testing.T) {
 		t.Fatal("serve did not return")
 	}
 }
+
+func TestTheDemoAgentIDIsReadAsAUUIDInLowerCase(t *testing.T) {
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	for raw, want := range map[string]string{
+		"":                                     "",
+		"3e7d58a1-d083-4b00-b0c5-105c3e845947": "3e7d58a1-d083-4b00-b0c5-105c3e845947",
+		"3E7D58A1-D083-4B00-B0C5-105C3E845947": "3e7d58a1-d083-4b00-b0c5-105c3e845947",
+		// Not a UUID: PostgreSQL would answer an error, not "no such agent"; treated as unset.
+		"demo-machine": "",
+	} {
+		if got := demoAgentID(raw, log); got != want {
+			t.Errorf("demoAgentID(%q) = %q, want %q", raw, got, want)
+		}
+	}
+}

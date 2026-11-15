@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"uuid"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sumiredc/killy/internal/clock"
@@ -65,6 +66,7 @@ func runServer(args []string, stderr io.Writer) int {
 		Live:                lv,
 		Broker:              sse.NewBroker(),
 		Pushes:              pushes,
+		DemoAgentID:         demoAgentID(os.Getenv("KILLY_DEMO_AGENT_ID"), log),
 		Log:                 log,
 	}
 	go func() {
@@ -111,4 +113,17 @@ func serve(ctx context.Context, log *slog.Logger, migrate func(context.Context) 
 		return err
 	}
 	return nil
+}
+
+// demoAgentID reads KILLY_DEMO_AGENT_ID. A value that is not a UUID is logged and treated as unset.
+func demoAgentID(raw string, log *slog.Logger) string {
+	if raw == "" {
+		return ""
+	}
+	id, err := uuid.Parse(raw)
+	if err != nil {
+		log.Error("KILLY_DEMO_AGENT_ID is not a UUID; no demo server is offered", "value", raw)
+		return ""
+	}
+	return id.String()
 }
