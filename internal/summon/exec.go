@@ -29,7 +29,7 @@ func RunParent() {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	t := time.NewTicker(ZombieInterval)
 	defer t.Stop()
-	p := &Parent{Spawn: spawnZombie, Pick: rand.IntN, Log: log}
+	p := &parent{Spawn: spawnZombie, Pick: rand.IntN, Log: log}
 	p.Run(context.Background(), t.C)
 }
 

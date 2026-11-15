@@ -84,6 +84,8 @@ func TestARealParentShowsItsCommandLineHoldsZombiesAndIsCollectedWhenKilled(t *t
 	if pid == 0 {
 		t.Fatal("no parent was started")
 	}
+	// A parent never exits by itself; one left by a failed check would run on.
+	t.Cleanup(func() { _ = syscall.Kill(pid, syscall.SIGKILL) })
 	cmdline, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "cmdline"))
 	if err != nil || string(cmdline) != "node\x00evil_daemon.js\x00" {
 		t.Errorf("cmdline %q (%v), want node evil_daemon.js", cmdline, err)

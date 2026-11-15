@@ -28,8 +28,8 @@ const (
 	ZombieInterval = 30 * time.Second
 )
 
-// Parent is a demo parent: it makes zombie children and never waits for them.
-type Parent struct {
+// parent is a demo parent: it makes zombie children and never waits for them.
+type parent struct {
 	// Spawn starts one child that exits at once.
 	Spawn func() error
 	// Pick picks one of n; math/rand/v2.IntN in production.
@@ -39,7 +39,7 @@ type Parent struct {
 
 // Run starts the first zombies, then adds one for each value from ticks up to MaxZombies, until
 // ctx is done. A child that cannot be started is logged and not counted.
-func (p *Parent) Run(ctx context.Context, ticks <-chan time.Time) {
+func (p *parent) Run(ctx context.Context, ticks <-chan time.Time) {
 	held := 0
 	spawn := func() {
 		if err := p.Spawn(); err != nil {
