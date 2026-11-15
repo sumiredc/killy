@@ -42,9 +42,23 @@ type machine struct {
 	signals int
 	// cgroup, when set, is the content of 100/cgroup.
 	cgroup string
+	// gate, when set, holds the first read of 100/stat until a second one comes (or 500 ms pass),
+	// so two kills that are not kept apart both read the parent before either signals.
+	gate     bool
+	arrivals int
+	opened   chan struct{}
 }
 
 func (m *machine) Open(name string) (fs.File, error) {
+	root := m.files()
+	// What was read is fixed before the wait, as a check reads the process before it signals.
+	if name == "100/stat" {
+		m.waitAtGate()
+	}
+	return root.Open(name)
+}
+
+func (m *machine) files() fstest.MapFS {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	state := "S"
@@ -63,7 +77,32 @@ func (m *machine) Open(name string) (fs.File, error) {
 	if m.cgroup != "" {
 		root["100/cgroup"] = &fstest.MapFile{Data: []byte(m.cgroup)}
 	}
-	return root.Open(name)
+	return root
+}
+
+func (m *machine) waitAtGate() {
+	m.mu.Lock()
+	if !m.gate {
+		m.mu.Unlock()
+		return
+	}
+	m.arrivals++
+	if m.arrivals == 1 {
+		m.opened = make(chan struct{})
+		opened := m.opened
+		m.mu.Unlock()
+		select {
+		case <-opened:
+		case <-time.After(500 * time.Millisecond):
+		}
+		m.mu.Lock()
+		m.gate = false
+		m.mu.Unlock()
+		return
+	}
+	close(m.opened)
+	m.gate = false
+	m.mu.Unlock()
 }
 
 func stat(pid int, state string, ppid int, start int64) string {
@@ -284,6 +323,9 @@ func TestTwoVisitorsKillingTheSameDemoParentInTurnSignalOnce(t *testing.T) {
 
 func TestTwoVisitorsKillingTheSameDemoParentAtOnceSignalOnce(t *testing.T) {
 	r := startDemoRelay(t)
+	r.machine.mu.Lock()
+	r.machine.gate = true
+	r.machine.mu.Unlock()
 	ids := [2]string{"3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f", "8d9e0f1a-2b3c-4d5e-af6a-7b8c9d0e1f2a"}
 	var outcomes [2]string
 	var wg sync.WaitGroup

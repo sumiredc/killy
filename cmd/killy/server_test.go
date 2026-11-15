@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -137,5 +139,18 @@ func TestTheDemoAgentIDIsReadAsAUUIDInLowerCase(t *testing.T) {
 		if got := demoAgentID(raw, log); got != want {
 			t.Errorf("demoAgentID(%q) = %q, want %q", raw, got, want)
 		}
+	}
+}
+
+func TestADemoAgentIDThatIsNotAUUIDIsLogged(t *testing.T) {
+	var buf bytes.Buffer
+	demoAgentID("demo-machine", slog.New(slog.NewTextHandler(&buf, nil)))
+	if !strings.Contains(buf.String(), "KILLY_DEMO_AGENT_ID") || !strings.Contains(buf.String(), "demo-machine") {
+		t.Errorf("log %q, want a line naming KILLY_DEMO_AGENT_ID and the value", buf.String())
+	}
+	buf.Reset()
+	demoAgentID("", slog.New(slog.NewTextHandler(&buf, nil)))
+	if buf.Len() != 0 {
+		t.Errorf("log %q for an unset value, want nothing", buf.String())
 	}
 }

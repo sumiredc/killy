@@ -70,7 +70,7 @@
   "pairUnreachable": "Killy server に接続できません。ネットワークを確認してください。",
   "pairFailed": "サーバーを追加できませんでした。しばらくしてから、もう一度お試しください。",
   "tryDemo": "デモサーバーを試す",
-  "demoUnavailable": "デモサーバーは今使えません",
+  "demoNotConfigured": "デモサーバーは今使えません",
   "deviceRateLimited": "この端末を Killy server に登録できませんでした。このネットワークからの登録が多すぎます。次にアプリを起動したときにもう一度登録します。",
   "deviceNotRegistered": "この端末はまだ Killy server に登録されていないため、サーバーを追加できません。ネットワークを確認して、アプリを起動し直してください。",
   "detailTitle": "サーバーの設定",

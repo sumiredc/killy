@@ -128,3 +128,12 @@ func TestWithoutADemoServerTheDatabaseIsNotAsked(t *testing.T) {
 		t.Errorf("%d %+v, want 404 demo_not_configured", status, r)
 	}
 }
+
+func TestAnInvalidDeviceTokenIsRefusedBeforeTheDemoServerIsLookedAt(t *testing.T) {
+	s := newTestServer(t)
+	s.DemoAgentID = ""
+	status, r := s.addDemo(t, "not-a-device-token")
+	if status != http.StatusUnauthorized || r.Error != "unauthorized" {
+		t.Errorf("%d %+v, want 401 unauthorized even with no demo server", status, r)
+	}
+}

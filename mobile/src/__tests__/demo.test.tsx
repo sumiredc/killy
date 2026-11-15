@@ -94,6 +94,16 @@ describe('Try the demo server', () => {
     expect(await screen.findByText('デモサーバーは今使えません')).toBeOnTheScreen();
   });
 
+  test('while the phone is still registering, the button cannot be pressed and sends nothing', async () => {
+    const server = new FakeServer();
+    server.hold('POST /app/v1/devices');
+    await startApp(server, null);
+    const button = screen.getByRole('button', { name: 'Try the demo server' });
+    expect(button).toBeDisabled();
+    await fireEvent.press(button);
+    expect(server.count(demoRoute)).toBe(0);
+  });
+
   test.each([
     ['too many registrations from this network', 429, { error: 'rate_limited' }, /too many registrations from this network/],
     ['the Killy server could not be reached at start', 503, { error: 'unavailable' }, /not registered with the Killy server yet/],

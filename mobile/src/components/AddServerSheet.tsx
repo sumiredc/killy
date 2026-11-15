@@ -24,7 +24,7 @@ const claimMessages: Record<ClaimErrorKind, Key> = {
   rate_limited: 'pairRateLimited',
   unreachable: 'pairUnreachable',
   not_registered: 'deviceNotRegistered',
-  demo_not_configured: 'demoUnavailable',
+  demo_not_configured: 'demoNotConfigured',
   other: 'pairFailed',
 };
 
