@@ -24,6 +24,7 @@ const claimMessages: Record<ClaimErrorKind, Key> = {
   rate_limited: 'pairRateLimited',
   unreachable: 'pairUnreachable',
   not_registered: 'deviceNotRegistered',
+  demo_not_configured: 'demoUnavailable',
   other: 'pairFailed',
 };
 
@@ -112,8 +113,9 @@ export function AddServerSheet({ onClose, link }: { onClose: () => void; link?: 
     }
   }
 
-  async function submit() {
-    if (!ready || phase.kind !== 'form') {
+  // A claim with the code in the field, or the public demo without one: the same states either way.
+  async function add(send: () => Promise<{ name: string }>) {
+    if (phase.kind !== 'form' || registration === 'pending') {
       return;
     }
     // Without a device token nothing is sent; the phone says why instead.
@@ -123,14 +125,20 @@ export function AddServerSheet({ onClose, link }: { onClose: () => void; link?: 
     }
     setPhase({ kind: 'adding' });
     try {
-      const server = await client.claim(code, name);
+      const server = await send();
       if (!mounted.current) return;
-      // The claim succeeds without the agent; its state arrives later on the event stream.
+      // The server is added without the agent; its state arrives later on the event stream.
       setPhase({ kind: 'added', name: server.name });
       closeTimer.current = setTimeout(onClose, addedFor);
     } catch (e) {
       if (!mounted.current) return;
       setPhase({ kind: 'form', error: claimMessages[e instanceof ClaimError ? e.kind : 'other'] });
+    }
+  }
+
+  async function submit() {
+    if (ready) {
+      await add(() => client.claim(code, name));
     }
   }
 
@@ -235,6 +243,16 @@ export function AddServerSheet({ onClose, link }: { onClose: () => void; link?: 
                   </KText>
                 </Pressable>
               </View>
+
+              {/* DESIGN Add server sheet 5: below the form, for anyone without a server of their own. */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('tryDemo')}
+                disabled={registration === 'pending'}
+                onPress={() => void add(() => client.addDemoServer())}
+                style={[styles.ghost, styles.demo]}>
+                <KText style={styles.ghostLabel}>{t('tryDemo')}</KText>
+              </Pressable>
             </>
           ) : (
             <View style={styles.status}>
@@ -289,6 +307,7 @@ const styles = StyleSheet.create({
   codeInput: { fontFamily: fonts.mono, fontSize: 24, letterSpacing: 10, textAlign: 'center' },
   // The secondary button of the sheet (`.ghost-btn` in the mock).
   ghost: { minHeight: 44, marginTop: -2, marginBottom: 14, borderRadius: radii.input, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
+  demo: { marginTop: 16, marginBottom: 0 },
   ghostLabel: { color: colors.text, fontSize: 14 },
   scanner: { alignItems: 'center', gap: 6, marginBottom: 6 },
   camera: { width: '100%', aspectRatio: 1, borderRadius: radii.input, overflow: 'hidden' },

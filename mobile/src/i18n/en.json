@@ -69,6 +69,8 @@
   "pairRateLimited": "Too many attempts. Wait a while and try again.",
   "pairUnreachable": "Cannot reach the Killy server. Check your network.",
   "pairFailed": "The server could not be added. Try again in a while.",
+  "tryDemo": "Try the demo server",
+  "demoUnavailable": "The demo server is not available right now",
   "deviceRateLimited": "This phone could not register with the Killy server: too many registrations from this network. It will try again the next time the app starts.",
   "deviceNotRegistered": "This phone is not registered with the Killy server yet, so it cannot add a server. Check your network and restart the app.",
   "detailTitle": "Server settings",

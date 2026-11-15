@@ -506,3 +506,39 @@ describe('updateDevice', () => {
     expect(server.requests).toEqual([]);
   });
 });
+
+describe('addDemoServer', () => {
+  const demo = { id: 'd1', name: 'demo-linux-01', hostname: 'demo-linux-01', notify: true };
+
+  test('sends no body with the device token and returns the demo server', async () => {
+    const server = new FakeServer();
+    server.respond('POST /app/v1/demo', 200, demo);
+    await expect(client(server).addDemoServer()).resolves.toEqual(demo);
+    expect(server.requests).toEqual([expect.objectContaining({ method: 'POST', url: `${url}/app/v1/demo`, authorization: 'Bearer dev-token' })]);
+  });
+
+  test.each([
+    [404, { error: 'demo_not_configured' }, 'demo_not_configured'],
+    [401, { error: 'unauthorized' }, 'other'],
+    [503, { error: 'unavailable' }, 'other'],
+    [200, { name: 'no id' }, 'other'],
+  ] as const)('a %i %j is %s', async (status, body, kind) => {
+    const server = new FakeServer();
+    server.respond('POST /app/v1/demo', status, body);
+    await expect(client(server).addDemoServer()).rejects.toEqual(new ClaimError(kind));
+  });
+
+  test('an answer that is not JSON is other, and no answer is unreachable', async () => {
+    const server = new FakeServer();
+    server.respondText('POST /app/v1/demo', 502, '<html>Bad gateway</html>');
+    await expect(client(server).addDemoServer()).rejects.toEqual(new ClaimError('other'));
+    server.unreachable('POST /app/v1/demo');
+    await expect(client(server).addDemoServer()).rejects.toEqual(new ClaimError('unreachable'));
+  });
+
+  test('without a device token nothing is sent', async () => {
+    const server = new FakeServer();
+    await expect(client(server, null).addDemoServer()).rejects.toEqual(new ClaimError('not_registered'));
+    expect(server.requests).toEqual([]);
+  });
+});
