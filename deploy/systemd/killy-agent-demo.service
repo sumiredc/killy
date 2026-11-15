@@ -1,0 +1,19 @@
+# Demo machine only: the agent of the public demo. It reports and kills only the parents that
+# killy-summon.service started (their cgroup is /system.slice/killy-summon.service).
+[Unit]
+Description=Killy agent (public demo)
+Documentation=https://github.com/sumiredc/killy
+After=network-online.target
+Wants=network-online.target
+# The normal agent would use the same /etc/killy/agent.json and report and kill everything,
+# exposing the demo machine through the public demo.
+Conflicts=killy-agent.service
+
+[Service]
+# As root, to signal the parents, which run as summon's dynamic user.
+ExecStart=/usr/local/bin/killy agent run --demo
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
