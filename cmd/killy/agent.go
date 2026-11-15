@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"math/rand/v2"
 	"net/http"
@@ -75,6 +76,7 @@ func runAgentRun(args []string, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	config := fs.String("config", agent.DefaultConfigPath, "agent configuration file")
 	outcomes := fs.String("outcomes", "/var/lib/killy/outcomes.jsonl", "file that keeps the outcome of every kill ID")
+	demo := fs.Bool("demo", false, "public demo: report and kill only parents started by killy summon")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -85,8 +87,10 @@ func runAgentRun(args []string, stderr io.Writer) int {
 		return 1
 	}
 	defer store.Close()
-	scanner := &proc.Scanner{Root: os.DirFS("/proc")}
-	killer := &kill.Killer{Proc: scanner, Pidfd: kill.NewPidfdOps(), Store: store, Clock: kill.SystemClock{}, SelfPID: os.Getpid, Log: log}
+	scanner, killer := newAgentParts(*demo, os.DirFS("/proc"), store, log)
+	if *demo {
+		log.Info("demo mode: only parents in the cgroup of killy-summon.service are reported and killed", "cgroup", proc.SummonCgroup)
+	}
 	hostname, err := os.Hostname()
 	if err != nil {
 		log.Error("hostname", "err", err)
@@ -114,6 +118,18 @@ func runAgentRun(args []string, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+// newAgentParts builds the scanner and the killer. With demo, both are limited to killy summon's
+// cgroup: the scanner reports nothing else and the killer kills nothing else. They are set together
+// here so that what the public demo shows and what it can kill never differ.
+func newAgentParts(demo bool, root fs.FS, store kill.OutcomeStore, log *slog.Logger) (*proc.Scanner, *kill.Killer) {
+	scanner := &proc.Scanner{Root: root}
+	killer := &kill.Killer{Proc: scanner, Pidfd: kill.NewPidfdOps(), Store: store, Clock: kill.SystemClock{}, SelfPID: os.Getpid, Log: log, Demo: demo}
+	if demo {
+		scanner.OnlyCgroup = proc.SummonCgroup
+	}
+	return scanner, killer
 }
 
 // every sends the current time at once and then every d until ctx is done.
