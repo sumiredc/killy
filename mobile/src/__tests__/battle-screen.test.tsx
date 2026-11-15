@@ -408,6 +408,21 @@ describe('the arena', () => {
     expect(c.getByTestId('hood-times')).toHaveTextContent('× 4');
   });
 
+  test('Killy is 164px wide at the bottom-left, its feet 36px up; the enemies are drawn over the info block', async () => {
+    await battleWith([server('a', 'web-01', [parent(3801, [3802], t1)])]);
+    await laidOut();
+    expect(screen.getByTestId('killy')).toHaveStyle({ position: 'absolute', left: 0, bottom: 36, width: 164 });
+    expect(screen.getByTestId('enemies')).toHaveStyle({ zIndex: 2 });
+  });
+
+  test('a back-row zombie is scaled towards its feet, so they stay on its slot', async () => {
+    await battleWith([server('a', 'web-01', [parent(3801, pids(4), t1)])]);
+    await laidOut();
+    const back = screen.getAllByTestId('zombie')[3];
+    const height = (48 * 80) / 56;
+    expect(back).toHaveStyle({ transform: [{ translateY: (height * (1 - 0.84)) / 2 }, { scale: 0.84 }] });
+  });
+
   test('in an empty state Killy stays, and there is no necromancer, zombie or counter', async () => {
     await battleWith([server('a', 'web-01', [])]);
     await laidOut();

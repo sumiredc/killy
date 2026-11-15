@@ -27,6 +27,7 @@ describe('placement (DESIGN: Battle tab)', () => {
   test('the 150px moon is centred on the same vertical line, behind the necromancer', () => {
     const m = moonAt(arena);
     expect(m.x + 150 / 2).toBeCloseTo(necromancerAt(arena).x + 150 / 2);
+    expect(m.y).toBeCloseTo(arena.height * 0.22);
   });
 
   test.each([

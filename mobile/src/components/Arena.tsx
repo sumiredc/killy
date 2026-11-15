@@ -1,5 +1,5 @@
 import { StyleSheet, View } from 'react-native';
-import Svg, { Circle, Defs, Line, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, G, Line, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { HoodIcon } from '@/art/HoodIcon';
 import { Killy } from '@/art/Killy';
@@ -70,9 +70,14 @@ export function Backdrop({ size }: { size: Size }) {
           <Stop offset="0.7" stopColor={colors.purple} stopOpacity="0" />
         </RadialGradient>
         <RadialGradient id="moonHalo" gradientUnits="userSpaceOnUse" cx={mc.x} cy={mc.y} r={halo} fx={mc.x} fy={mc.y}>
-          {shadowFalloff.map(([d, k]) => (
-            <Stop key={d} offset={(r + 10 + d) / halo} stopColor={colors.purple300} stopOpacity={0.25 * 0.85 * k} />
-          ))}
+          {[
+            // Nothing under the moon: a CSS box-shadow is not drawn beneath its box.
+            <Stop key="center" offset="0" stopColor={colors.purple300} stopOpacity="0" />,
+            <Stop key="rim" offset={(r - 0.5) / halo} stopColor={colors.purple300} stopOpacity="0" />,
+            ...shadowFalloff.map(([d, k]) => (
+              <Stop key={d} offset={(r + 10 + d) / halo} stopColor={colors.purple300} stopOpacity={0.25 * 0.85 * k} />
+            )),
+          ]}
         </RadialGradient>
         {/* CSS `radial-gradient(circle at 38% 36%, …)` reaches the farthest corner of the 150px box. */}
         <RadialGradient
@@ -94,9 +99,12 @@ export function Backdrop({ size }: { size: Size }) {
         <Circle key={`${s.x},${s.y}`} cx={size.width * s.x} cy={size.height * s.y} r={s.r} fill="#fff" opacity={s.o} />
       ))}
       <Circle cx={mc.x} cy={mc.y} r={halo} fill="url(#moonHalo)" />
-      <Circle testID="moon" cx={mc.x} cy={mc.y} r={r} fill="url(#moonFace)" opacity="0.85" />
-      <Circle cx={moon.x + MOON_SIZE * 0.7} cy={moon.y + MOON_SIZE * 0.64} r="9" fill="rgb(120,90,190)" opacity={0.35 * 0.85} />
-      <Circle cx={moon.x + MOON_SIZE * 0.34} cy={moon.y + MOON_SIZE * 0.7} r="6" fill="rgb(120,90,190)" opacity={0.25 * 0.85} />
+      {/* The moon and its craters fade together, as the mock's `.moon` opacity covers its ::after. */}
+      <G opacity="0.85">
+        <Circle testID="moon" cx={mc.x} cy={mc.y} r={r} fill="url(#moonFace)" />
+        <Circle cx={moon.x + MOON_SIZE * 0.7} cy={moon.y + MOON_SIZE * 0.64} r="9" fill="rgb(120,90,190)" opacity="0.35" />
+        <Circle cx={moon.x + MOON_SIZE * 0.34} cy={moon.y + MOON_SIZE * 0.7} r="6" fill="rgb(120,90,190)" opacity="0.25" />
+      </G>
     </Svg>
   );
 }
@@ -152,7 +160,8 @@ export function Enemies({ size, zombies }: { size: Size; zombies: number[] }) {
   const necro = necromancerAt(size);
   const last = zombieBox(slots.length - 1, size);
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none" testID="enemies">
+    // Above the info block, as the mock's `.party` (z-index 2) is above `.info` (1).
+    <View style={styles.enemies} pointerEvents="none" testID="enemies">
       <Svg style={StyleSheet.absoluteFill} width={size.width} height={size.height} testID="strings">
         {strings(ground.shown.length, size).map((l) => (
           <Line key={`${l.x2},${l.y2}`} {...l} stroke={colors.purple300} strokeWidth="1" opacity="0.6" testID="string" />
@@ -217,6 +226,7 @@ const styles = StyleSheet.create({
   current: { transform: [{ translateY: -2 }] },
   done: { opacity: 0.22 },
   times: { alignSelf: 'center', color: colors.text, fontSize: 14 },
+  enemies: { ...StyleSheet.absoluteFill, zIndex: 2 },
   necromancer: { position: 'absolute', width: NECROMANCER_WIDTH, zIndex: 10 },
   zombie: { position: 'absolute', width: ZOMBIE_WIDTH, alignItems: 'center' },
   // Under the feet, 10px wider than the zombie on each side; the mock puts its bottom edge 16px below them.

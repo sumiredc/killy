@@ -84,7 +84,12 @@ export default function BattleScreen() {
           <KText style={styles.noticeText}>{t('deviceRateLimited')}</KText>
         </View>
       )}
-      <View style={styles.arena} testID="arena" onLayout={(e) => setSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}>
+      <View style={styles.arena}>
+        {/* Measured inside the border, where the absolutely placed scene is laid out. */}
+        <View
+          style={StyleSheet.absoluteFill}
+          testID="arena"
+          onLayout={(e) => setSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}>
         {size && <Backdrop size={size} />}
         {size && <Ground size={size} />}
         {current ? (
@@ -127,6 +132,7 @@ export default function BattleScreen() {
         )}
         {current && size && <Enemies size={size} zombies={current.parent.zombies} />}
         <KillyOnStage />
+        </View>
       </View>
 
       <Pressable
@@ -205,7 +211,7 @@ const styles = StyleSheet.create({
   },
   chipText: { color: colors.purple100, fontSize: 12.5 },
   countRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
-  count: { color: colors.text, fontSize: 56, lineHeight: 60, letterSpacing: -2 },
+  count: { color: colors.text, fontSize: 56, lineHeight: 56, letterSpacing: -2 },
   countLabel: { color: colors.muted, fontSize: 15 },
   pid: { color: colors.purple300, fontSize: 12.5, lineHeight: 20, marginTop: 10 },
   cmd: { color: colors.muted, fontSize: 12.5, lineHeight: 20 },

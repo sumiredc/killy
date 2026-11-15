@@ -173,6 +173,39 @@ describe('a battle', () => {
     expect(b.allClear).toEqual({ parents: 2, zombies: 3 });
   });
 
+  test('the parents put away, killed or already gone, are counted for the parent counter', () => {
+    const p1 = parent(10, [11], t1);
+    const p2 = parent(20, [21], t2);
+    const p3 = parent(30, [31], t3);
+    const state: State = { servers: [server('a', [p1, p2, p3])] };
+    let b = onState(newBattle(), state);
+    expect(b.cleared).toBe(0);
+    b = applyOutcome(b, state, { serverId: 'a', parent: p1, zombiesShown: 1 }, { outcome: 'already_gone' }).battle;
+    b = applyOutcome(b, state, { serverId: 'a', parent: p2, zombiesShown: 1 }, { outcome: 'refused', reason: 'protected' }).battle;
+    b = applyOutcome(b, state, { serverId: 'a', parent: p2, zombiesShown: 1 }, { outcome: 'killed', reaped: 1 }).battle;
+    expect(b.cleared).toBe(2);
+  });
+
+  test('a battle that starts after the queue emptied counts its put-away parents from zero', () => {
+    const p1 = parent(10, [11], t1);
+    const p2 = parent(20, [21], t2);
+    const both: State = { servers: [server('a', [p1, p2])] };
+    let b = onState(newBattle(), both);
+    b = applyOutcome(b, both, { serverId: 'a', parent: p1, zombiesShown: 1 }, { outcome: 'killed', reaped: 1 }).battle;
+    b = onState(b, { servers: [server('a', [])] });
+    b = onState(b, { servers: [server('a', [parent(40, [41], t3)])] });
+    expect(b.cleared).toBe(0);
+  });
+
+  test('closing All clear counts the put-away parents from zero', () => {
+    const p1 = parent(10, [11], t1);
+    const state: State = { servers: [server('a', [p1])] };
+    let b = onState(newBattle(), state);
+    b = applyOutcome(b, state, { serverId: 'a', parent: p1, zombiesShown: 1 }, { outcome: 'killed', reaped: 1 }).battle;
+    expect(b.cleared).toBe(1);
+    expect(closeAllClear(b).cleared).toBe(0);
+  });
+
   test('All clear keeps its numbers while it is shown, and closing it starts a new battle', () => {
     const p1 = parent(10, [11, 12], t1);
     const state: State = { servers: [server('a', [p1])] };
