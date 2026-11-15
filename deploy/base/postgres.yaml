@@ -53,7 +53,11 @@ spec:
             - name: data
               mountPath: /var/lib/postgresql
   volumeClaimTemplates:
-    - metadata:
+    # apiVersion and kind are written out because the API server adds them; with ServerSideApply
+    # Argo CD would otherwise show the StatefulSet as OutOfSync for ever (argo-cd#11143).
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
         name: data
       spec:
         accessModes: [ReadWriteOnce]
