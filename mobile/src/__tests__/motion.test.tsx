@@ -12,11 +12,11 @@ import { useIdleMotion } from '../killy/motion';
 
 const arena = { width: 358, height: 600 };
 
-function Scene() {
+function Scene({ zombies = [3802, 3803, 3804] }: { zombies?: number[] }) {
   const clock = useIdleMotion();
   return (
     <>
-      <Enemies size={arena} zombies={[3802, 3803, 3804]} clock={clock} />
+      <Enemies size={arena} zombies={zombies} clock={clock} />
       <KillyOnStage clock={clock} />
     </>
   );
@@ -109,4 +109,38 @@ test('turning reduce motion on while the loops run puts everything back at rest 
   expect(translateY('killy')).toBe(0);
   expect(translateY('necromancer')).toBe(0);
   expect(rotate('zombie', 0)).toBeCloseTo(0);
+});
+
+test('the answer to a change made before the first answer arrives is the change', async () => {
+  let answer: (on: boolean) => void = () => {};
+  let changed: ((on: boolean) => void) | undefined;
+  jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockReturnValue(new Promise((resolve) => (answer = resolve)));
+  jest.spyOn(AccessibilityInfo, 'addEventListener').mockImplementation(((event: string, cb: (on: boolean) => void) => {
+    if (event === 'reduceMotionChanged') {
+      changed = cb;
+    }
+    return { remove: () => {} };
+  }) as typeof AccessibilityInfo.addEventListener);
+  await render(<Scene />);
+  await act(() => changed?.(false));
+  await act(async () => answer(true));
+  await ms(1400);
+  expect(translateY('killy')).toBeLessThan(-4);
+});
+
+test('if the OS cannot be asked, the loops run', async () => {
+  jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockRejectedValue(new Error('no answer'));
+  await render(<Scene />);
+  await ms(1400);
+  expect(translateY('killy')).toBeLessThan(-4);
+});
+
+test('zombies added while the scene is moving get their strings without breaking it', async () => {
+  reduceMotion(false);
+  await render(<Scene zombies={[3802]} />);
+  await ms(300);
+  await screen.rerender(<Scene zombies={[3802, 3803, 3804, 3805]} />);
+  await ms(300);
+  expect(screen.getAllByTestId('zombie')).toHaveLength(4);
+  expect(screen.getAllByTestId('string')).toHaveLength(8);
 });

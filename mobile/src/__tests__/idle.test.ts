@@ -154,6 +154,8 @@ describe('strings', () => {
       const nearest = Math.min(...from.map((a) => Math.abs(a.x - toHead.x2)));
       expect(Math.abs(toHead.x1 - toHead.x2)).toBeCloseTo(nearest);
       expect({ x: toHand.x1, y: toHand.y1 }).not.toEqual({ x: toHead.x1, y: toHead.y1 });
+      const others = from.filter((a) => a.x !== toHead.x1 || a.y !== toHead.y1);
+      expect(Math.abs(toHand.x1 - toHand.x2)).toBeCloseTo(Math.min(...others.map((a) => Math.abs(a.x - toHand.x2))));
     }
   });
 

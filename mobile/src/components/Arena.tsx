@@ -160,7 +160,9 @@ const AnimatedLine = Animated.createAnimatedComponent(Line);
 
 /** One marionette string, redrawn each frame from the idle poses (the mock's drawThreads). */
 function StringLine({ lines, index }: { lines: SharedValue<ArenaLine[]>; index: number }) {
-  const props = useAnimatedProps(() => lines.value[index]);
+  // When zombies are added, the new strings render before the derived lines are recomputed for
+  // them; until then such a string is a point, which draws nothing.
+  const props = useAnimatedProps(() => lines.value[index] ?? { x1: 0, y1: 0, x2: 0, y2: 0 });
   return <AnimatedLine animatedProps={props} stroke={colors.purple300} strokeWidth="1" opacity="0.6" testID="string" />;
 }
 
