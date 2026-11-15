@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Production: killy.sumire.pink. The shared sumire.pink Cloudflare Tunnel sends *.sumire.pink to
+# ingress-nginx, and the Ingress host picks this overlay. Argo CD creates the namespace.
+namespace: killy
+
+resources:
+  - ../../base
+  # Sealed for this name and namespace only (--scope strict); re-seal if either changes.
+  - sealedsecret.yaml
+
+images:
+  - name: 10.1.1.10:5000/killy/server
+    digest: sha256:e09203e9bdf3bd9a705f26c70c806008f177da3482a7c2c9061ac18893209589
+
+patches:
+  - target: { kind: Ingress, name: killy }
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: killy.sumire.pink
