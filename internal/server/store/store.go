@@ -32,25 +32,30 @@ func New(pool *pgxpool.Pool) *Store {
 
 // Migrate applies the migrations embedded in the binary that the database does not have yet.
 // Each migration runs in its own transaction, so one that fails leaves no trace and stops here.
-func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
+// It returns the schema version the database has afterwards.
+func Migrate(ctx context.Context, pool *pgxpool.Pool) (int64, error) {
 	sub, err := fs.Sub(migrations, "migrations")
 	if err != nil {
-		return err
+		return 0, err
 	}
 	return migrate(ctx, pool, sub)
 }
 
-func migrate(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS) error {
+func migrate(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS) (int64, error) {
 	db := stdlib.OpenDBFromPool(pool)
 	defer db.Close()
 	p, err := goose.NewProvider(goose.DialectPostgres, db, fsys)
 	if err != nil {
-		return fmt.Errorf("load migrations: %w", err)
+		return 0, fmt.Errorf("load migrations: %w", err)
 	}
 	if _, err := p.Up(ctx); err != nil {
-		return fmt.Errorf("migrate: %w", err)
+		return 0, fmt.Errorf("migrate: %w", err)
 	}
-	return nil
+	v, err := p.GetDBVersion(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("read schema version: %w", err)
+	}
+	return v, nil
 }
 
 type Agent struct {

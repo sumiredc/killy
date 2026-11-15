@@ -75,7 +75,13 @@ func runServer(args []string, stderr io.Writer) int {
 		srv.WatchConnections(ctx, t.C)
 	}()
 	err = serve(ctx, log,
-		func(ctx context.Context) error { return store.Migrate(ctx, pool) },
+		func(ctx context.Context) error {
+			v, err := store.Migrate(ctx, pool)
+			if err == nil {
+				log.Info("database migrated", "version", v)
+			}
+			return err
+		},
 		func() (net.Listener, error) { return net.Listen("tcp", *listen) },
 		srv.Handler(), srv.StopStreams)
 	if err != nil {

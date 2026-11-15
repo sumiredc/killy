@@ -1,0 +1,61 @@
+name: image
+
+# Pull requests only build the image; a push to main builds it and pushes it to the LAN registry.
+on:
+  pull_request:
+    paths:
+      - go.mod
+      - go.sum
+      - cmd/**
+      - internal/**
+      - Dockerfile
+      - .dockerignore
+      - .github/workflows/image.yml
+  push:
+    branches: [main]
+    paths:
+      - go.mod
+      - go.sum
+      - cmd/**
+      - internal/**
+      - Dockerfile
+      - .dockerignore
+      - .github/workflows/image.yml
+
+permissions:
+  contents: read
+
+jobs:
+  server:
+    # Every job runs on the self-hosted runner while the repository is private. Write the runner
+    # name literally on the runs-on line, so the switch to GitHub-hosted runners finds every job by grep.
+    runs-on: arc-runner-killy
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          driver: remote
+          endpoint: tcp://buildkitd.arc-runners.svc:1234
+      - id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64
+          build-args: VERSION=${{ github.sha }}
+          tags: 10.1.1.10:5000/killy/server:${{ github.sha }}
+          push: ${{ github.event_name == 'push' }}
+          # A plain image manifest, so the digest pinned in deploy/ is the image itself.
+          provenance: false
+          sbom: false
+      - name: Show the digest
+        if: github.event_name == 'push'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          SHA: ${{ github.sha }}
+        run: |
+          test -n "$DIGEST"
+          echo "10.1.1.10:5000/killy/server:${SHA}@${DIGEST}"
+          echo "\`10.1.1.10:5000/killy/server:${SHA}@${DIGEST}\`" >> "$GITHUB_STEP_SUMMARY"
