@@ -45,12 +45,11 @@ file('notification-icon', '2 5 120 120', solid('#fff'));
 JS
 
 render() { rsvg-convert -w "$2" -h "$3" "$work/$1.svg" -o "$out/$1.png"; }
-render icon 1024 1024
 render android-icon-foreground 1024 1024
 render android-icon-monochrome 1024 1024
 render splash-icon 480 447
 render notification-icon 96 96
-# The App Store refuses icons with transparency: flatten the iOS icon onto the purple background.
+# The App Store refuses icons with transparency: render the iOS icon onto the purple background.
 rsvg-convert -w 1024 -h 1024 -b '#9046FF' "$work/icon.svg" -o "$out/icon.png"
 rm -f "$out/android-icon-background.png"
 echo "wrote $(cd "$out" && ls icon.png android-icon-*.png splash-icon.png notification-icon.png | tr '\n' ' ')"
