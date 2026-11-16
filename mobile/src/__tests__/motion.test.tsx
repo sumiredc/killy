@@ -43,10 +43,6 @@ const translateY = (testID: string, i = 0) => Number(transform(testID, i).find((
 const rotate = (testID: string, i = 0) => parseFloat(String(transform(testID, i).find((x) => 'rotate' in x)?.rotate ?? '0'));
 const ms = (n: number) => act(() => jest.advanceTimersByTimeAsync(n));
 
-// Every frame of fake time runs the animation under act; on the CI runner that is slower than
-// jest's default 5 s for a test.
-jest.setTimeout(30_000);
-
 beforeEach(() => jest.useFakeTimers());
 afterEach(() => {
   jest.useRealTimers();

@@ -64,6 +64,7 @@
     "resolver": "react-native-reanimated/jest/resolver",
     "setupFilesAfterEnv": [
       "./jest.setup-after-env.js"
-    ]
+    ],
+    "testTimeout": 30000
   }
 }
