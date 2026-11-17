@@ -1,4 +1,4 @@
-import { buildServerURL, ConfigError, serverURL } from '../config';
+import { buildDemoEnabled, buildServerURL, ConfigError, demoEnabled, serverURL } from '../config';
 
 describe('serverURL', () => {
   test('reads the URL set for the build', () => {
@@ -34,5 +34,29 @@ describe('buildServerURL', () => {
   test('fails when EXPO_PUBLIC_KILLY_SERVER_URL is not set', () => {
     delete process.env.EXPO_PUBLIC_KILLY_SERVER_URL;
     expect(() => buildServerURL()).toThrow(ConfigError);
+  });
+});
+
+describe('demoEnabled', () => {
+  test('only 1 turns the public demo on', () => {
+    expect(demoEnabled('1')).toBe(true);
+    expect(demoEnabled(' 1 ')).toBe(true);
+    for (const v of [undefined, '', '0', 'true', 'yes']) {
+      expect(demoEnabled(v)).toBe(false);
+    }
+  });
+});
+
+describe('buildDemoEnabled', () => {
+  const original = process.env.EXPO_PUBLIC_KILLY_DEMO;
+  afterEach(() => {
+    process.env.EXPO_PUBLIC_KILLY_DEMO = original;
+  });
+
+  test('reads EXPO_PUBLIC_KILLY_DEMO', () => {
+    process.env.EXPO_PUBLIC_KILLY_DEMO = '1';
+    expect(buildDemoEnabled()).toBe(true);
+    delete process.env.EXPO_PUBLIC_KILLY_DEMO;
+    expect(buildDemoEnabled()).toBe(false);
   });
 });

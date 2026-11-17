@@ -2,6 +2,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
+import { buildDemoEnabled } from '@/config';
 import { useServerURL } from '@/config-context';
 import type { Key } from '@/i18n';
 import { useI18n } from '@/i18n/context';
@@ -53,6 +54,7 @@ export function AddServerSheet({ onClose, link }: { onClose: () => void; link?: 
   const { t } = useI18n();
   const { client, registration } = useKilly();
   const appServer = useServerURL();
+  const showDemo = buildDemoEnabled();
   const [code, setCode] = useState(link?.ok ? link.code : '');
   const [name, setName] = useState('');
   const [phase, setPhase] = useState<Phase>({ kind: 'form', error: link && !link.ok ? pairLinkError(link.reason) : null });
@@ -244,15 +246,18 @@ export function AddServerSheet({ onClose, link }: { onClose: () => void; link?: 
                 </Pressable>
               </View>
 
-              {/* DESIGN Add server sheet 5: below the form, for anyone without a server of their own. */}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('tryDemo')}
-                disabled={registration === 'pending'}
-                onPress={() => void add(() => client.addDemoServer())}
-                style={[styles.ghost, styles.demo]}>
-                <KText style={styles.ghostLabel}>{t('tryDemo')}</KText>
-              </Pressable>
+              {/* DESIGN Add server sheet 5: below the form, for anyone without a server of their own,
+                  in the builds that offer the public demo only. */}
+              {showDemo && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('tryDemo')}
+                  disabled={registration === 'pending'}
+                  onPress={() => void add(() => client.addDemoServer())}
+                  style={[styles.ghost, styles.demo]}>
+                  <KText style={styles.ghostLabel}>{t('tryDemo')}</KText>
+                </Pressable>
+              )}
             </>
           ) : (
             <View style={styles.status}>

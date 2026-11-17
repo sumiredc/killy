@@ -207,6 +207,8 @@ Demo zombies must not be created by the agent itself: the agent would be their p
 
 The Killy server offers the demo agent named by `KILLY_DEMO_AGENT_ID`. The agent ID is known only after the demo machine is paired with the server (`killy agent pair` prints it), and it is not a secret, so it is set in the overlay. When it is unset, `POST /app/v1/demo` fails and the app says the demo server is not available.
 
+The demo is for the hackathon's judging only, so it lives on staging: the demo machine is paired with `stg-killy.sumire.pink` and `KILLY_DEMO_AGENT_ID` is set in `deploy/overlays/stg/` only. Production has no demo agent. The builds for the judges connect to staging and are built with `EXPO_PUBLIC_KILLY_DEMO=1`, which shows "Try the demo server"; without it, as in builds that connect to production, the app has no such button. While judging runs, the staging image is not updated, because the judges are using it.
+
 ## Deployment
 
 The Killy server runs on the home Kubernetes cluster and is published through the existing Cloudflare Tunnel. The cluster's conventions (GitOps, registry, secrets, node layout) are owned by the aidd-infra repository's `DEPLOY.md`; this section records only Killy's choices.
@@ -220,7 +222,7 @@ No DNS record, tunnel route or certificate is added: the tunnel already sends `*
 
 | Item | Setting |
 |---|---|
-| Hostnames | `killy.sumire.pink` (production), `stg-killy.sumire.pink` (staging) |
+| Hostnames | `killy.sumire.pink` (production), `stg-killy.sumire.pink` (staging; also the public demo for the hackathon's judges, see "Demo environment") |
 | Namespace | `killy` (staging: `stg-killy`) |
 | Manifests | Kustomize in this repository: `deploy/base/` (`Deployment`, `Service`, `Ingress`, PostgreSQL `StatefulSet` and `Service`) and `deploy/overlays/stg/`, `deploy/overlays/prd/`, each with its own `SealedSecret`. Argo CD applications `stg-killy` and `killy` (AppProject `killy`) watch the overlays. Never `kubectl apply` by hand |
 | Deployment | `replicas: 1`, `strategy: Recreate`, requests and limits set, node affinity that excludes control-plane nodes |
@@ -255,7 +257,7 @@ Availability: with one replica and `Recreate`, a node reboot or eviction stops t
 | Push | `expo-notifications` |
 | QR | `expo-camera` |
 | Secrets | Device token in `expo-secure-store` |
-| Builds | EAS: iOS to TestFlight (public link), Android APK attached to the GitHub Release (see "Distribution") |
+| Builds | EAS: iOS to TestFlight (public link), Android APK attached to the GitHub Release (see "Distribution"). The Killy server is fixed per build by `EXPO_PUBLIC_KILLY_SERVER_URL`; `EXPO_PUBLIC_KILLY_DEMO=1` shows "Try the demo server" (see "Demo environment"). The builds for the hackathon's judges connect to staging with the demo on |
 
 ## Distribution
 

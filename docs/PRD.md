@@ -151,9 +151,12 @@ The operator wants to know whether Killy can reach a server right now.
 
 A judge wants to try Killy without a server.
 
+The public demo exists for the hackathon's judging only. It runs on the staging Killy server, and only the builds made for the judges (the TestFlight public link and the APK) connect there and show "Try the demo server". The production Killy server has no demo, and builds that connect to it do not show the button.
+
 - Main flow: in Add server, the judge taps "Try the demo server"; the public demo server is added without a pairing code. Demo zombies appear and can be killed.
 - Alternative: another visitor kills the same demo parent first → it disappears from everyone's screen ("already gone" for the late one).
 - Exception: no public demo server is configured → the app says the demo server is not available; nothing is added.
+- Exception: the build connects to the production Killy server → there is no "Try the demo server" button.
 - Postconditions: only parents created by `killy summon` on the demo machine are ever killed; new ones keep appearing.
 
 ### UC7 Run a demo environment
