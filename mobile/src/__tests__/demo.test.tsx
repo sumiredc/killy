@@ -28,9 +28,10 @@ afterEach(() => {
 });
 
 /** Starts the app with savedToken as the device token (null: the phone registers at start). */
-async function startApp(server: FakeServer, savedToken: string | null = 'dev-token', languageCode = 'en') {
+async function startApp(server: FakeServer, savedToken: string | null = 'dev-token', languageCode = 'en', demo = true) {
   server.stream();
   jest.spyOn(config, 'buildServerURL').mockReturnValue('https://killy.example');
+  jest.spyOn(config, 'buildDemoEnabled').mockReturnValue(demo);
   jest.mocked(Localization.getLocales).mockReturnValue([{ languageCode } as Localization.Locale]);
   jest.spyOn(prefs, 'makePrefs').mockReturnValue(new MemoryPrefs());
   let token = savedToken;
@@ -114,5 +115,13 @@ describe('Try the demo server', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Try the demo server' }));
     expect(await screen.findByText(message)).toBeOnTheScreen();
     expect(server.count(demoRoute)).toBe(0);
+  });
+});
+
+describe('a build without the public demo', () => {
+  test('has no Try the demo server button, and adding a server by code still works', async () => {
+    await startApp(new FakeServer(), 'dev-token', 'en', false);
+    expect(screen.queryByRole('button', { name: 'Try the demo server' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Add' })).toBeOnTheScreen();
   });
 });

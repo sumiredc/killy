@@ -209,6 +209,8 @@ sequenceDiagram
 
 Killy server は、`KILLY_DEMO_AGENT_ID` で指定された agent を公開デモとして出します。agent の ID はデモ機を Killy server とペアリングした後で初めて分かり（`killy agent pair` が表示する）、秘密情報ではないので、overlay に書きます。未設定なら `POST /app/v1/demo` は失敗し、app はデモサーバーが使えないと表示します。
 
+デモはハッカソンの審査のためだけにあるので、staging に置きます。デモ機は `stg-killy.sumire.pink` とペアリングし、`KILLY_DEMO_AGENT_ID` は `deploy/overlays/stg/` にだけ書きます。production にデモの agent はありません。審査員向けの build は staging につなぎ、`EXPO_PUBLIC_KILLY_DEMO=1` で build します。これで「デモサーバーを試す」が出ます。production につなぐ build のように、これを付けない build には、そのボタンがありません。審査の間は、審査員が使っているので、staging の image を更新しません。
+
 ## デプロイ
 
 Killy server は home Kubernetes の cluster で動かし、既存の Cloudflare Tunnel で公開します。cluster の決まり（GitOps、registry、秘密情報、ノードの配置）は aidd-infra リポジトリの `DEPLOY.md` が持ちます。この節には Killy の選択だけを書きます。
@@ -222,7 +224,7 @@ DNS のレコード、tunnel の route、証明書は追加しません。tunnel
 
 | 項目 | 設定 |
 |---|---|
-| ホスト名 | `killy.sumire.pink`（production）、`stg-killy.sumire.pink`（staging） |
+| ホスト名 | `killy.sumire.pink`（production）、`stg-killy.sumire.pink`（staging。ハッカソンの審査員向けの公開デモも兼ねる。「デモ環境」を参照） |
 | Namespace | `killy`（staging は `stg-killy`） |
 | Manifest | このリポジトリの Kustomize：`deploy/base/`（`Deployment`、`Service`、`Ingress`、PostgreSQL の `StatefulSet` と `Service`）と、`deploy/overlays/stg/`・`deploy/overlays/prd/`（それぞれ自分の `SealedSecret` を持つ）。Argo CD の Application `stg-killy` と `killy`（AppProject `killy`）が overlay を見る。手で `kubectl apply` はしない |
 | Deployment | `replicas: 1`、`strategy: Recreate`、requests と limits を設定、control-plane のノードを除く node affinity |
@@ -257,7 +259,7 @@ production の前に:
 | Push | `expo-notifications` |
 | QR | `expo-camera` |
 | 秘密情報 | device token は `expo-secure-store` に置く |
-| Build | EAS：iOS は TestFlight（公開リンク）、Android の APK は GitHub Release に添付する（「配布」を参照） |
+| Build | EAS：iOS は TestFlight（公開リンク）、Android の APK は GitHub Release に添付する（「配布」を参照）。Killy server は build ごとに `EXPO_PUBLIC_KILLY_SERVER_URL` で決まる。`EXPO_PUBLIC_KILLY_DEMO=1` で「デモサーバーを試す」が出る（「デモ環境」を参照）。ハッカソンの審査員向けの build は、staging につなぎ、デモを出す |
 
 ## 配布
 

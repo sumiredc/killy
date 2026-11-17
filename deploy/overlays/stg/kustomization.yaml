@@ -3,6 +3,7 @@ kind: Kustomization
 
 # Staging: stg-killy.sumire.pink. The shared sumire.pink Cloudflare Tunnel sends *.sumire.pink to
 # ingress-nginx, and the Ingress host picks this overlay. Argo CD creates the namespace.
+# The public demo for the hackathon's judges lives here only; production has none.
 namespace: stg-killy
 
 resources:
@@ -20,3 +21,9 @@ patches:
       - op: replace
         path: /spec/rules/0/host
         value: stg-killy.sumire.pink
+  # The demo machine's agent (not a secret: `killy agent pair` prints it).
+  - target: { kind: Deployment, name: killy-server }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: { name: KILLY_DEMO_AGENT_ID, value: a8fd6189-f2b7-4f53-abeb-ddfa41f03565 }
