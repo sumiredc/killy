@@ -7,6 +7,21 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal"
+    },
+    "testflight": {
+      "distribution": "store",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_KILLY_SERVER_URL": "https://stg-killy.sumire.pink",
+        "EXPO_PUBLIC_KILLY_DEMO": "1"
+      }
+    }
+  },
+  "submit": {
+    "testflight": {
+      "ios": {
+        "ascAppId": "6835946573"
+      }
     }
   }
 }
