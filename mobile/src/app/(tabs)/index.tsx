@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Backdrop, Enemies, Ground, KillyOnStage, ParentCounter } from '@/components/Arena';
+import { KillButton } from '@/components/KillButton';
 import type { Key } from '@/i18n';
 import { useI18n } from '@/i18n/context';
 import { counter, type Size } from '@/killy/arena';
@@ -10,7 +11,7 @@ import { parentKey, type Shown } from '@/killy/battle';
 import { useBattle } from '@/killy/battle-context';
 import type { KillErrorKind } from '@/killy/client';
 import { useKilly } from '@/killy/context';
-import { useIdleMotion } from '@/killy/motion';
+import { useIdleClock, useReduceMotion } from '@/killy/motion';
 import { useHoldToKill } from '@/killy/hold';
 import { KText } from '@/theme/KText';
 import { colors, gutter, radii } from '@/theme/tokens';
@@ -50,9 +51,7 @@ export default function BattleScreen() {
   const { registration, state } = useKilly();
   const battle = useBattle();
   const current = battle.queue[0];
-  const press = useHoldToKill(current && parentKey(current.server.id, current.parent), battle.kill);
   const servers = state?.servers ?? [];
-  const canKill = current !== undefined && !battle.busy && battle.allClear === null;
 
   // A reason the app knows is said in words; any other is shown as the agent sent it.
   const reason = (r: string | undefined) => {
@@ -77,7 +76,11 @@ export default function BattleScreen() {
   };
   const shown = battle.shown && outcome(battle.shown);
   const [size, setSize] = useState<Size | null>(null);
-  const clock = useIdleMotion();
+  const reduceMotion = useReduceMotion();
+  const clock = useIdleClock(reduceMotion === false);
+  const canKill = current !== undefined && !battle.busy && battle.allClear === null;
+  // A hold only runs while the button can be pressed: when it cannot, or another parent comes to the front, the hold ends.
+  const press = useHoldToKill(canKill ? parentKey(current.server.id, current.parent) : undefined, battle.kill, reduceMotion === true);
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']} testID="battle-screen">
@@ -133,26 +136,18 @@ export default function BattleScreen() {
           />
         )}
         {current && size && <Enemies size={size} zombies={current.parent.zombies} clock={clock} />}
-        <KillyOnStage clock={clock} />
+        <KillyOnStage clock={clock} charge={press.windUp} lean={press.lean} />
         </View>
       </View>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t('hold')}
-        disabled={!canKill}
+      <KillButton
+        label={t('hold')}
+        sub={current && t('killSub', { pid: current.parent.pid, host: current.server.name })}
+        enabled={canKill}
+        charge={press.charge}
         onPressIn={press.onPressIn}
         onPressOut={press.onPressOut}
-        style={[styles.kill, !canKill && styles.killDisabled]}>
-        <KText kind="monoSemiBold" style={styles.killLabel}>
-          {t('hold')}
-        </KText>
-        {current && (
-          <KText kind="mono" style={styles.killSub}>
-            {t('killSub', { pid: current.parent.pid, host: current.server.name })}
-          </KText>
-        )}
-      </Pressable>
+      />
       {battle.error !== null && (
         <KText style={styles.error} testID="kill-error">
           {t(errors[battle.error])}
@@ -181,7 +176,7 @@ export default function BattleScreen() {
               </View>
             </View>
             <Pressable accessibilityRole="button" style={styles.close} onPress={battle.closeAllClear}>
-              <KText kind="monoSemiBold" style={styles.killLabel}>
+              <KText kind="monoSemiBold" style={styles.closeLabel}>
                 {t('close')}
               </KText>
             </Pressable>
@@ -223,10 +218,6 @@ const styles = StyleSheet.create({
   result: { gap: 4, marginTop: 8 },
   resultOk: { color: colors.green, fontSize: 12.5, lineHeight: 20 },
   resultBad: { color: colors.red, fontSize: 12.5, lineHeight: 20 },
-  kill: { marginTop: 12, minHeight: 64, borderRadius: radii.button, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 },
-  killDisabled: { backgroundColor: colors.elev3 },
-  killLabel: { color: '#FFFFFF', fontSize: 16 },
-  killSub: { color: colors.purple100, fontSize: 11, marginTop: 2 },
   error: { color: colors.red, fontSize: 13, marginTop: 8, textAlign: 'center' },
   overlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 24 },
   card: { backgroundColor: colors.elev1, borderRadius: radii.card, borderWidth: 1, borderColor: colors.line, padding: 24, gap: 12 },
@@ -235,5 +226,6 @@ const styles = StyleSheet.create({
   stat: { flex: 1, backgroundColor: colors.elev2, borderRadius: radii.input, padding: 14, gap: 4 },
   statValue: { color: colors.text, fontSize: 28 },
   statLabel: { color: colors.muted, fontSize: 12 },
+  closeLabel: { color: '#FFFFFF', fontSize: 16 },
   close: { minHeight: 52, borderRadius: radii.button, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
 });
