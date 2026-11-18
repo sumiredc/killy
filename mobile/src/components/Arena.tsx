@@ -1,11 +1,23 @@
+import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, { type SharedValue, useAnimatedProps, useAnimatedStyle, useDerivedValue } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  ReduceMotion,
+  type SharedValue,
+  useAnimatedProps,
+  useAnimatedStyle,
+  useDerivedValue,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import Svg, { Circle, Defs, G, Line, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { HoodIcon } from '@/art/HoodIcon';
 import { Killy } from '@/art/Killy';
 import { Necromancer } from '@/art/Necromancer';
+import { Soul } from '@/art/Soul';
 import { Zombie } from '@/art/Zombie';
+import type { Bubble } from '@/killy/battle-context';
 import {
   type Counter,
   GROUND_HEIGHT,
@@ -23,8 +35,27 @@ import {
   zombieBox,
 } from '@/killy/arena';
 import { killyBob, necroFloat, necroWork, puppet, stringsAt } from '@/killy/idle';
+import {
+  DEFEAT_FROM,
+  defeatRows,
+  ENTER_FROM,
+  flashOpacity,
+  killyDash,
+  killyHop,
+  necromancer as necromancerPose,
+  NEXT_IN_MS,
+  outcomeOf,
+  REST,
+  sigkill,
+  stringsOpacity,
+  zombie as zombiePose,
+} from '@/killy/strike';
+import type { StrikeMotion } from '@/killy/strike-motion';
 import { KText } from '@/theme/KText';
 import { colors } from '@/theme/tokens';
+
+// CSS `ease-out`, the mock's `enter`: Reanimated's Easing.out is a different curve.
+const cssEaseOut = Easing.bezier(0, 0, 0.58, 1);
 
 // The mock's `.stars`: position as a fraction of the arena, radius in px, opacity.
 const stars = [
@@ -158,6 +189,18 @@ export function ParentCounter({ value, label }: { value: Counter; label: string 
 
 const AnimatedLine = Animated.createAnimatedComponent(Line);
 
+/**
+ * The kill sequence as the enemies see it: its clock and outcome while a kill is on, at rest
+ * otherwise. Given as a plain prop, `on` is right from the first frame of a parent that comes in
+ * after a defeat, when the shared values may still hold the defeat's end.
+ */
+function seen(motion: StrikeMotion, on: boolean) {
+  'worklet';
+  return on
+    ? { t: motion.elapsed.value, outcome: outcomeOf(motion.outcome.value), at: motion.at.value, n: motion.n.value }
+    : { t: REST, outcome: null, at: DEFEAT_FROM, n: 0 };
+}
+
 /** One marionette string, redrawn each frame from the idle poses (the mock's drawThreads). */
 function StringLine({ lines, index }: { lines: SharedValue<ArenaLine[]>; index: number }) {
   // When zombies are added, the new strings render before the derived lines are recomputed for
@@ -166,63 +209,218 @@ function StringLine({ lines, index }: { lines: SharedValue<ArenaLine[]>; index: 
   return <AnimatedLine animatedProps={props} stroke={colors.purple300} strokeWidth="1" opacity="0.6" testID="string" />;
 }
 
-/** A zombie in slot i, doing its puppet jerk around its feet. */
-function ZombieOnGround({ pid, index, size, clock }: { pid: number; index: number; size: Size; clock: SharedValue<number> }) {
+/** The soul's width, and how far its bottom is above the zombie's feet (the mock's `.zombie .soul`). */
+const SOUL_WIDTH = 26;
+const SOUL_HEIGHT = (SOUL_WIDTH * 46) / 40;
+
+/** A zombie in slot i, doing its puppet jerk around its feet until the kill sequence knocks it out and releases its soul. */
+function ZombieOnGround({
+  pid,
+  index,
+  size,
+  clock,
+  motion,
+  on,
+}: {
+  pid: number;
+  index: number;
+  size: Size;
+  clock: SharedValue<number>;
+  motion: StrikeMotion;
+  on: boolean;
+}) {
   const box = zombieBox(index, size);
+  const pose = useDerivedValue(() => {
+    const k = seen(motion, on);
+    return zombiePose(k.t, index, k.n, k.outcome, k.at);
+  });
   const jerk = useAnimatedStyle(() => {
-    const p = puppet(clock.value, index);
+    // A knocked-out zombie stops jerking (the mock's `.zombie.dead { animation: none }`).
+    const p = pose.value.alive ? puppet(clock.value, index) : { y: 0, rotate: 0 };
     return { transform: [{ scale: box.scale }, { translateY: p.y }, { rotate: `${p.rotate}deg` }] };
   });
+  const body = useAnimatedStyle(() => {
+    const b = pose.value.body;
+    return { opacity: b.opacity, transform: [{ translateX: b.x }, { rotate: `${b.rotate}deg` }, { scaleY: b.scaleY }] };
+  });
+  const soul = useAnimatedStyle(() => {
+    const s = pose.value.soul;
+    return { opacity: s.opacity, transform: [{ translateX: s.x }, { translateY: s.y }, { scale: s.scale }] };
+  });
+  const pidStyle = useAnimatedStyle(() => ({ opacity: pose.value.pidOpacity }));
   return (
     <Animated.View testID="zombie" style={[styles.zombie, { left: box.left, top: box.top, zIndex: index < 3 ? 9 : 5 }, jerk]}>
-      <Zombie width={ZOMBIE_WIDTH} />
-      <KText kind="mono" style={styles.pid} testID="zombie-pid">
-        {pid}
-      </KText>
+      <Animated.View style={[styles.body, body]} testID="zombie-body">
+        <Zombie width={ZOMBIE_WIDTH} pose={pose} />
+      </Animated.View>
+      <Animated.View style={[styles.soul, soul]} testID="zombie-soul">
+        <Soul width={SOUL_WIDTH} />
+      </Animated.View>
+      <Animated.View style={[styles.pidBox, pidStyle]}>
+        <KText kind="mono" style={styles.pid} testID="zombie-pid">
+          {pid}
+        </KText>
+      </Animated.View>
     </Animated.View>
   );
 }
 
-/** The necromancer, its zombies on the ground and the strings between them, all moving with the idle clock. */
-export function Enemies({ size, zombies, clock }: { size: Size; zombies: number[]; clock: SharedValue<number> }) {
+/**
+ * The necromancer, its zombies on the ground and the strings between them, all moving with the
+ * idle clock and, while a kill is on (`striking`), with the kill sequence. A parent drawn with
+ * `entering` comes in from above, as the next one does after a defeat.
+ */
+export function Enemies({
+  size,
+  zombies,
+  clock,
+  motion,
+  striking = false,
+  entering = false,
+}: {
+  size: Size;
+  zombies: number[];
+  clock: SharedValue<number>;
+  motion: StrikeMotion;
+  striking?: boolean;
+  entering?: boolean;
+}) {
   const ground = onGround(zombies);
   const necro = necromancerAt(size);
   const last = zombieBox(slots.length - 1, size);
   const count = ground.shown.length;
-  const lines = useDerivedValue(() => stringsAt(clock.value, count, size));
-  const float = useAnimatedStyle(() => ({ transform: [{ translateY: necroFloat(clock.value) }] }));
-  const work = useAnimatedStyle(() => ({ transform: [{ rotate: `${necroWork(clock.value)}deg` }] }));
+  // How far the parent has come in, 0–1: from its first frame, so it never shows before it starts coming.
+  const enter = useSharedValue(entering ? 0 : 1);
+  useEffect(() => {
+    if (entering) {
+      enter.set(withTiming(1, { duration: NEXT_IN_MS, easing: cssEaseOut, reduceMotion: ReduceMotion.Never }));
+    }
+  }, [entering, enter]);
+  const lines = useDerivedValue(() => stringsAt(clock.value, count, size, ENTER_FROM * (1 - enter.value)));
+  const pose = useDerivedValue(() => {
+    const k = seen(motion, striking);
+    return necromancerPose(k.t, k.outcome, k.at, k.n);
+  });
+  const float = useAnimatedStyle(() => {
+    const p = pose.value;
+    const e = enter.value;
+    return {
+      opacity: p.opacity * e,
+      transform: [{ translateY: necroFloat(clock.value) + ENTER_FROM * (1 - e) + p.y }, { scale: p.scale }],
+    };
+  });
+  const work = useAnimatedStyle(() => ({ transform: [{ translateX: pose.value.x }, { rotate: `${necroWork(clock.value)}deg` }] }));
+  // The strings are cut and, after a recoil, come back together: each is drawn at 60%, so the
+  // whole set goes from 1 down to 0 and back.
+  const cut = useAnimatedStyle(() => ({
+    opacity: (() => {
+      const k = seen(motion, striking);
+      return stringsOpacity(k.t, k.outcome, k.at) / 0.6;
+    })(),
+  }));
+  // The +N chip goes with the last zombie drawn.
+  const more = useAnimatedStyle(() => ({
+    opacity: (() => {
+      const k = seen(motion, striking);
+      return zombiePose(k.t, count - 1, k.n, k.outcome, k.at).body.opacity;
+    })(),
+  }));
   return (
     // Above the info block, as the mock's `.party` (z-index 2) is above `.info` (1).
     <View style={styles.enemies} pointerEvents="none" testID="enemies">
-      <Svg style={StyleSheet.absoluteFill} width={size.width} height={size.height} testID="strings">
-        {Array.from({ length: 2 * count }, (_, i) => (
-          <StringLine key={i} lines={lines} index={i} />
-        ))}
-      </Svg>
+      <Animated.View style={[StyleSheet.absoluteFill, cut]} testID="strings-cut">
+        <Svg style={StyleSheet.absoluteFill} width={size.width} height={size.height} testID="strings">
+          {Array.from({ length: 2 * count }, (_, i) => (
+            <StringLine key={i} lines={lines} index={i} />
+          ))}
+        </Svg>
+      </Animated.View>
       <Animated.View style={[styles.necromancer, { left: necro.x, top: necro.y }, float]} testID="necromancer">
         <Animated.View style={[styles.work, work]} testID="necromancer-work">
           <Necromancer width={NECROMANCER_WIDTH} clock={clock} />
         </Animated.View>
       </Animated.View>
       {ground.shown.map((pid, i) => (
-        <ZombieOnGround key={pid} pid={pid} index={i} size={size} clock={clock} />
+        <ZombieOnGround key={pid} pid={pid} index={i} size={size} clock={clock} motion={motion} on={striking} />
       ))}
       {ground.more > 0 && (
-        <View style={[styles.more, { left: last.left, bottom: size.height - last.top + 4 }]} testID="zombies-more">
+        <Animated.View style={[styles.more, { left: last.left, bottom: size.height - last.top + 4 }, more]} testID="zombies-more">
           <KText kind="mono" style={styles.moreText}>{`+${ground.more}`}</KText>
-        </View>
+        </Animated.View>
       )}
     </View>
   );
 }
 
-/** Killy, bottom-left, facing right, bobbing and blinking with the idle clock. */
-export function KillyOnStage({ clock, charge, lean }: { clock: SharedValue<number>; charge?: SharedValue<number>; lean?: SharedValue<number> }) {
-  const bob = useAnimatedStyle(() => ({ transform: [{ translateY: killyBob(clock.value) }] }));
+/** The arena's flash at the hit, and "SIGKILL" floating up above the necromancer (the mock's `.flash` and `.float`). */
+export function StrikeEffects({ size, motion }: { size: Size; motion: StrikeMotion }) {
+  const necro = necromancerAt(size);
+  const flash = useAnimatedStyle(() => ({ opacity: flashOpacity(motion.elapsed.value) }));
+  const text = useAnimatedStyle(() => {
+    const s = sigkill(motion.elapsed.value);
+    return { opacity: s.opacity, transform: [{ translateY: s.y }] };
+  });
+  return (
+    <>
+      <Animated.View style={[styles.flash, flash]} pointerEvents="none" testID="strike-flash" />
+      <Animated.View
+        style={[styles.sigkill, { left: necro.x - 10, top: necro.y - 10 }, text]}
+        pointerEvents="none"
+        testID="strike-sigkill">
+        <KText kind="monoSemiBold" style={styles.sigkillText}>
+          SIGKILL
+        </KText>
+      </Animated.View>
+    </>
+  );
+}
+
+/** Killy's bubble: just above the head, reaching left, its tail dropping from the lower right onto the head (the mock's `.bubble`). */
+function SpeechBubble({ bubble }: { bubble: Bubble | null }) {
+  if (bubble === null) {
+    return null;
+  }
+  return (
+    <View style={styles.bubble} testID="killy-bubble" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <KText style={styles.bubbleText}>{bubble.symbol}</KText>
+      <View style={styles.bubbleTail} />
+    </View>
+  );
+}
+
+/**
+ * Killy, bottom-left, facing right, bobbing and blinking with the idle clock. During a kill it
+ * dashes and swings, then hops twice when the parent is put away; it bows for All clear.
+ */
+export function KillyOnStage({
+  clock,
+  charge,
+  lean,
+  motion,
+  bubble = null,
+}: {
+  clock: SharedValue<number>;
+  charge?: SharedValue<number>;
+  lean?: SharedValue<number>;
+  motion?: StrikeMotion;
+  bubble?: Bubble | null;
+}) {
+  const bob = useAnimatedStyle(() => {
+    // The hops take the place of the bob while they last (the mock's `.killy.hop` animation).
+    const hop =
+      motion && outcomeOf(motion.outcome.value) === 'defeat'
+        ? killyHop(motion.elapsed.value, defeatRows(motion.at.value, motion.n.value).result)
+        : null;
+    return { transform: [{ translateY: hop ?? killyBob(clock.value) }] };
+  });
+  // The dash moves the drawing, not the bubble (the mock's `.killy.dash .art`).
+  const dash = useAnimatedStyle(() => ({ transform: [{ translateX: motion ? killyDash(motion.elapsed.value) : 0 }] }));
   return (
     <Animated.View style={[styles.killy, bob]} pointerEvents="none" testID="killy">
-      <Killy width={KILLY_WIDTH} clock={clock} charge={charge} lean={lean} />
+      <Animated.View style={dash} testID="killy-dash">
+        <Killy width={KILLY_WIDTH} clock={clock} charge={charge} lean={lean} strike={motion?.elapsed} bow={motion?.bow} />
+      </Animated.View>
+      <SpeechBubble bubble={bubble} />
     </Animated.View>
   );
 }
@@ -247,16 +445,13 @@ const styles = StyleSheet.create({
   work: { transformOrigin: '50% 20%' },
   // Scaled, lifted and tilted around its feet: the mock's transform-origin 50% 100%.
   zombie: { position: 'absolute', width: ZOMBIE_WIDTH, alignItems: 'center', transformOrigin: '50% 100%' },
+  // The drawing, which sags back around 72% across and its feet (the mock's `.zombie .body`).
+  body: { transformOrigin: '72% 100%' },
+  // Centred over the feet, 6px up (the mock's `.zombie .soul`).
+  soul: { position: 'absolute', left: ZOMBIE_WIDTH / 2 - SOUL_WIDTH / 2, top: ZOMBIE_HEIGHT - 6 - SOUL_HEIGHT, width: SOUL_WIDTH },
   // Under the feet, 10px wider than the zombie on each side; the mock puts its bottom edge 16px below them.
-  pid: {
-    position: 'absolute',
-    top: ZOMBIE_HEIGHT + 2,
-    left: -10,
-    right: -10,
-    textAlign: 'center',
-    fontSize: 10,
-    color: colors.muted,
-  },
+  pidBox: { position: 'absolute', top: ZOMBIE_HEIGHT + 2, left: -10, right: -10 },
+  pid: { textAlign: 'center', fontSize: 10, color: colors.muted },
   more: {
     position: 'absolute',
     paddingVertical: 2,
@@ -274,5 +469,31 @@ const styles = StyleSheet.create({
     bottom: 36,
     width: KILLY_WIDTH,
     zIndex: 11,
+  },
+  // Over everything in the arena, Killy too (the mock's z-index 4 and 5 above `.killy`'s 3).
+  flash: { ...StyleSheet.absoluteFill, backgroundColor: colors.purple100, zIndex: 12 },
+  sigkill: { position: 'absolute', zIndex: 13 },
+  sigkillText: { fontSize: 20, color: colors.red },
+  bubble: {
+    position: 'absolute',
+    top: -24,
+    right: 78,
+    paddingVertical: 4,
+    paddingHorizontal: 9,
+    borderRadius: 12,
+    backgroundColor: colors.text,
+  },
+  bubbleText: { color: '#000', fontSize: 13 },
+  // A right-angled triangle under the bubble's right end, as the mock's border trick draws it.
+  bubbleTail: {
+    position: 'absolute',
+    right: 12,
+    bottom: -8,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 9,
+    borderLeftColor: 'transparent',
+    borderTopWidth: 9,
+    borderTopColor: colors.text,
   },
 });

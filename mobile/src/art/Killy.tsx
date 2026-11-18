@@ -3,6 +3,7 @@ import Svg, { Circle, Defs, Ellipse, G, type GProps, LinearGradient, Path, Rect,
 
 import { killyBlink } from '@/killy/idle';
 import { ghostMatrix, scytheMatrix } from '@/killy/pose';
+import { scytheSwing } from '@/killy/strike';
 
 const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
 const AnimatedG = Animated.createAnimatedComponent(G);
@@ -18,6 +19,8 @@ export function Killy({
   clock,
   charge,
   lean,
+  strike,
+  bow,
 }: {
   width: number;
   clock?: SharedValue<number>;
@@ -25,12 +28,16 @@ export function Killy({
   charge?: SharedValue<number>;
   /** 1 while the kill button is held: the ghost leans back. */
   lean?: SharedValue<number>;
+  /** The kill sequence's clock (ms since the hold completed): the scythe swings at its start. */
+  strike?: SharedValue<number>;
+  /** How far Killy has bowed, 0–1. */
+  bow?: SharedValue<number>;
 }) {
   // `matrix` is the transform react-native-svg's native group takes; its public props do not list
   // it, because transforms usually go through `transform` and are turned into a matrix in JS,
   // which animated props skip.
-  const ghost = useAnimatedProps(() => ({ matrix: ghostMatrix(lean ? lean.value : 0) }) as unknown as GProps);
-  const scythe = useAnimatedProps(() => ({ matrix: scytheMatrix(charge ? charge.value : 0) }) as unknown as GProps);
+  const ghost = useAnimatedProps(() => ({ matrix: ghostMatrix(lean ? lean.value : 0, bow ? bow.value : 0) }) as unknown as GProps);
+  const scythe = useAnimatedProps(() => ({ matrix: scytheMatrix(charge ? charge.value : 0, strike ? scytheSwing(strike.value) : null) }) as unknown as GProps);
   const near = useAnimatedProps(() => ({ ry: 7.2 * (clock ? killyBlink(clock.value) : 1) }));
   const far = useAnimatedProps(() => ({ ry: 6.6 * (clock ? killyBlink(clock.value) : 1) }));
   return (

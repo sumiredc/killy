@@ -196,11 +196,11 @@ function rotateAround(p: Point, o: Point, deg: number): Point {
   return { x: o.x + dx * Math.cos(r) - dy * Math.sin(r), y: o.y + dx * Math.sin(r) + dy * Math.cos(r) };
 }
 
-/** The control-bar anchors at time t, floating and rocking with the necromancer. */
-export function anchorsAt(t: number, arena: Size): Point[] {
+/** The control-bar anchors at time t, floating and rocking with the necromancer, moved down by dy while it comes in. */
+export function anchorsAt(t: number, arena: Size, dy = 0): Point[] {
   'worklet';
   const at = necromancerAt(arena);
-  const lift = necroFloat(t);
+  const lift = necroFloat(t) + dy;
   const turn = necroWork(t);
   const k = NECROMANCER_WIDTH / 150;
   return anchors.map((a) => {
@@ -227,11 +227,11 @@ export function zombiePointAt(t: number, i: number, arena: Size, p: Point): Poin
 /**
  * The marionette strings at time t for `count` zombies on the ground: from the anchor nearest
  * each zombie's head to the head, and from the nearest other anchor to its front hand, as the
- * mock's drawThreads does every frame.
+ * mock's drawThreads does every frame. `dy` is how far the necromancer is moved down from its place (while it comes in).
  */
-export function stringsAt(t: number, count: number, arena: Size): Line[] {
+export function stringsAt(t: number, count: number, arena: Size, dy = 0): Line[] {
   'worklet';
-  const from = anchorsAt(t, arena);
+  const from = anchorsAt(t, arena, dy);
   const nearest = (p: Point, skip: number) => {
     let best = -1;
     for (let j = 0; j < from.length; j++) {

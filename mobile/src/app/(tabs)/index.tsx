@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Backdrop, Enemies, Ground, KillyOnStage, ParentCounter } from '@/components/Arena';
+import { Backdrop, Enemies, Ground, KillyOnStage, ParentCounter, StrikeEffects } from '@/components/Arena';
 import { KillButton } from '@/components/KillButton';
 import type { Key } from '@/i18n';
 import { useI18n } from '@/i18n/context';
@@ -13,6 +13,7 @@ import type { KillErrorKind } from '@/killy/client';
 import { useKilly } from '@/killy/context';
 import { useIdleClock, useReduceMotion } from '@/killy/motion';
 import { useHoldToKill } from '@/killy/hold';
+import { useStrikeMotion } from '@/killy/strike-motion';
 import { KText } from '@/theme/KText';
 import { colors, gutter, radii } from '@/theme/tokens';
 
@@ -45,12 +46,12 @@ function Result({ shown }: { shown: { lines: string[]; ok: boolean } }) {
 }
 
 // The battle screen: the arena (DESIGN: Battle tab), the kill button and the All clear card.
-// The motion comes with #27, #83, #28 and #84.
+// The kill sequence is #101; Killy's other reactions come with #83 and the All clear overlay with #84.
 export default function BattleScreen() {
   const { t } = useI18n();
   const { registration, state } = useKilly();
   const battle = useBattle();
-  const current = battle.queue[0];
+  const current = battle.current;
   const servers = state?.servers ?? [];
 
   // A reason the app knows is said in words; any other is shown as the agent sent it.
@@ -78,9 +79,18 @@ export default function BattleScreen() {
   const [size, setSize] = useState<Size | null>(null);
   const reduceMotion = useReduceMotion();
   const clock = useIdleClock(reduceMotion === false);
+  const instant = reduceMotion !== false;
+  const motion = useStrikeMotion(battle.strike, battle.bowing, instant);
   const canKill = current !== undefined && !battle.busy && battle.allClear === null;
+  // The sequence's clock starts as the hold ends, so the swing takes over from the wind-up at once.
+  const fire = (key: string) => {
+    const n = battle.kill(key, instant);
+    if (n !== null && !instant) {
+      motion.start(n);
+    }
+  };
   // A hold only runs while the button can be pressed: when it cannot, or another parent comes to the front, the hold ends.
-  const press = useHoldToKill(canKill ? parentKey(current.server.id, current.parent) : undefined, battle.kill, reduceMotion === true);
+  const press = useHoldToKill(canKill ? parentKey(current.server.id, current.parent) : undefined, fire, reduceMotion === true);
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']} testID="battle-screen">
@@ -106,19 +116,34 @@ export default function BattleScreen() {
             </View>
             <View style={styles.countRow}>
               <KText kind="monoSemiBold" style={styles.count} testID="battle-zombies">
-                {current.parent.zombies.length}
+                {/* Once the parent is put away its zombies are released, as the mock's count goes to 0. */}
+                {battle.strike?.outcome === 'defeat' && battle.strike.revealed ? 0 : current.parent.zombies.length}
               </KText>
               <KText kind="mono" style={styles.countLabel}>
                 {t('zLabel')}
               </KText>
             </View>
-            <KText kind="mono" style={styles.pid}>
-              {t('whoParent', { pid: current.parent.pid })}
-            </KText>
-            <KText kind="mono" style={styles.cmd} numberOfLines={2}>
-              {current.parent.cmd}
-            </KText>
-            {shown && <Result shown={shown} />}
+            {shown && shown.ok && battle.strike !== null ? (
+              // The parent being put away: its result takes the place of its PID and command line, the
+              // first line in green, as the mock's `.who.done`.
+              <View testID="kill-result">
+                {shown.lines.map((line, i) => (
+                  <KText key={line} kind="mono" style={i === 0 ? [styles.pid, styles.resultOk] : styles.cmd}>
+                    {line}
+                  </KText>
+                ))}
+              </View>
+            ) : (
+              <>
+                <KText kind="mono" style={styles.pid}>
+                  {t('whoParent', { pid: current.parent.pid })}
+                </KText>
+                <KText kind="mono" style={styles.cmd} numberOfLines={2}>
+                  {current.parent.cmd}
+                </KText>
+                {shown && <Result shown={shown} />}
+              </>
+            )}
           </View>
         ) : (
           <View style={styles.empty}>
@@ -131,12 +156,28 @@ export default function BattleScreen() {
         )}
         {current && (
           <ParentCounter
-            value={counter(battle.cleared, battle.queue.length)}
-            label={t('counter', { i: battle.cleared + 1, n: battle.cleared + battle.queue.length })}
+            value={counter(battle.counter.cleared, battle.counter.queued, battle.counter.fighting)}
+            label={t('counter', {
+              // Once the last parent is put away, the count stays on it.
+              i: Math.min(battle.counter.cleared + 1, battle.counter.cleared + battle.counter.queued),
+              n: battle.counter.cleared + battle.counter.queued,
+            })}
           />
         )}
-        {current && size && <Enemies size={size} zombies={current.parent.zombies} clock={clock} />}
-        <KillyOnStage clock={clock} charge={press.windUp} lean={press.lean} />
+        {current && size && (
+          <Enemies
+            // A new parent is drawn afresh, its zombies in their places.
+            key={parentKey(current.server.id, current.parent)}
+            size={size}
+            zombies={current.parent.zombies}
+            clock={clock}
+            motion={motion}
+            striking={battle.strike !== null}
+            entering={battle.afterDefeat && !instant}
+          />
+        )}
+        <KillyOnStage clock={clock} charge={press.windUp} lean={press.lean} motion={motion} bubble={battle.bubble} />
+        {size && <StrikeEffects size={size} motion={motion} />}
         </View>
       </View>
 

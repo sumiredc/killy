@@ -1,6 +1,6 @@
 import { BlurView } from 'expo-blur';
 import { Tabs, usePathname, useRouter } from 'expo-router';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { BattleIcon, SettingsIcon } from '@/art/TabIcons';
 import { useI18n } from '@/i18n/context';
@@ -17,6 +17,7 @@ export default function TabsLayout() {
   const onSettings = usePathname() === '/settings';
   const battleLabel = t('tabBattle');
   const settings = t('settings');
+  const dim = battle.busy ? 0.4 : 1;
   return (
     <Tabs
       screenOptions={{
@@ -46,12 +47,18 @@ export default function TabsLayout() {
         name="settings"
         options={{
           title: settings,
-          tabBarIcon: ({ color }) => <SettingsIcon color={color} />,
+          // DESIGN Tab bar: disabled while a kill animation is running, at 40% as the mock's `.tab:disabled`.
+          // On the icon and the label: the tab's button sets its own opacity for presses.
+          tabBarIcon: ({ color }) => (
+            <View style={{ opacity: dim }} testID="tab-settings-icon">
+              <SettingsIcon color={color} />
+            </View>
+          ),
           tabBarAccessibilityLabel: settings,
-          tabBarLabelStyle: { fontFamily: fontFor(settings, 'mono'), fontSize: 12 },
+          tabBarLabelStyle: { fontFamily: fontFor(settings, 'mono'), fontSize: 12, opacity: dim },
         }}
         listeners={{
-          // Not while a kill is in flight: its outcome belongs on the battle screen.
+          // Not while a kill is under way: its sequence and outcome belong on the battle screen.
           tabPress: (e) => {
             if (battle.busy) {
               e.preventDefault();
