@@ -1,0 +1,20 @@
+# The Killy agent on an operator's Linux server: watches for zombie processes, reports them to
+# the Killy server and kills a parent when the phone asks. Install after `killy agent pair`,
+# which writes /etc/killy/agent.json; without it `killy agent run` exits at start.
+[Unit]
+Description=Killy agent
+Documentation=https://github.com/sumiredc/killy
+After=network-online.target
+Wants=network-online.target
+# Only one agent may use /etc/killy/agent.json; the demo machine runs the demo agent instead.
+Conflicts=killy-agent-demo.service
+
+[Service]
+# As root, to signal parents owned by any user and to use /etc/killy and /var/lib/killy, which
+# the agent creates with mode 0700.
+ExecStart=/usr/local/bin/killy agent run
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

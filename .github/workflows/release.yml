@@ -1,0 +1,63 @@
+name: release
+
+# A version tag (v1.2.3) builds the killy binaries for Linux and puts them on a GitHub Release of
+# that tag. The Android APK (built by EAS) is attached to the same Release by hand.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  binaries:
+    # Every job runs on the self-hosted runner while the repository is private. Write the runner
+    # name literally on the runs-on line, so the switch to GitHub-hosted runners finds every job by grep.
+    runs-on: arc-runner-killy
+    timeout-minutes: 15
+    # Only this job may write: it creates the Release and uploads to it with GITHUB_TOKEN.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Build
+        env:
+          TAG: ${{ github.ref_name }}
+        # Static, so it runs whatever the server's libc. No -trimpath: with it, go version -m
+        # does not show the -ldflags, and the version in the binary could not be checked.
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for arch in amd64 arm64; do
+            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build \
+              -ldflags "-X github.com/sumiredc/killy/internal/version.Version=${TAG}" \
+              -o "dist/killy-linux-${arch}" ./cmd/killy
+            go version -m "dist/killy-linux-${arch}" | grep -E 'ldflags|CGO_ENABLED|GOARCH'
+          done
+          (cd dist && sha256sum killy-linux-* > SHA256SUMS)
+          cat dist/SHA256SUMS
+      - name: Create the Release and upload the binaries
+        env:
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        # The runner image has no gh, so this talks to the REST API with curl.
+        run: |
+          set -euo pipefail
+          api=https://api.github.com/repos/${REPO}
+          auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+          body=$(printf '{"tag_name":"%s","name":"%s","generate_release_notes":true}' "$TAG" "$TAG")
+          # The response is pretty-printed, and the release's own "id" is the first one (before "author").
+          id=$(curl -fsS "${auth[@]}" -X POST "$api/releases" -d "$body" | grep -m1 -oE '"id": *[0-9]+' | grep -oE '[0-9]+')
+          test -n "$id"
+          for f in dist/killy-linux-amd64 dist/killy-linux-arm64 dist/SHA256SUMS; do
+            curl -fsS "${auth[@]}" -H "Content-Type: application/octet-stream" \
+              --data-binary "@$f" "https://uploads.github.com/repos/${REPO}/releases/${id}/assets?name=$(basename "$f")" > /dev/null
+            echo "uploaded $(basename "$f")"
+          done
+          echo "https://github.com/${REPO}/releases/tag/${TAG}" >> "$GITHUB_STEP_SUMMARY"

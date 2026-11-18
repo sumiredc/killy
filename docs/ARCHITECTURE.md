@@ -265,7 +265,7 @@ Operators and judges get everything except the iOS app from this repository's Gi
 
 | Artifact | How it is produced |
 |---|---|
-| `killy` for linux/amd64 and linux/arm64 | A workflow builds them when a version tag is pushed. It runs on the self-hosted runner while the repository is private and on GitHub-hosted runners afterwards (it does not need the LAN registry) |
+| `killy` for linux/amd64 and linux/arm64 | Files `killy-linux-amd64`, `killy-linux-arm64` and `SHA256SUMS`. A workflow (`release.yml`) builds them when a version tag (`v*`) is pushed, statically (`CGO_ENABLED=0`) with the tag as the version. It runs on the self-hosted runner while the repository is private and on GitHub-hosted runners afterwards (it does not need the LAN registry) |
 | Android APK | Built by EAS and attached to the same Release |
 | systemd units | `deploy/systemd/`: `killy-agent.service` (`killy agent run`, as root), `killy-agent-demo.service` (`killy agent run --demo`) and `killy-summon.service` (`killy summon`) |
 
