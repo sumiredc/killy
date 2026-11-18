@@ -218,11 +218,11 @@ export function Enemies({ size, zombies, clock }: { size: Size; zombies: number[
 }
 
 /** Killy, bottom-left, facing right, bobbing and blinking with the idle clock. */
-export function KillyOnStage({ clock }: { clock: SharedValue<number> }) {
+export function KillyOnStage({ clock, charge, lean }: { clock: SharedValue<number>; charge?: SharedValue<number>; lean?: SharedValue<number> }) {
   const bob = useAnimatedStyle(() => ({ transform: [{ translateY: killyBob(clock.value) }] }));
   return (
     <Animated.View style={[styles.killy, bob]} pointerEvents="none" testID="killy">
-      <Killy width={KILLY_WIDTH} clock={clock} />
+      <Killy width={KILLY_WIDTH} clock={clock} charge={charge} lean={lean} />
     </Animated.View>
   );
 }

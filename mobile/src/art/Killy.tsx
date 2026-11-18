@@ -1,9 +1,11 @@
 import Animated, { type SharedValue, useAnimatedProps } from 'react-native-reanimated';
-import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, Ellipse, G, type GProps, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
 import { killyBlink } from '@/killy/idle';
+import { ghostMatrix, scytheMatrix } from '@/killy/pose';
 
 const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
+const AnimatedG = Animated.createAnimatedComponent(G);
 
 /**
  * Killy, ported from killySVG in mock/art.js without redrawing. Faces right, has no mouth.
@@ -11,7 +13,24 @@ const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
  * the idle clock, the eyes blink; each is squashed towards its own centre, as the mock's scaleY
  * with transform-box fill-box.
  */
-export function Killy({ width, clock }: { width: number; clock?: SharedValue<number> }) {
+export function Killy({
+  width,
+  clock,
+  charge,
+  lean,
+}: {
+  width: number;
+  clock?: SharedValue<number>;
+  /** How full the kill button is, 0–1: the scythe winds up with it. */
+  charge?: SharedValue<number>;
+  /** 1 while the kill button is held: the ghost leans back. */
+  lean?: SharedValue<number>;
+}) {
+  // `matrix` is the transform react-native-svg's native group takes; its public props do not list
+  // it, because transforms usually go through `transform` and are turned into a matrix in JS,
+  // which animated props skip.
+  const ghost = useAnimatedProps(() => ({ matrix: ghostMatrix(lean ? lean.value : 0) }) as unknown as GProps);
+  const scythe = useAnimatedProps(() => ({ matrix: scytheMatrix(charge ? charge.value : 0) }) as unknown as GProps);
   const near = useAnimatedProps(() => ({ ry: 7.2 * (clock ? killyBlink(clock.value) : 1) }));
   const far = useAnimatedProps(() => ({ ry: 6.6 * (clock ? killyBlink(clock.value) : 1) }));
   return (
@@ -28,16 +47,16 @@ export function Killy({ width, clock }: { width: number; clock?: SharedValue<num
         </LinearGradient>
       </Defs>
 
-      <G testID="killy-ghost">
+      <AnimatedG testID="killy-ghost" animatedProps={ghost}>
         <Path
           d="M80 16 C102 16 116 34 116 56 C116 74 112 88 108 100 Q100 112 92 102 Q84 114 74 104 Q64 116 54 106 Q40 113 26 106 Q14 101 8 88 Q28 95 40 84 C46 77 46 66 46 56 C46 34 58 16 80 16 Z"
           fill="url(#killyBody)"
         />
         <AnimatedEllipse testID="killy-eye" cx="88" cy="56" rx="4.8" ry="7.2" fill="#000" animatedProps={near} />
         <AnimatedEllipse testID="killy-eye" cx="105" cy="55" rx="3.8" ry="6.6" fill="#000" animatedProps={far} />
-      </G>
+      </AnimatedG>
 
-      <G testID="killy-scythe">
+      <AnimatedG testID="killy-scythe" animatedProps={scythe}>
         <Path d="M100 146 Q119 82 127 16" fill="none" stroke="#2f2740" strokeWidth="7" strokeLinecap="round" />
         <Path d="M98.6 143 Q117 82 125 18" fill="none" stroke="#5c4f78" strokeWidth="2" strokeLinecap="round" />
         <Circle cx="100" cy="146" r="4.5" fill="#9046ff" />
@@ -60,7 +79,7 @@ export function Killy({ width, clock }: { width: number; clock?: SharedValue<num
             strokeLinejoin="round"
           />
         </G>
-      </G>
+      </AnimatedG>
 
       <Circle testID="killy-arm" cx="115" cy="82" r="7.5" fill="#ffffff" />
     </Svg>
