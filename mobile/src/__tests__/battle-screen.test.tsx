@@ -1,15 +1,18 @@
 import { webcrypto } from 'node:crypto';
+import { useEffect } from 'react';
 
 import { act, fireEvent, renderRouter, screen, within } from 'expo-router/testing-library';
 import * as Localization from 'expo-localization';
-import { StyleSheet } from 'react-native';
+import { AccessibilityInfo, StyleSheet } from 'react-native';
 
 import * as config from '../config';
 import RootLayout from '../app/_layout';
 import TabsLayout from '../app/(tabs)/_layout';
 import BattleScreen from '../app/(tabs)/index';
 import SettingsScreen from '../app/(tabs)/settings';
+import { type Strike, useBattle } from '../killy/battle-context';
 import * as deps from '../killy/deps';
+import * as strikeMotion from '../killy/strike-motion';
 import * as prefs from '../prefs';
 import { FakeNotifications, MemoryPrefs } from '../testing/fake-notifications';
 import type { ParentState, ServerState } from '../killy/types';
@@ -17,10 +20,28 @@ import { FakeServer, type FakeStream, settle } from '../testing/fake-server';
 
 jest.mock('expo-localization', () => ({ getLocales: jest.fn(() => [{ languageCode: 'en' }]) }));
 
+/** What the battle holds about the kill under way, read by the probe on the battle screen at every render. */
+const seen: { strike: Strike | null; bowing: boolean } = { strike: null, bowing: false };
+function Probe() {
+  const b = useBattle();
+  useEffect(() => {
+    seen.strike = b.strike;
+    seen.bowing = b.bowing;
+  });
+  return null;
+}
+
 const routes = {
   _layout: RootLayout,
   '(tabs)/_layout': TabsLayout,
-  '(tabs)/index': BattleScreen,
+  '(tabs)/index': function BattleWithProbe() {
+    return (
+      <>
+        <BattleScreen />
+        <Probe />
+      </>
+    );
+  },
   '(tabs)/settings': SettingsScreen,
 };
 
@@ -30,6 +51,10 @@ beforeEach(() => jest.useFakeTimers());
 afterEach(() => {
   jest.useRealTimers();
   jest.restoreAllMocks();
+  // React Native's jest setup makes this a mock already, which restoreAllMocks leaves as a test set it.
+  jest.mocked(AccessibilityInfo.isReduceMotionEnabled).mockResolvedValue(false);
+  seen.strike = null;
+  seen.bowing = false;
 });
 
 async function startApp(server: FakeServer, languageCode = 'en') {
@@ -67,6 +92,17 @@ async function hold(ms: number) {
   await act(() => jest.advanceTimersByTimeAsync(ms));
   await fireEvent(killButton(), 'pressOut');
   await act(() => jest.advanceTimersByTimeAsync(2000));
+}
+
+/** Lets the kill sequence run to its end: a defeat of up to six zombies, then All clear, takes under 7 s. */
+const sequence = () => act(() => jest.advanceTimersByTimeAsync(10_000));
+const ms = (n: number) => act(() => jest.advanceTimersByTimeAsync(n));
+
+/** Holds the kill button until the kill starts and lets go, leaving the clock at the end of the hold. */
+async function fire() {
+  await fireEvent(killButton(), 'pressIn');
+  await ms(1000);
+  await fireEvent(killButton(), 'pressOut');
 }
 
 const t1 = '2026-11-13T00:00:01Z';
@@ -135,22 +171,43 @@ describe('hold to kill', () => {
 describe('outcomes', () => {
   const two = () => [server('a', 'web-01', [parent(3801, [3802, 3803], t1), parent(4100, [4101], t2)])];
 
-  test('killed shows the PID and the zombies reaped, and the next parent comes up', async () => {
+  // DESIGN Kill sequence with the result in at once and n = 2: the result shows at
+  // 670 + (380 + 70n) + 600 + (1300 + 130n) + 900 = 3850 + 200n ms after the hold, and the next
+  // parent comes 1300 ms later, at 5150 + 200n.
+  test('killed shows the PID and the zombies reaped once the parent is put away, then the next parent comes up', async () => {
     const { s } = await battleWith(two());
     s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 2 });
-    await hold(1000);
+    await fire();
+    await ms(4250 - 50);
+    expect(screen.queryByText('PID 3801 killed')).toBeNull();
+    expect(screen.getByText('parent PID 3801')).toBeOnTheScreen();
+    await ms(100);
     expect(screen.getByText('PID 3801 killed')).toBeOnTheScreen();
     expect(screen.getByText('2 zombies reaped by init')).toBeOnTheScreen();
+    expect(screen.getByText('SIGKILL → PID 3801 on web-01')).toBeOnTheScreen();
+    // The result takes the place of the parent's PID and command line, as in the mock.
+    expect(screen.queryByText('parent PID 3801')).toBeNull();
+    expect(screen.queryByText('node worker-3801.js')).toBeNull();
+    expect(screen.queryByText('parent PID 4100')).toBeNull();
+    await ms(5550 - 4300 - 50);
+    expect(screen.queryByText('parent PID 4100')).toBeNull();
+    await ms(100);
     expect(screen.getByText('parent PID 4100')).toBeOnTheScreen();
+    expect(screen.queryByText('PID 3801 killed')).toBeNull();
   });
 
-  test('already gone says so and the next parent comes up', async () => {
+  test('already gone plays the same defeat, then says so and the next parent comes up', async () => {
     const { s } = await battleWith(two());
     s.respond('POST /app/v1/kills', 200, { outcome: 'already_gone' });
-    await hold(1000);
+    await fire();
+    await ms(4250 - 50);
+    expect(screen.queryByText('PID 3801 had already exited')).toBeNull();
+    await ms(100);
     expect(screen.getByText('PID 3801 had already exited')).toBeOnTheScreen();
-    expect(screen.getByText('parent PID 4100')).toBeOnTheScreen();
     expect(screen.queryByText(/killed$/)).toBeNull();
+    expect(screen.queryByText('parent PID 4100')).toBeNull();
+    await ms(5550 - 4300 + 50);
+    expect(screen.getByText('parent PID 4100')).toBeOnTheScreen();
   });
 
   test.each([
@@ -183,6 +240,7 @@ describe('outcomes', () => {
     const { s, stream } = await battleWith(two());
     s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 2 });
     await hold(1000);
+    await sequence();
     await sendState(stream, two());
     expect(screen.getByText('parent PID 4100')).toBeOnTheScreen();
     await sendState(stream, [server('a', 'web-01', [parent(4100, [4101], t2)])]);
@@ -243,11 +301,13 @@ describe('All clear', () => {
     // While the kill is in flight: the parent shows one zombie more, and a new parent appears.
     await sendState(stream, [server('a', 'web-01', [parent(3801, [3802, 3803, 3804], t1)]), server('b', 'db-01', [parent(5000, [5001], t3)])]);
     await act(() => answer.resolve(200, { outcome: 'killed', reaped: 3 }));
+    await sequence();
     // The new parent is in the queue, so the battle goes on rather than ending.
     expect(screen.queryByTestId('all-clear')).toBeNull();
     expect(screen.getByText('parent PID 5000')).toBeOnTheScreen();
     s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 1 });
     await hold(1000);
+    await sequence();
     const overlay = screen.getByTestId('all-clear');
     expect(within(overlay).getByTestId('stat-parents')).toHaveTextContent('2');
     expect(within(overlay).getByTestId('stat-zombies')).toHaveTextContent('3');
@@ -260,8 +320,10 @@ describe('All clear', () => {
     ]);
     s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 1 });
     await hold(1000);
+    await sequence();
     s.respond('POST /app/v1/kills', 200, { outcome: 'already_gone' });
     await hold(1000);
+    await sequence();
     // A zombie more on the last parent before its kill starts.
     await sendState(stream, [
       server('a', 'web-01', [parent(3801, [3802, 3803, 3804], t1), parent(4100, [4101, 4102], t2)]),
@@ -269,12 +331,269 @@ describe('All clear', () => {
     ]);
     s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 2 });
     await hold(1000);
+    await sequence();
     const overlay = screen.getByTestId('all-clear');
     expect(within(overlay).getByText('All clear')).toBeOnTheScreen();
     expect(within(overlay).getByTestId('stat-parents')).toHaveTextContent('2');
     expect(within(overlay).getByTestId('stat-zombies')).toHaveTextContent('5');
     await fireEvent.press(within(overlay).getByText('Close'));
     expect(screen.queryByTestId('all-clear')).toBeNull();
+  });
+});
+
+// DESIGN: Kill sequence, Kill outcomes other than killed, Killy's reactions. Times are from the end
+// of the hold. With the result in at once, the defeat goes on at 670 ms; for n zombies the result
+// shows at 670 + (380 + 70n) + 600 + (1300 + 130n) + 900 and the battle moves on 1300 ms later.
+describe('the kill sequence', () => {
+  // The bubble is hidden from screen readers: its symbols say nothing a reader needs.
+  const bubble = () => screen.queryByTestId('killy-bubble', { includeHiddenElements: true });
+  const settingsTab = () => screen.getByLabelText('Settings');
+  // React Navigation draws each icon twice, for the active and the inactive look.
+  const settingsDim = () => [
+    within(settingsTab()).getByText('Settings'),
+    ...within(settingsTab()).getAllByTestId('tab-settings-icon', { includeHiddenElements: true }),
+  ];
+
+  test('Killy reacts with ……！！ as the kill starts, and with ……！ when the parent is put away', async () => {
+    const { s } = await battleWith([server('a', 'web-01', [parent(3801, [3802], t1), parent(4100, [4101], t2)])]);
+    s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 1 });
+    expect(bubble()).toBeNull();
+    await fire();
+    expect(bubble()).toHaveTextContent('……！！');
+    await ms(750);
+    expect(bubble()).toHaveTextContent('……！！');
+    await ms(100);
+    expect(bubble()).toBeNull();
+    // n = 1: the result at 4050.
+    await ms(4050 - 850 - 50);
+    expect(bubble()).toBeNull();
+    await ms(100);
+    expect(bubble()).toHaveTextContent('……！');
+    expect(screen.getByText('PID 3801 killed')).toBeOnTheScreen();
+  });
+
+  test('after the last parent, Killy bows with 🤍 when the battle would move on, and All clear comes 600 ms later', async () => {
+    const { s } = await battleWith([server('a', 'web-01', [parent(3801, [3802], t1)])]);
+    s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 1 });
+    await fire();
+    // n = 1: the result at 4050, the bow at 5350, All clear at 5950.
+    await ms(5350 - 50);
+    expect(bubble()).toBeNull();
+    expect(screen.getByText('SIGKILL → PID 3801 on web-01')).toBeOnTheScreen();
+    await ms(100);
+    expect(bubble()).toHaveTextContent('🤍');
+    expect(screen.queryByTestId('all-clear')).toBeNull();
+    await ms(5950 - 5400 - 50);
+    expect(screen.queryByTestId('all-clear')).toBeNull();
+    expect(killButton()).toBeDisabled();
+    await ms(100);
+    expect(screen.getByTestId('all-clear')).toBeOnTheScreen();
+  });
+
+  test('a result that comes late holds the defeat back: it goes on from the arrival, not from 670 ms', async () => {
+    const { s } = await battleWith([server('a', 'web-01', [parent(3801, [3802], t1), parent(4100, [4101], t2)])]);
+    const answer = s.hold('POST /app/v1/kills');
+    await fire();
+    await ms(2000);
+    expect(screen.queryByTestId('kill-result')).toBeNull();
+    await act(() => answer.resolve(200, { outcome: 'killed', reaped: 1 }));
+    // n = 1, going on at 2000: the result at 2000 + 380 + 70 + 600 + 1300 + 130 + 900 = 5380, the next parent at 6680.
+    await ms(5380 - 2000 - 50);
+    expect(screen.queryByText('PID 3801 killed')).toBeNull();
+    await ms(100);
+    expect(screen.getByText('PID 3801 killed')).toBeOnTheScreen();
+    await ms(6680 - 5430 - 50);
+    expect(screen.getByText('SIGKILL → PID 3801 on web-01')).toBeOnTheScreen();
+    await ms(100);
+    expect(screen.getByText('parent PID 4100')).toBeOnTheScreen();
+  });
+
+  test.each([
+    [{ outcome: 'refused', reason: 'protected' }],
+    [{ outcome: 'signal_failed', reason: 'EPERM' }],
+    [{ outcome: 'zombies_remain' }],
+    [{ outcome: 'unknown', reason: 'timeout' }],
+  ])('%j: the necromancer recoils at 670 ms with Killy\'s ……？, and the kill button is back once it has (1220 ms)', async (res) => {
+    const { s } = await battleWith([server('a', 'web-01', [parent(3801, [3802], t1)])]);
+    s.respond('POST /app/v1/kills', 200, res);
+    await fire();
+    await ms(620);
+    expect(screen.queryByTestId('kill-result')).toBeNull();
+    expect(bubble()).toHaveTextContent('……！！');
+    await ms(100);
+    expect(screen.getByTestId('kill-result')).toBeOnTheScreen();
+    expect(bubble()).toHaveTextContent('……？');
+    expect(killButton()).toBeDisabled();
+    await ms(1220 - 720 - 50);
+    expect(killButton()).toBeDisabled();
+    await ms(100);
+    expect(killButton()).toBeEnabled();
+    expect(screen.getByText('parent PID 3801')).toBeOnTheScreen();
+    expect(screen.queryByTestId('all-clear')).toBeNull();
+  });
+
+  test('a kill request that fails plays as unknown: ……？, the reason under the button and nothing on the info line', async () => {
+    const { s } = await battleWith([server('a', 'web-01', [parent(3801, [3802], t1)])]);
+    s.unreachable('POST /app/v1/kills');
+    await fire();
+    await ms(620);
+    expect(screen.queryByTestId('kill-error')).toBeNull();
+    await ms(100);
+    expect(bubble()).toHaveTextContent('……？');
+    expect(screen.getByTestId('kill-error')).toHaveTextContent(/Cannot reach the Killy server/);
+    expect(screen.queryByTestId('kill-result')).toBeNull();
+    await ms(600);
+    expect(killButton()).toBeEnabled();
+    expect(screen.getByText('parent PID 3801')).toBeOnTheScreen();
+  });
+
+  test('during the sequence the Settings tab is at 40% and does not open; afterwards it is back', async () => {
+    const { s } = await battleWith([server('a', 'web-01', [parent(3801, [3802], t1), parent(4100, [4101], t2)])]);
+    s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 1 });
+    settingsDim().forEach((e) => expect(e).toHaveStyle({ opacity: 1 }));
+    await fire();
+    await ms(3000);
+    settingsDim().forEach((e) => expect(e).toHaveStyle({ opacity: 0.4 }));
+    await fireEvent.press(settingsTab());
+    expect(screen.queryByTestId('settings-screen')).toBeNull();
+    await sequence();
+    settingsDim().forEach((e) => expect(e).toHaveStyle({ opacity: 1 }));
+    await fireEvent.press(settingsTab());
+    expect(await screen.findByTestId('settings-screen')).toBeOnTheScreen();
+  });
+
+  test('the parent counter shows the parent as put away when its result shows, not when the result arrives', async () => {
+    const { s } = await battleWith([server('a', 'web-01', [parent(3801, [3802], t1), parent(4100, [4101], t2)])]);
+    s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 1 });
+    const hoods = () => within(screen.getByTestId('parent-counter')).getAllByTestId(/^hood-(done|current|waiting)$/).map((h) => h.props.testID);
+    await fire();
+    await ms(4000);
+    expect(hoods()).toEqual(['hood-current', 'hood-waiting']);
+    await ms(100);
+    expect(hoods()).toEqual(['hood-done', 'hood-waiting']);
+    await sequence();
+    expect(hoods()).toEqual(['hood-done', 'hood-current']);
+  });
+
+  test('zombies reported during the sequence do not change what is being killed', async () => {
+    const { s, stream } = await battleWith([server('a', 'web-01', [parent(3801, [3802], t1)])]);
+    s.respond('POST /app/v1/kills', 200, { outcome: 'refused', reason: 'protected' });
+    await fire();
+    await sendState(stream, [server('a', 'web-01', [parent(3801, [3802, 3803], t1)])]);
+    expect(screen.getByTestId('battle-zombies')).toHaveTextContent('1');
+    await sequence();
+    expect(screen.getByTestId('battle-zombies')).toHaveTextContent('2');
+  });
+
+  test('the defeat is not started before the result: the strike has no outcome until it arrives, then goes on from its arrival', async () => {
+    const { s } = await battleWith([server('a', 'web-01', [parent(3801, [3802], t1)])]);
+    const answer = s.hold('POST /app/v1/kills');
+    await fire();
+    for (const step of [500, 1000, 1500]) {
+      await ms(step);
+      expect(seen.strike?.outcome).toBeNull();
+      expect(seen.strike?.at).toBeNull();
+    }
+    await act(() => answer.resolve(200, { outcome: 'killed', reaped: 1 }));
+    expect(seen.strike?.outcome).toBe('defeat');
+    expect(seen.strike?.at).toBe(3000);
+  });
+
+  test('the arena\'s sequence starts as the hold ends, with the zombies on the ground', async () => {
+    const starts: number[] = [];
+    const real = strikeMotion.useStrikeMotion;
+    jest.spyOn(strikeMotion, 'useStrikeMotion').mockImplementation((...args) => {
+      const m = real(...args);
+      return { ...m, start: (n: number) => (starts.push(n), m.start(n)) };
+    });
+    const { s } = await battleWith([server('a', 'web-01', [parent(3801, [3802, 3803, 3804], t1)])]);
+    s.respond('POST /app/v1/kills', 200, { outcome: 'refused', reason: 'protected' });
+    await fireEvent(killButton(), 'pressIn');
+    await ms(990);
+    expect(starts).toEqual([]);
+    await ms(10);
+    expect(starts).toEqual([3]);
+  });
+
+  test('with reduce motion the arena\'s sequence does not start', async () => {
+    jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(true);
+    const starts: number[] = [];
+    const real = strikeMotion.useStrikeMotion;
+    jest.spyOn(strikeMotion, 'useStrikeMotion').mockImplementation((...args) => {
+      const m = real(...args);
+      return { ...m, start: (n: number) => (starts.push(n), m.start(n)) };
+    });
+    const { s } = await battleWith([server('a', 'web-01', [parent(3801, [3802], t1)])]);
+    s.respond('POST /app/v1/kills', 200, { outcome: 'refused', reason: 'protected' });
+    await fire();
+    expect(s.count('POST /app/v1/kills')).toBe(1);
+    expect(starts).toEqual([]);
+  });
+
+  test('Killy bows only when the battle would move on after the last parent', async () => {
+    const { s } = await battleWith([server('a', 'web-01', [parent(3801, [3802], t1)])]);
+    s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 1 });
+    await fire();
+    await ms(5350 - 50);
+    expect(seen.bowing).toBe(false);
+    await ms(100);
+    expect(seen.bowing).toBe(true);
+    await sequence();
+    await fireEvent.press(within(screen.getByTestId('all-clear')).getByText('Close'));
+    expect(seen.bowing).toBe(false);
+  });
+
+  test('a parent reported after the result of the last one is fought next: no bow and no All clear until it is put away too', async () => {
+    const { s, stream } = await battleWith([server('a', 'web-01', [parent(3801, [3802], t1)])]);
+    s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 1 });
+    await fire();
+    await ms(2000);
+    await sendState(stream, [server('a', 'web-01', [parent(3801, [3802], t1), parent(5000, [5001, 5002], t3)])]);
+    await sequence();
+    expect(seen.bowing).toBe(false);
+    expect(screen.queryByTestId('all-clear')).toBeNull();
+    expect(screen.getByText('parent PID 5000')).toBeOnTheScreen();
+    expect(killButton()).toBeEnabled();
+    s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 2 });
+    await fire();
+    await sequence();
+    const overlay = screen.getByTestId('all-clear');
+    expect(within(overlay).getByTestId('stat-parents')).toHaveTextContent('2');
+    expect(within(overlay).getByTestId('stat-zombies')).toHaveTextContent('3');
+  });
+
+  test('if the other parents leave during the sequence, the battle ends with All clear', async () => {
+    const { s, stream } = await battleWith([server('a', 'web-01', [parent(3801, [3802], t1), parent(4100, [4101], t2)])]);
+    s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 1 });
+    await fire();
+    await ms(2000);
+    await sendState(stream, [server('a', 'web-01', [parent(3801, [3802], t1)])]);
+    await sequence();
+    expect(within(screen.getByTestId('all-clear')).getByTestId('stat-parents')).toHaveTextContent('1');
+  });
+
+  test('once the parent is put away its zombie count goes to 0', async () => {
+    const { s } = await battleWith([server('a', 'web-01', [parent(3801, [3802, 3803], t1), parent(4100, [4101], t2)])]);
+    s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 2 });
+    await fire();
+    await ms(4250 - 50);
+    expect(screen.getByTestId('battle-zombies')).toHaveTextContent('2');
+    await ms(100);
+    expect(screen.getByTestId('battle-zombies')).toHaveTextContent('0');
+    await sequence();
+    expect(screen.getByTestId('battle-zombies')).toHaveTextContent('1');
+  });
+
+  test('with reduce motion the battle switches to the result as soon as it arrives', async () => {
+    jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(true);
+    const { s } = await battleWith([server('a', 'web-01', [parent(3801, [3802], t1), parent(4100, [4101], t2)])]);
+    s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 1 });
+    await fire();
+    await ms(10);
+    expect(screen.getByText('parent PID 4100')).toBeOnTheScreen();
+    expect(screen.getByText('PID 3801 killed')).toBeOnTheScreen();
+    expect(bubble()).toHaveTextContent('……！');
+    expect(killButton()).toBeEnabled();
   });
 });
 
@@ -311,6 +630,7 @@ describe('tabs', () => {
     expect(screen.queryByTestId('settings-screen')).toBeNull();
     await act(() => answer.resolve(200, { outcome: 'refused', reason: 'protected' }));
     await fireEvent(killButton(), 'pressOut');
+    await sequence();
     await fireEvent.press(screen.getByLabelText('Settings'));
     expect(await screen.findByTestId('settings-screen')).toBeOnTheScreen();
   });
@@ -323,6 +643,7 @@ describe('tabs', () => {
     // The killed parent's zombies are no longer waiting, nor are the disconnected server's.
     s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 2 });
     await hold(1000);
+    await sequence();
     expect(within(screen.getByLabelText('Battle')).queryByText('4')).toBeNull();
     await fireEvent.press(screen.getByLabelText('Settings'));
     expect(await screen.findByTestId('settings-screen')).toBeOnTheScreen();
@@ -380,6 +701,7 @@ describe('the arena', () => {
     ]);
     s.respond('POST /app/v1/kills', 200, { outcome: 'already_gone' });
     await hold(1000);
+    await sequence();
     const c = within(screen.getByTestId('parent-counter'));
     expect(c.getAllByTestId(/^hood-(done|current|waiting)$/).map((h) => h.props.testID)).toEqual([
       'hood-done',
@@ -404,6 +726,7 @@ describe('the arena', () => {
     ]);
     s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 1 });
     await hold(1000);
+    await sequence();
     const c = within(screen.getByTestId('parent-counter'));
     expect(c.getAllByTestId(/^hood-(done|current|waiting)$/).map((h) => h.props.testID)).toEqual(['hood-current']);
     expect(c.getByTestId('hood-times')).toHaveTextContent('× 4');

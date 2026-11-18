@@ -10,29 +10,34 @@ export const scytheOrigin = { x: 115, y: 82 };
 export const ghostOrigin = { x: 70, y: 110 };
 /** The lean at its fullest: the mock's `.killy.charging .ghost { transform: rotate(-6deg) translateX(-4px) }`. */
 export const LEAN = { rotate: -6, x: -4 };
+/** The bow: the mock's `.killy.bow .ghost { transform: rotate(14deg) translateY(4px) }`. */
+export const BOW = { rotate: 14, y: 4 };
 
-/** An SVG matrix [a, b, c, d, e, f]: rotate by `deg` around `o`, after moving the drawing by (tx, 0). */
-export function rotateAbout(deg: number, o: { x: number; y: number }, tx = 0): number[] {
+/** An SVG matrix [a, b, c, d, e, f]: rotate by `deg` around `o`, after moving the drawing by (tx, ty). */
+export function rotateAbout(deg: number, o: { x: number; y: number }, tx = 0, ty = 0): number[] {
   'worklet';
   const r = (deg * Math.PI) / 180;
   const cos = Math.cos(r);
   const sin = Math.sin(r);
-  // p' = o + R(p + (tx, 0) - o), as CSS applies `rotate() translateX()` about a transform-origin.
+  // p' = o + R(p + (tx, ty) - o), as CSS applies `rotate() translate()` about a transform-origin.
   const dx = tx - o.x;
-  const dy = -o.y;
+  const dy = ty - o.y;
   return [cos, sin, -sin, cos, o.x + cos * dx - sin * dy, o.y + sin * dx + cos * dy];
 }
 
-/** The scythe's matrix at a charge from 0 to 1. */
-export function scytheMatrix(charge: number): number[] {
+/**
+ * The scythe's matrix at a charge from 0 to 1, or at `swing` degrees while the kill's swing runs
+ * (null otherwise).
+ */
+export function scytheMatrix(charge: number, swing: number | null = null): number[] {
   'worklet';
-  return rotateAbout(WIND_UP * charge, scytheOrigin);
+  return rotateAbout(swing ?? WIND_UP * charge, scytheOrigin);
 }
 
-/** The ghost's matrix at a lean from 0 to 1. */
-export function ghostMatrix(lean: number): number[] {
+/** The ghost's matrix at a lean from 0 to 1 and a bow from 0 to 1 (Killy does not do both at once). */
+export function ghostMatrix(lean: number, bow = 0): number[] {
   'worklet';
-  return rotateAbout(LEAN.rotate * lean, ghostOrigin, LEAN.x * lean);
+  return rotateAbout(LEAN.rotate * lean + BOW.rotate * bow, ghostOrigin, LEAN.x * lean, BOW.y * bow);
 }
 
 /** Applies an SVG matrix to a point, for tests and for anything that must follow a moved part. */

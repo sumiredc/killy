@@ -51,6 +51,8 @@ describe('parent counter', () => {
   test('below five parents in the battle, one hood each: cleared ones first, then the current, then the waiting', () => {
     expect(counter(0, 1)).toEqual({ kind: 'hoods', hoods: ['current'] });
     expect(counter(1, 3)).toEqual({ kind: 'hoods', hoods: ['done', 'current', 'waiting', 'waiting'] });
+    // Between a parent put away and the next coming in, none is being fought.
+    expect(counter(1, 2, false)).toEqual({ kind: 'hoods', hoods: ['done', 'waiting', 'waiting'] });
   });
 
   test('from five parents in the battle, cleared ones included, one hood and the number still in the queue', () => {

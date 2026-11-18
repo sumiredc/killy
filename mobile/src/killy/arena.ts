@@ -65,14 +65,15 @@ export type Counter = { kind: 'hoods'; hoods: ('done' | 'current' | 'waiting')[]
 
 /**
  * The parent counter. `cleared` is how many parents this battle has put away (killed or already
- * gone), `queued` how many are still in the queue, the first of them being fought.
+ * gone), `queued` how many are still in the queue, the first of them being fought unless
+ * `fighting` is false (a parent has just been put away and the next has not come in yet).
  */
-export function counter(cleared: number, queued: number): Counter {
+export function counter(cleared: number, queued: number, fighting = true): Counter {
   if (cleared + queued >= COMPACT_AT) {
     return { kind: 'compact', remaining: queued };
   }
   const hoods: ('done' | 'current' | 'waiting')[] = [];
   for (let i = 0; i < cleared; i++) hoods.push('done');
-  for (let i = 0; i < queued; i++) hoods.push(i === 0 ? 'current' : 'waiting');
+  for (let i = 0; i < queued; i++) hoods.push(i === 0 && fighting ? 'current' : 'waiting');
   return { kind: 'hoods', hoods };
 }
