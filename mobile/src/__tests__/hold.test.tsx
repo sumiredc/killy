@@ -10,11 +10,11 @@ import { apply, ghostMatrix, ghostOrigin, rotateAbout, scytheMatrix, scytheOrigi
 // DESIGN: Hold to kill. The tests render the button with the testing library directly, so
 // Reanimated runs (expo-router's renderRouter replaces it with a mock that does not move).
 
-type Probe = { charge: SharedValue<number>; lean: SharedValue<number> };
+type Probe = { charge: SharedValue<number>; windUp: SharedValue<number>; lean: SharedValue<number> };
 
 function Harness({ target, onFire, reduceMotion = false, onValues }: { target?: string; onFire: (t: string) => void; reduceMotion?: boolean; onValues: (p: Probe) => void }) {
   const press = useHoldToKill(target, onFire, reduceMotion);
-  useEffect(() => onValues({ charge: press.charge, lean: press.lean }));
+  useEffect(() => onValues({ charge: press.charge, windUp: press.windUp, lean: press.lean }));
   return <KillButton label="Hold to kill" enabled={target !== undefined} charge={press.charge} onPressIn={press.onPressIn} onPressOut={press.onPressOut} />;
 }
 
@@ -77,25 +77,64 @@ describe('the button fills while held', () => {
     expect(fired).toEqual(['parent-1']);
   });
 
-  test('with reduce motion it fills in quarters, still full when the kill starts', async () => {
+  test('with reduce motion it fills a quarter every 250 ms, full exactly when the kill starts', async () => {
     const { fired, probe } = await setUp({ reduceMotion: true });
     await fireEvent(button(), 'pressIn');
-    const seen = new Set<number>();
-    for (let t = 0; t < 980; t += 20) {
-      await ms(20);
-      seen.add(Math.round(probe[0].charge.value * 1000) / 1000);
+    // Just before each quarter, then the last moment before the kill.
+    for (const [t, want] of [
+      [240, 0],
+      [490, 0.25],
+      [740, 0.5],
+      [999, 0.75],
+    ] as const) {
+      await ms(t - (t === 240 ? 0 : t === 490 ? 240 : t === 740 ? 490 : 740));
+      expect(probe[0].charge.value).toBeCloseTo(want, 2);
+      expect(fired).toEqual([]);
     }
-    expect([...seen].every((v) => [0, 0.25, 0.5, 0.75, 1].includes(v))).toBe(true);
-    expect(seen.has(0.5)).toBe(true);
-    await ms(20);
+    await ms(1);
     expect(fired).toEqual(['parent-1']);
   });
 
-  test('a disabled button does not fill', async () => {
-    const { probe } = await setUp({ target: undefined });
+  test('with reduce motion the scythe does not wind up', async () => {
+    const { probe } = await setUp({ reduceMotion: true });
+    await fireEvent(button(), 'pressIn');
+    await ms(800);
+    expect(probe[0].charge.value).toBeGreaterThan(0);
+    expect(probe[0].windUp.value).toBe(0);
+  });
+
+  test('the scythe winds up with the fill when motion is allowed', async () => {
+    const { probe } = await setUp();
     await fireEvent(button(), 'pressIn');
     await ms(500);
+    expect(probe[0].windUp.value).toBeCloseTo(probe[0].charge.value, 1);
+    expect(probe[0].windUp.value).toBeGreaterThan(0.4);
+  });
+
+  test('when the target goes during a hold (another parent came up, or the button can no longer be pressed), the hold ends', async () => {
+    const fired: string[] = [];
+    const probe: Probe[] = [];
+    const harness = (target: string | undefined) => (
+      <Harness target={target} onFire={(t) => fired.push(t)} onValues={(p) => void (probe[0] = p)} />
+    );
+    await render(harness('parent-1'));
+    await fireEvent(button(), 'pressIn');
+    await ms(500);
+    expect(probe[0].charge.value).toBeGreaterThan(0.4);
+    await screen.rerender(harness(undefined));
+    await ms(20);
     expect(probe[0].charge.value).toBe(0);
+    expect(probe[0].windUp.value).toBe(0);
+    await ms(1000);
+    expect(fired).toEqual([]);
+
+    await screen.rerender(harness('parent-1'));
+    await fireEvent(button(), 'pressIn');
+    await ms(500);
+    await screen.rerender(harness('parent-2'));
+    await ms(1000);
+    expect(probe[0].charge.value).toBe(0);
+    expect(fired).toEqual([]);
   });
 });
 

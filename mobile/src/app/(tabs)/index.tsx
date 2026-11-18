@@ -52,7 +52,6 @@ export default function BattleScreen() {
   const battle = useBattle();
   const current = battle.queue[0];
   const servers = state?.servers ?? [];
-  const canKill = current !== undefined && !battle.busy && battle.allClear === null;
 
   // A reason the app knows is said in words; any other is shown as the agent sent it.
   const reason = (r: string | undefined) => {
@@ -79,7 +78,9 @@ export default function BattleScreen() {
   const [size, setSize] = useState<Size | null>(null);
   const reduceMotion = useReduceMotion();
   const clock = useIdleClock(reduceMotion === false);
-  const press = useHoldToKill(current && parentKey(current.server.id, current.parent), battle.kill, reduceMotion === true);
+  const canKill = current !== undefined && !battle.busy && battle.allClear === null;
+  // A hold only runs while the button can be pressed: when it cannot, or another parent comes to the front, the hold ends.
+  const press = useHoldToKill(canKill ? parentKey(current.server.id, current.parent) : undefined, battle.kill, reduceMotion === true);
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']} testID="battle-screen">
@@ -135,7 +136,7 @@ export default function BattleScreen() {
           />
         )}
         {current && size && <Enemies size={size} zombies={current.parent.zombies} clock={clock} />}
-        <KillyOnStage clock={clock} charge={press.charge} lean={press.lean} />
+        <KillyOnStage clock={clock} charge={press.windUp} lean={press.lean} />
         </View>
       </View>
 

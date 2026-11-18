@@ -164,7 +164,7 @@ All three use Killy's `ghost` and `eye` parts from `killySVG` without the `scyth
 
 Holding the button fills it with `red` from left to right over **1000 ms**; Killy leans back and the scythe winds up proportionally (up to −42°). Releasing early resets both. When full, the kill starts.
 
-With "reduce motion" enabled, the button still fills, because the fill is how the hold shows, but in quarters rather than smoothly, and Killy does not lean back or wind up (not in the mock).
+With "reduce motion" enabled, the button still fills, because the fill is how the hold shows, but a quarter every 250 ms rather than smoothly, full when the kill starts; Killy does not lean back or wind up (not in the mock).
 
 ### Kill sequence
 

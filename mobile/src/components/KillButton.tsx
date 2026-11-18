@@ -31,7 +31,8 @@ export function KillButton({
       disabled={!enabled}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
-      style={[styles.kill, !enabled && styles.killDisabled]}>
+      // The mock's `.kill:active`: pressed in a little while held.
+      style={({ pressed }) => [styles.kill, !enabled && styles.killDisabled, pressed && enabled && styles.pressed]}>
       <Animated.View style={[styles.fill, fill]} testID="kill-fill" pointerEvents="none" />
       <KText kind="monoSemiBold" style={styles.label}>
         {label}
@@ -57,6 +58,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   killDisabled: { backgroundColor: colors.elev3 },
+  pressed: { transform: [{ scale: 0.985 }] },
   // The mock's `.kill-fill`: the whole button, scaled from the left edge.
   fill: { ...StyleSheet.absoluteFill, backgroundColor: colors.red, transformOrigin: 'left' },
   label: { color: '#FFFFFF', fontSize: 16 },
