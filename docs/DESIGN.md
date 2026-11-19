@@ -141,13 +141,12 @@ All artwork is flat vector, drawn in `mock/art.js` (`killySVG`, `parentSVG`, `zo
 
 ## App icon, splash and notification icon
 
-All of them show the whole Killy with the Enter-key scythe, drawn from `killySVG` as is (not in the mock). The purple ghost head alone, which the mock's push icon uses, is not used: on a purple field it reads as Kiro's own logo, and the scythe with its ⏎ collar is what is Killy's alone. The images are generated from `mock/art.js` by `mobile/assets/icons/build.sh`; do not edit the PNGs by hand.
+All of them draw Killy from `killySVG` as is, with the Enter-key scythe (not in the mock). The ghost alone on a purple field, as the mock's push icon has it, reads as Kiro's own logo; the scythe with its ⏎ collar is Killy's alone, and the backgrounds are black. The images are generated from `mock/art.js` by `mobile/assets/icons/build.sh`; do not edit the PNGs by hand.
 
 | Image | Look |
 |---|---|
-| App icon (iOS) | `bg` (black) with a soft `purple` glow behind Killy; Killy, scythe included, centred and 80% as wide as the icon. iOS rounds the corners itself, so the image is a full square |
-| Android adaptive icon | Background layer plain `bg`. Foreground: the glow over the whole layer and the same Killy, fitted into the 66 dp circle every launcher mask keeps |
-| Android themed icon (monochrome) | The same Killy in one colour with the eyes cut out |
+| App icon (iOS, and Android's adaptive icon) | `bg` (black) background. Killy's head peeks in from the lower left with the scythe's collar and shaft in front, cropped as in the mock's push icon: in a 40 × 40 box, the 200-wide art drawn 76 wide, moved 18 left and 2 down. iOS rounds the corners itself, so the image is a full square. Android's foreground is the same drawing on a transparent layer, with the 40 × 40 box filling the 72 dp the launcher shows of the 108 dp layer; the background layer is plain `bg` |
+| Android themed icon (monochrome) | The same crop, Killy and the scythe in one colour with the eyes cut out |
 | Splash | The whole Killy with the scythe on `bg`, 160 px wide |
 | Android notification icon | The whole Killy with the scythe in white with the eyes cut out, on transparent; Android tints it with `purple` |
 
