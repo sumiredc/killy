@@ -16,7 +16,7 @@
 - Killy server の側での summon 由来の確認。agent だけが守る（#24 の制約）
 - 公開デモの可用性。デモ機と home cluster が止まれば使えない（[PRD: Not guaranteed](../../../docs/PRD.md#not-guaranteed) の High availability）
 - 別の PID namespace のゾンビ（[PRD: Not guaranteed](../../../docs/PRD.md#not-guaranteed)）
-- Killy の絵（「追加できた」の 🤍 でお辞儀）。M3（#27）で付ける
+- Killy の絵（「追加できた」の 💜 でお辞儀）。M3（#27）で付ける
 
 ## Requirements
 

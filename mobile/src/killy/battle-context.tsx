@@ -30,7 +30,7 @@ export type Strike = {
 };
 
 /** Killy's reactions to a kill (DESIGN: Killy's reactions). `id` tells one appearance from the next. */
-export type Bubble = { symbol: '……！！' | '……！' | '……？' | '🤍'; id: number };
+export type Bubble = { symbol: '……！！' | '……！' | '……？' | '💜'; id: number };
 
 type BattleView = {
   queue: QueueItem[];
@@ -178,7 +178,7 @@ export function BattleProvider({ children }: { children: ReactNode }) {
         }
         if (allClear !== null) {
           setBowing(true);
-          say('🤍', BUBBLE_MS.allClear);
+          say('💜', BUBBLE_MS.allClear);
         }
         after(when(strikeEnd('defeat', at, n, allClear !== null)), () => {
           setStrike(() => null);
