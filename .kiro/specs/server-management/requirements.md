@@ -15,7 +15,7 @@
 - 常時の接続表示と、応答の時間（round trip）・最後の受信の時刻（[PRD: Not guaranteed](../../../docs/PRD.md#not-guaranteed)）
 - 他の phone の紐付けの削除、agent の停止、agent の登録の削除。削除で外れるのは、この device と agent の紐付けだけ
 - QR を読み取っただけでのサーバーの追加。読み取ったコードは入力欄に入り、追加は「追加する」で行う
-- Killy の絵と反応（追加できたときの 🤍 など。M3、#27）
+- Killy の絵と反応（追加できたときの 💜 など。M3、#27）
 - 署名付きの kill の命令（[PRD: Should-have](../../../docs/PRD.md#should-have)）
 
 ## Requirements

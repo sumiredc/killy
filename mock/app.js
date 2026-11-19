@@ -453,7 +453,7 @@ async function kill() {
     renderBattle(true);
     react('……！', 'orooro');
   } else {
-    react('🤍', 'bow', 3000);
+    react('💜', 'bow', 3000);
     await delay(600);
     renderClear();
     $('#clearKilly').innerHTML = killySVG();

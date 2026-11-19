@@ -372,7 +372,7 @@ describe('the kill sequence', () => {
     expect(screen.getByText('PID 3801 killed')).toBeOnTheScreen();
   });
 
-  test('after the last parent, Killy bows with 🤍 when the battle would move on, and All clear comes 600 ms later', async () => {
+  test('after the last parent, Killy bows with 💜 when the battle would move on, and All clear comes 600 ms later', async () => {
     const { s } = await battleWith([server('a', 'web-01', [parent(3801, [3802], t1)])]);
     s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 1 });
     await fire();
@@ -381,7 +381,7 @@ describe('the kill sequence', () => {
     expect(bubble()).toBeNull();
     expect(screen.getByText('SIGKILL → PID 3801 on web-01')).toBeOnTheScreen();
     await ms(100);
-    expect(bubble()).toHaveTextContent('🤍');
+    expect(bubble()).toHaveTextContent('💜');
     expect(screen.queryByTestId('all-clear')).toBeNull();
     await ms(5950 - 5400 - 50);
     expect(screen.queryByTestId('all-clear')).toBeNull();

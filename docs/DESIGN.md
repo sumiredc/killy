@@ -85,7 +85,7 @@ Empty states replace the info block and hide the enemies; the kill button is dis
 
 ### All clear overlay
 
-Dimmed, blurred backdrop over everything. Card with Killy bowing (no scythe) and 🤍, title `All clear`, "すべてのサーバーのゾンビが成仏しました", two stat tiles (parents killed, zombies released), and one primary button "閉じる" / "Close". The app counts both numbers itself: parents whose kill outcome was `killed` in this battle, and the zombies shown for them when each kill started; `already_gone` is not counted.
+Dimmed, blurred backdrop over everything. Card with Killy bowing (no scythe) and 💜, title `All clear`, "すべてのサーバーのゾンビが成仏しました", two stat tiles (parents killed, zombies released), and one primary button "閉じる" / "Close". The app counts both numbers itself: parents whose kill outcome was `killed` in this battle, and the zombies shown for them when each kill started; `already_gone` is not counted.
 
 ### Settings tab
 
@@ -108,7 +108,7 @@ When the OS blocks notifications for Killy, the app Notifications row shows "OS 
 4. Actions: "キャンセル" (text) and "追加する" (primary, enabled at 6 characters).
 5. Below the form: secondary button "デモサーバーを試す" / "Try the demo server", which adds the public demo server without a code (not in the mock). Only builds that offer the demo show it (the builds for the hackathon's judges); other builds have no button. When no demo server is configured, the error box shows "デモサーバーは今使えません" / "The demo server is not available right now".
 
-States: waiting (spinner, "追加しています…" / "Adding…"), added (Killy with 🤍, "‹name› を追加しました", closes after ~1.3 s), error (red box above the actions with the reason and what to do: unknown, used or expired code; QR code for another Killy server; too many attempts, wait and try again; Killy server unreachable). A QR code or `killy://pair` link that is not a Killy pairing code, and a camera the OS does not allow, show in the same box; with no camera the code can still be typed (not in the mock).
+States: waiting (spinner, "追加しています…" / "Adding…"), added (Killy with 💜, "‹name› を追加しました", closes after ~1.3 s), error (red box above the actions with the reason and what to do: unknown, used or expired code; QR code for another Killy server; too many attempts, wait and try again; Killy server unreachable). A QR code or `killy://pair` link that is not a Killy pairing code, and a camera the OS does not allow, show in the same box; with no camera the code can still be typed (not in the mock).
 
 ### Server sheet
 
@@ -179,7 +179,7 @@ Times are from the moment the hold completes, as in the mock.
 | +600 | Each zombie, 130 ms apart: body fades out (700 ms) while its soul rises ~130px with a gentle sway (1.3 s) |
 | +1300 + 130·n | Necromancer fades upward with blur (900 ms) — only after all zombies are gone |
 | +900 | Info shows the kill result in `green`; Killy hops twice; bubble `……！` |
-| +1300 | Next parent drops in (600 ms) and Killy fidgets (`……！`), or All clear: Killy bows with 🤍 and the overlay appears 600 ms later |
+| +1300 | Next parent drops in (600 ms) and Killy fidgets (`……！`), or All clear: Killy bows with 💜 and the overlay appears 600 ms later |
 
 In the real app the steps up to t = 670 ms play immediately; the zombie defeat starts only when the agent reports `killed`. If the result is later than 670 ms, the necromancer keeps trembling until it arrives.
 
@@ -210,6 +210,6 @@ With "reduce motion" enabled, loops stop and transitions become instant.
 | A new zombie appears | `……！` | Fidget |
 | Kill starts | `……！！` | Dash and swing |
 | A parent is killed | `……！` | Two small hops |
-| All clear / server added | `🤍` | Bow |
+| All clear / server added | `💜` | Bow |
 
 The bubble sits just above Killy's head, extends to the left, and its tail drops from the bubble's lower right onto the head.

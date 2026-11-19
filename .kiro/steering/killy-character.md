@@ -15,7 +15,7 @@ A small, silent apprentice reaper: a white ghost who carries a scythe whose coll
 - No dialogue, no first-person sentences, no words in Killy's bubble — in any language.
 - Killy reacts only with:
   - **Symbols:** `……！`, `……？`, `……！！`
-  - **Marks:** `💡`, `🤍` (sweat and other marks only if added here first)
+  - **Marks:** `💡`, `💜` (sweat and other marks only if added here first)
   - **Gestures:** fidgeting left and right, dashing and swinging the scythe, small hops, bowing
 - Killy has **no mouth**. Do not draw one.
 

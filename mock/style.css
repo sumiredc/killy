@@ -467,7 +467,7 @@ button:focus-visible { outline: 2px solid var(--purple-300); outline-offset: 2px
 .clear-killy .scythe { display: none; }
 .clear-killy .ghost { transform-box: view-box; transform-origin: 70px 110px; transform: rotate(12deg); }
 .clear-killy .arm { transform: translate(-6px, 6px); }
-.clear-killy::after { content: '🤍'; position: absolute; top: 0; right: 24px; font-size: 20px; }
+.clear-killy::after { content: '💜'; position: absolute; top: 0; right: 24px; font-size: 20px; }
 .clear h2 { margin: 6px 0 4px; font-family: var(--mono); font-size: 24px; font-weight: 600; }
 .clear p { margin: 0 0 18px; color: var(--muted); font-size: 14px; }
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 18px; }
@@ -675,7 +675,7 @@ button:focus-visible { outline: 2px solid var(--purple-300); outline-offset: 2px
 @keyframes spin { to { transform: rotate(360deg); } }
 .paired-killy { position: relative; width: 120px; }
 .paired-killy .scythe { display: none; }
-.paired-killy::after { content: '🤍'; position: absolute; top: -4px; right: 18px; font-size: 18px; }
+.paired-killy::after { content: '💜'; position: absolute; top: -4px; right: 18px; font-size: 18px; }
 
 .danger-btn {
   width: 100%;
