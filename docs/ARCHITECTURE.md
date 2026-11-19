@@ -266,8 +266,22 @@ Operators and judges get everything except the iOS app from this repository's Gi
 | Artifact | How it is produced |
 |---|---|
 | `killy` for linux/amd64 and linux/arm64 | Files `killy-linux-amd64`, `killy-linux-arm64` and `SHA256SUMS`. A workflow (`release.yml`) builds them when a version tag (`v*`) is pushed, statically (`CGO_ENABLED=0`) with the tag as the version. It runs on the self-hosted runner while the repository is private and on GitHub-hosted runners afterwards (it does not need the LAN registry) |
-| Android APK | Built by EAS and attached to the same Release |
+| Android APK | File `killy-android.apk`. Built by EAS with the `apk` profile of `mobile/eas.json` (staging, with the demo) and attached by hand to the Release whose binaries it goes with; EAS's own download links are not used, because how long they are kept is not known |
 | systemd units | `deploy/systemd/`: `killy-agent.service` (`killy agent run`, as root), `killy-agent-demo.service` (`killy agent run --demo`) and `killy-summon.service` (`killy summon`) |
+
+Attaching the APK, with `TAG` set to the Release (for example `v0.1.0`):
+
+```sh
+cd mobile && npx eas-cli build --platform android --profile apk
+```
+
+```sh
+curl -fL -o killy-android.apk "$(npx eas-cli build:list --platform android --build-profile apk --status finished --limit 1 --json | jq -r '.[0].artifacts.buildUrl')"
+```
+
+```sh
+gh release upload "$TAG" killy-android.apk -R sumiredc/killy
+```
 
 ## Repository layout
 
