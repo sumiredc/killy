@@ -1,7 +1,7 @@
 #!/bin/bash
 # Builds the app icon, Android's adaptive and themed icon layers, the splash image and the Android
-# notification icon from killySVG in mock/art.js: the whole Killy with the Enter-key scythe (DESIGN:
-# App icon, splash and notification icon). Needs node and rsvg-convert. Run from anywhere; it writes
+# notification icon from killySVG in mock/art.js, drawn with the Enter-key scythe (DESIGN: App icon,
+# splash and notification icon). Needs node and rsvg-convert. Run from anywhere; it writes
 # into mobile/assets/images.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
@@ -26,24 +26,17 @@ const solid = (colour) =>
   `<mask id="cut" maskUnits="userSpaceOnUse" x="-50" y="-50" width="300" height="300"><rect x="-50" y="-50" width="300" height="300" fill="#000"/><g filter="url(#white)">${killy}</g>${eyes.join('').replace(/fill="[^"]*"/g, 'fill="#000"')}</mask>` +
   `<rect x="-50" y="-50" width="300" height="300" fill="${colour}" mask="url(#cut)"/>`;
 
-// The whole Killy, scythe included (x 8–199, y −8–150 of the art), centred in a 100 × 100 box.
-const fit = 'translate(6.6 20.4) scale(0.42)';
-// A purple glow behind Killy on black, as behind the arena's necromancer.
-const glow =
-  `<radialGradient id="glow" gradientUnits="userSpaceOnUse" cx="56" cy="46" r="56"><stop offset="0" stop-color="#9046FF" stop-opacity="0.5"/><stop offset="1" stop-color="#9046FF" stop-opacity="0"/></radialGradient>`;
-// Android's adaptive layers are 108 dp; whatever the mask, the launcher keeps the circle of 66 dp in
-// the middle, so the 100 box is drawn 66 dp wide there.
-const layer = 'translate(21 21) scale(0.66)';
+// The mock's push icon: in a 40 × 40 box the 200-wide art is 76 wide, 18 left and 2 down, so Killy's
+// head peeks in from the lower left with the scythe's collar and shaft in front of it.
+const crop = 'translate(-18 2) scale(0.38)';
+// Android's adaptive layers are 108 dp, of which the launcher shows the middle 72.
+const layer = 'translate(18 18) scale(1.8)';
 const file = (name, viewBox, inner) =>
   fs.writeFileSync(`${work}/${name}.svg`, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}">${inner}</svg>`);
 
-file('icon', '0 0 100 100', `<defs>${glow}</defs><rect width="100" height="100" fill="#000"/><rect width="100" height="100" fill="url(#glow)"/><g transform="${fit}">${killy}</g>`);
-file(
-  'android-icon-foreground',
-  '0 0 108 108',
-  `<defs>${glow}</defs><g transform="translate(-4 -4) scale(1.16)"><rect width="100" height="100" fill="url(#glow)"/></g><g transform="${layer}"><g transform="${fit}">${killy}</g></g>`,
-);
-file('android-icon-monochrome', '0 0 108 108', `<g transform="${layer}"><g transform="${fit}">${solid('#fff')}</g></g>`);
+file('icon', '0 0 40 40', `<rect width="40" height="40" fill="#000"/><clipPath id="box"><rect width="40" height="40"/></clipPath><g clip-path="url(#box)"><g transform="${crop}">${killy}</g></g>`);
+file('android-icon-foreground', '0 0 108 108', `<g transform="${layer}"><g transform="${crop}">${killy}</g></g>`);
+file('android-icon-monochrome', '0 0 108 108', `<g transform="${layer}"><g transform="${crop}">${solid('#fff')}</g></g>`);
 // The whole Killy with a little room around it.
 file('splash-icon', '2 -14 204 170', killy);
 file('notification-icon', '0 -26 210 210', solid('#fff'));
