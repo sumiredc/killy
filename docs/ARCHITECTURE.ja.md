@@ -259,15 +259,16 @@ production の前に:
 | Push | `expo-notifications` |
 | QR | `expo-camera` |
 | 秘密情報 | device token は `expo-secure-store` に置く |
-| Build | EAS：iOS は TestFlight（公開リンク）、Android の APK は GitHub Release に添付する（「配布」を参照）。Killy server は build ごとに `EXPO_PUBLIC_KILLY_SERVER_URL` で決まる。`EXPO_PUBLIC_KILLY_DEMO=1` で「デモサーバーを試す」が出る（「デモ環境」を参照）。ハッカソンの審査員向けの build は、staging につなぎ、デモを出す |
+| Build | EAS：iOS は TestFlight（公開リンク）、Android は Google Play のオープンテストと、GitHub Release に添付する APK（「配布」を参照）。Killy server は build ごとに `EXPO_PUBLIC_KILLY_SERVER_URL` で決まる。`EXPO_PUBLIC_KILLY_DEMO=1` で「デモサーバーを試す」が出る（「デモ環境」を参照）。ハッカソンの審査員向けの build は、staging につなぎ、デモを出す |
 
 ## 配布
 
-operator と審査員は、iOS の app 以外のすべてを、このリポジトリの GitHub Releases から入手します。リポジトリが public になるまでは、チームだけがダウンロードできます。
+operator と審査員は、agent のバイナリをこのリポジトリの GitHub Releases から、iOS の app を TestFlight の公開リンクから、Android の app を Google Play のオープンテストのリンクから入手します。Android の APK も GitHub Releases に置きます。Google Play を使わない人のためと、Play の審査が遅れたときの予備です。リポジトリが public になるまでは、Releases からはチームだけがダウンロードできます。
 
 | 成果物 | 作り方 |
 |---|---|
 | linux/amd64 と linux/arm64 の `killy` | ファイルは `killy-linux-amd64`・`killy-linux-arm64`・`SHA256SUMS`。version の tag（`v*`）が push されたら workflow（`release.yml`）が、static（`CGO_ENABLED=0`）に、tag を version として build する。リポジトリが private の間は self-hosted runner で、その後は GitHub-hosted runner で動く（LAN の registry は使わない） |
+| Google Play の Android | オープンテストのトラックで、そのリンクから参加する。Play の開発者アカウントは組織のものなので、先にクローズドテストをする必要は無い。EAS が `mobile/eas.json` の `play` の profile（AAB、staging につなぎ、デモを出す）で build する。EAS の keystore を upload key にし、署名の鍵は Play App Signing が持つ。Play に登録するプライバシーポリシーは GitHub 上の [PRIVACY.md](PRIVACY.md) なので、審査に出すのはリポジトリが public になった後 |
 | Android の APK | ファイルは `killy-android.apk`。EAS が `mobile/eas.json` の `apk` の profile（staging につなぎ、デモを出す）で build し、組になるバイナリの Release に手で添付する。EAS のダウンロード用のリンクは、保存期間が分からないので使わない |
 | systemd の unit | `deploy/systemd/`：`killy-agent.service`（`killy agent run` を root で）、`killy-agent-demo.service`（`killy agent run --demo`）、`killy-summon.service`（`killy summon`） |
 

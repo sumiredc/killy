@@ -257,15 +257,16 @@ Availability: with one replica and `Recreate`, a node reboot or eviction stops t
 | Push | `expo-notifications` |
 | QR | `expo-camera` |
 | Secrets | Device token in `expo-secure-store` |
-| Builds | EAS: iOS to TestFlight (public link), Android APK attached to the GitHub Release (see "Distribution"). The Killy server is fixed per build by `EXPO_PUBLIC_KILLY_SERVER_URL`; `EXPO_PUBLIC_KILLY_DEMO=1` shows "Try the demo server" (see "Demo environment"). The builds for the hackathon's judges connect to staging with the demo on |
+| Builds | EAS: iOS to TestFlight (public link), Android to Google Play open testing and as an APK attached to the GitHub Release (see "Distribution"). The Killy server is fixed per build by `EXPO_PUBLIC_KILLY_SERVER_URL`; `EXPO_PUBLIC_KILLY_DEMO=1` shows "Try the demo server" (see "Demo environment"). The builds for the hackathon's judges connect to staging with the demo on |
 
 ## Distribution
 
-Operators and judges get everything except the iOS app from this repository's GitHub Releases. Before the repository is public, only the team can download them.
+Operators and judges get the agent binaries from this repository's GitHub Releases, the iOS app through a TestFlight public link and the Android app through a Google Play open testing link; the Android APK is on the GitHub Releases too, for anyone who does not use Google Play and in case the Play review is late. Before the repository is public, only the team can download from the Releases.
 
 | Artifact | How it is produced |
 |---|---|
 | `killy` for linux/amd64 and linux/arm64 | Files `killy-linux-amd64`, `killy-linux-arm64` and `SHA256SUMS`. A workflow (`release.yml`) builds them when a version tag (`v*`) is pushed, statically (`CGO_ENABLED=0`) with the tag as the version. It runs on the self-hosted runner while the repository is private and on GitHub-hosted runners afterwards (it does not need the LAN registry) |
+| Android on Google Play | Open testing track, joined through its link; the Play developer account is an organisation's, so no closed test is needed first. Built by EAS with the `play` profile of `mobile/eas.json` (an AAB, staging, with the demo). EAS's keystore is the upload key and Play App Signing holds the signing key. The privacy policy Play links to is [PRIVACY.md](PRIVACY.md) on GitHub, so the build is sent for review only once the repository is public |
 | Android APK | File `killy-android.apk`. Built by EAS with the `apk` profile of `mobile/eas.json` (staging, with the demo) and attached by hand to the Release whose binaries it goes with; EAS's own download links are not used, because how long they are kept is not known |
 | systemd units | `deploy/systemd/`: `killy-agent.service` (`killy agent run`, as root), `killy-agent-demo.service` (`killy agent run --demo`) and `killy-summon.service` (`killy summon`) |
 

@@ -23,7 +23,7 @@ Killy is our entry to the **Kiroween 2026** hackathon in the **Frankenstein** ca
 | User | What they want |
 |---|---|
 | Operator | Runs one or more Linux servers. Installs the agent, pairs the phone, gets notified and kills zombie parents. |
-| Judge / visitor | Has no server of their own. Installs the app (TestFlight or APK) and tries Killy against the public demo environment. |
+| Judge / visitor | Has no server of their own. Installs the app (TestFlight, Google Play open testing, or APK) and tries Killy against the public demo environment. |
 
 ## Guarantees
 
@@ -82,7 +82,7 @@ Killy is our entry to the **Kiroween 2026** hackathon in the **Frankenstein** ca
 | Languages | Backend (agent, server, summon) in Go 1.27 (toolchain go1.27.3). Mobile app in React Native with Expo. |
 | Hosting | Killy server on the team's home Kubernetes cluster at `killy.sumire.pink`, exposed through the existing Cloudflare Tunnel, one replica. The home cluster gives no uptime guarantee. |
 | Notifications | Expo Push Service (APNs and FCM credentials managed by EAS). |
-| Distribution | iOS through a TestFlight public link. The Android APK and the agent binaries are downloaded from the repository's GitHub Releases. |
+| Distribution | iOS through a TestFlight public link. Android through a Google Play open testing link, with the APK on the repository's GitHub Releases as well. The agent binaries are downloaded from the GitHub Releases. |
 | Character | Killy never speaks. See the character rules. |
 
 ## Use cases
@@ -151,7 +151,7 @@ The operator wants to know whether Killy can reach a server right now.
 
 A judge wants to try Killy without a server.
 
-The public demo exists for the hackathon's judging only. It runs on the staging Killy server, and only the builds made for the judges (the TestFlight public link and the APK) connect there and show "Try the demo server". The production Killy server has no demo, and builds that connect to it do not show the button.
+The public demo exists for the hackathon's judging only. It runs on the staging Killy server, and only the builds made for the judges (the TestFlight public link, the Google Play open test and the APK) connect there and show "Try the demo server". The production Killy server has no demo, and builds that connect to it do not show the button.
 
 - Main flow: in Add server, the judge taps "Try the demo server"; the public demo server is added without a pairing code. Demo zombies appear and can be killed.
 - Alternative: another visitor kills the same demo parent first → it disappears from everyone's screen ("already gone" for the late one).
