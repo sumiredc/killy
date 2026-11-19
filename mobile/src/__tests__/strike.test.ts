@@ -1,4 +1,5 @@
-import { apply, BOW, ghostMatrix, ghostOrigin, rotateAbout } from '../killy/pose';
+import { DRAW } from '../art/Killy';
+import { apply, BOW, ghostMatrix, ghostOrigin, rotateAbout, scytheMatrix, WIND_UP } from '../killy/pose';
 import {
   defeatRows,
   flashOpacity,
@@ -206,4 +207,34 @@ test('Killy bows by turning 14° forward and sinking 4px (the mock\'s `.killy.bo
   const head = apply(ghostMatrix(0, 1), { x: 80, y: 16 });
   expect(head.x).toBeGreaterThan(80);
   expect(apply(ghostMatrix(0, 0), p)).toEqual(p);
+});
+
+test('wound up and through the whole swing, the scythe stays inside the area Killy is drawn on', () => {
+  // The blade's outer edge (killySVG's `M124 6 C148 -8 184 -2 199 46`), its collar and the butt of the shaft.
+  const bez = (a: number, b: number, c: number, d: number, t: number) =>
+    a * (1 - t) ** 3 + 3 * b * t * (1 - t) ** 2 + 3 * c * t * t * (1 - t) + d * t ** 3;
+  const points = [
+    { x: 100, y: 150.5 },
+    { x: 113, y: 3 },
+    { x: 141, y: 3 },
+  ];
+  for (let t = 0; t <= 1; t += 0.05) {
+    points.push({ x: bez(124, 148, 184, 199, t), y: bez(6, -8, -2, 46, t) });
+  }
+  const angles = [WIND_UP];
+  for (let t = 0; t < 700; t += 5) {
+    angles.push(scytheSwing(t) as number);
+  }
+  for (const a of angles) {
+    for (const p of points) {
+      const q = apply(scytheMatrix(0, a), p);
+      expect(q.x).toBeGreaterThanOrEqual(DRAW.x);
+      expect(q.x).toBeLessThanOrEqual(DRAW.x + DRAW.width);
+      expect(q.y).toBeGreaterThanOrEqual(DRAW.y);
+      expect(q.y).toBeLessThanOrEqual(DRAW.y + DRAW.height);
+    }
+  }
+  // It still covers the mock's 200 × 150 box, which the screen lays out.
+  expect(DRAW.x).toBeLessThanOrEqual(0);
+  expect(DRAW.y + DRAW.height).toBeGreaterThanOrEqual(150);
 });
