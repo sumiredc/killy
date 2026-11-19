@@ -268,8 +268,22 @@ operator と審査員は、iOS の app 以外のすべてを、このリポジ�
 | 成果物 | 作り方 |
 |---|---|
 | linux/amd64 と linux/arm64 の `killy` | ファイルは `killy-linux-amd64`・`killy-linux-arm64`・`SHA256SUMS`。version の tag（`v*`）が push されたら workflow（`release.yml`）が、static（`CGO_ENABLED=0`）に、tag を version として build する。リポジトリが private の間は self-hosted runner で、その後は GitHub-hosted runner で動く（LAN の registry は使わない） |
-| Android の APK | EAS が build し、同じ Release に添付する |
+| Android の APK | ファイルは `killy-android.apk`。EAS が `mobile/eas.json` の `apk` の profile（staging につなぎ、デモを出す）で build し、組になるバイナリの Release に手で添付する。EAS のダウンロード用のリンクは、保存期間が分からないので使わない |
 | systemd の unit | `deploy/systemd/`：`killy-agent.service`（`killy agent run` を root で）、`killy-agent-demo.service`（`killy agent run --demo`）、`killy-summon.service`（`killy summon`） |
+
+APK の添付（`TAG` は Release。例 `v0.1.0`）：
+
+```sh
+cd mobile && npx eas-cli build --platform android --profile apk
+```
+
+```sh
+curl -fL -o killy-android.apk "$(npx eas-cli build:list --platform android --build-profile apk --status finished --limit 1 --json | jq -r '.[0].artifacts.buildUrl')"
+```
+
+```sh
+gh release upload "$TAG" killy-android.apk -R sumiredc/killy
+```
 
 ## リポジトリの構成
 

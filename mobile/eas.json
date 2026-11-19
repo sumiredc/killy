@@ -15,6 +15,17 @@
         "EXPO_PUBLIC_KILLY_SERVER_URL": "https://stg-killy.sumire.pink",
         "EXPO_PUBLIC_KILLY_DEMO": "1"
       }
+    },
+    "apk": {
+      "distribution": "internal",
+      "autoIncrement": true,
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_KILLY_SERVER_URL": "https://stg-killy.sumire.pink",
+        "EXPO_PUBLIC_KILLY_DEMO": "1"
+      }
     }
   },
   "submit": {
