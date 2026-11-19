@@ -35,7 +35,7 @@ const errors: Record<KillErrorKind, Key> = {
 
 function Result({ shown }: { shown: { lines: string[]; ok: boolean } }) {
   return (
-    <View style={styles.result} testID="kill-result">
+    <View style={[styles.result, !shown.ok && styles.resultBox]} testID="kill-result">
       {shown.lines.map((line) => (
         <KText key={line} kind="mono" style={shown.ok ? styles.resultOk : styles.resultBad}>
           {line}
@@ -108,7 +108,9 @@ export default function BattleScreen() {
         {size && <Backdrop size={size} />}
         {size && <Ground size={size} />}
         {current ? (
-          <View style={styles.info}>
+          // A reason in red reaches down over the necromancer: while one is shown, the info block
+          // comes in front of the enemies so it can be read (not in the mock, where it is behind).
+          <View style={[styles.info, shown && !shown.ok && styles.infoFront]} testID="battle-info">
             <View style={styles.chip}>
               <KText kind="mono" style={styles.chipText} testID="battle-server">
                 {current.server.name}
@@ -237,6 +239,8 @@ const styles = StyleSheet.create({
   // The mock's `.arena`; everything in it is placed absolutely, as there.
   arena: { flex: 1, backgroundColor: colors.elev1, borderColor: colors.line, borderWidth: 1, borderRadius: radii.card, overflow: 'hidden' },
   info: { position: 'absolute', top: 20, left: 20, right: 70, zIndex: 1 },
+  // Above the enemies (2), below Killy (11).
+  infoFront: { zIndex: 3 },
   chip: {
     alignSelf: 'flex-start',
     marginBottom: 10,
@@ -259,6 +263,8 @@ const styles = StyleSheet.create({
   result: { gap: 4, marginTop: 8 },
   resultOk: { color: colors.green, fontSize: 12.5, lineHeight: 20 },
   resultBad: { color: colors.red, fontSize: 12.5, lineHeight: 20 },
+  // The arena's own colour behind a red reason, so it reads over the moon and the robe.
+  resultBox: { alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 8, marginLeft: -8, borderRadius: radii.input, backgroundColor: 'rgba(25,22,31,0.85)' },
   error: { color: colors.red, fontSize: 13, marginTop: 8, textAlign: 'center' },
   overlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 24 },
   card: { backgroundColor: colors.elev1, borderRadius: radii.card, borderWidth: 1, borderColor: colors.line, padding: 24, gap: 12 },

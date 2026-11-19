@@ -660,6 +660,17 @@ describe('tabs', () => {
     expect(s.count('POST /app/v1/kills')).toBe(0);
   });
 
+  test('a reason in red is drawn in front of the necromancer; otherwise the enemies are over the info block', async () => {
+    const { s } = await battleWith([server('a', 'web-01', [parent(3801, [3802], t1)])]);
+    const z = () => StyleSheet.flatten(screen.getByTestId('battle-info').props.style).zIndex as number;
+    const enemies = 2;
+    expect(z()).toBeLessThan(enemies);
+    s.respond('POST /app/v1/kills', 200, { outcome: 'refused', reason: 'protected' });
+    await hold(1000);
+    expect(screen.getByTestId('kill-result')).toBeOnTheScreen();
+    expect(z()).toBeGreaterThan(enemies);
+  });
+
   test('a reason the app does not know is shown as the agent sent it, whatever its name', async () => {
     const { s } = await battleWith([server('a', 'web-01', [parent(3801, [3802], t1)])]);
     s.respond('POST /app/v1/kills', 200, { outcome: 'refused', reason: 'constructor' });
