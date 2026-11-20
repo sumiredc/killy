@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#000000">
 <title>Killy: put zombie processes to rest, from your phone</title>
-<meta name="description" content="Killy watches your Linux servers for zombie processes, tells your phone, and lets you kill the zombies' parent with one hold of a button. An entry for Kiroween 2026.">
+<meta name="description" content="Killy watches your Linux servers for zombie processes, tells your phone, and lets you kill the zombies' parent with one hold of a button.">
 <link rel="icon" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="style.css">
 <meta property="og:title" content="Killy">
-<meta property="og:description" content="Put zombie processes to rest, from your phone. An entry for Kiroween 2026.">
+<meta property="og:description" content="Put zombie processes to rest, from your phone.">
 <meta property="og:image" content="https://killy.sumire-sakamoto.co.jp/ogp.png">
 <meta property="og:url" content="https://killy.sumire-sakamoto.co.jp/">
 <meta property="og:type" content="website">
@@ -30,13 +30,12 @@
   <main>
     <div class="hero">
       <h1><span class="en">Put zombie processes to rest, from your phone.</span><span class="ja">ゾンビプロセスを、スマホから成仏させる。</span></h1>
-      <p><span class="en">Killy watches your Linux servers for zombie processes and tells your phone when a parent is holding some. Hold a button for one second, and Killy sends <code>SIGKILL</code> to that parent.</span><span class="ja">Killy は Linux サーバーのゾンビプロセスを見張り、ゾンビを抱えた親が現れるとスマホに知らせます。ボタンを 1 秒長押しすると、その親に <code>SIGKILL</code> を送ります。</span></p>
-      <p class="entry"><span class="en">An entry for Kiroween 2026, Frankenstein category.</span><span class="ja">Kiroween 2026 Frankenstein 部門の応募作です。</span></p>
-      <div class="actions">
-        <a class="button primary" href="#get"><span class="en">Get the app</span><span class="ja">アプリを入手する</span></a>
-        <a class="button secondary" href="#demo"><span class="en">Try the demo</span><span class="ja">デモを試す</span></a>
+      <div class="stores">
+        <!-- Add href="App Store page URL" to this link when the page is published. Same for Google Play below. -->
+        <a class="badge" id="store-ios"><img class="en" src="badges/app-store-en.svg" width="120" height="40" alt="Download on the App Store"><img class="ja" src="badges/app-store-ja.svg" width="109" height="40" alt="App Store からダウンロード"></a>
+        <a class="badge" id="store-play"><img class="en" src="badges/google-play-en.png" width="646" height="250" alt="Get it on Google Play"><img class="ja" src="badges/google-play-ja.png" width="646" height="250" alt="Google Play で手に入れよう"></a>
       </div>
-
+      <p><span class="en">Killy watches your Linux servers for zombie processes and tells your phone when a parent is holding some. Hold a button for one second, and Killy sends <code>SIGKILL</code> to that parent.</span><span class="ja">Killy は Linux サーバーのゾンビプロセスを見張り、ゾンビを抱えた親が現れるとスマホに知らせます。ボタンを 1 秒長押しすると、その親に <code>SIGKILL</code> を送ります。</span></p>
       <figure class="scene">
         <img class="en" src="scene.svg" width="720" height="360" alt="The battle screen: Killy, a small white ghost with a scythe, faces six zombies that a hooded necromancer works like marionettes in front of the moon.">
         <img class="ja" src="scene-ja.svg" width="720" height="360" alt="対戦画面。鎌を持った白い小さなおばけの Killy が、月の前でフードをかぶった死霊使いに操り人形のように操られた 6 体のゾンビと向き合っている。">
@@ -97,41 +96,13 @@
       <p class="muted note"><span class="en">Killy shows what it will kill. Whether that parent is safe to kill is your decision.</span><span class="ja">Killy は、何を kill するかを見せます。その親を kill してよいかの判断は、あなたのものです。</span></p>
     </section>
 
-    <section id="get">
-      <h2><span class="en">Get Killy</span><span class="ja">入手する</span></h2>
-      <div class="cards">
-        <div class="card">
-          <p class="where">iOS</p>
-          <p><span class="en">TestFlight, through a public link.</span><span class="ja">TestFlight の公開リンクから入れます。</span></p>
-          <!-- Replace this with <a class="link" href="TestFlight public link"> when the link is issued. -->
-          <span class="soon"><span class="en">Link coming soon</span><span class="ja">リンクは準備中です</span></span>
-        </div>
-        <div class="card">
-          <p class="where">Android (Google Play)</p>
-          <p><span class="en">Open testing on Google Play: join through a link.</span><span class="ja">Google Play のオープンテストです。リンクから参加します。</span></p>
-          <!-- Replace this with <a class="link" href="Google Play open testing link"> when the link is issued. -->
-          <span class="soon"><span class="en">Link coming soon</span><span class="ja">リンクは準備中です</span></span>
-        </div>
-        <div class="card">
-          <p class="where">Android (APK)</p>
-          <p><span class="en">For anyone who does not use Google Play. The APK is attached to each release.</span><span class="ja">Google Play を使わない人向けです。APK は各リリースに添付します。</span></p>
-          <p><a class="link" href="https://github.com/sumiredc/killy/releases"><span class="en">GitHub Releases</span><span class="ja">GitHub Releases</span></a></p>
-        </div>
-        <div class="card">
-          <p class="where">killy agent (Linux)</p>
-          <p><span class="en">For your own servers: Linux 5.3 or later, <code>amd64</code> or <code>arm64</code>. Download <code>killy</code> from the release, then pair the server with the app.</span><span class="ja">自分のサーバー用です。Linux 5.3 以降の <code>amd64</code> または <code>arm64</code>。リリースから <code>killy</code> を落とし、app とペアリングします。</span></p>
-          <p><a class="link" href="https://github.com/sumiredc/killy/releases"><span class="en">GitHub Releases</span><span class="ja">GitHub Releases</span></a></p>
-          <pre><span class="prompt">$ </span>killy agent pair --server &lt;url&gt;
+    <section id="agent">
+      <h2><span class="en">Install the agent on your server</span><span class="ja">サーバーに agent を入れる</span></h2>
+      <p><span class="en">The agent runs on each Linux server you want watched: Linux 5.3 or later, <code>amd64</code> or <code>arm64</code>. Download <code>killy</code> from the release, then pair the server with the app.</span><span class="ja">見張りたい Linux サーバーごとに、agent を動かします。Linux 5.3 以降の <code>amd64</code> または <code>arm64</code> に対応しています。リリースから <code>killy</code> を落とし、サーバーをアプリとペアリングします。</span></p>
+      <p><a class="link" href="https://github.com/sumiredc/killy/releases"><span class="en">GitHub Releases</span><span class="ja">GitHub Releases</span></a></p>
+      <pre><span class="prompt">$ </span>killy agent pair --server &lt;url&gt;
 <span class="prompt">$ </span>killy agent run</pre>
-          <p class="muted note"><span class="en">The pair command shows a 6-character code and a QR code. In the app, open Settings, then Add server, and enter the code.</span><span class="ja">pair コマンドが、6 文字のコードと QR コードを表示します。app の設定 → サーバーを追加で、そのコードを入力します。</span></p>
-        </div>
-      </div>
-    </section>
-
-    <section id="demo">
-      <h2><span class="en">Try the demo</span><span class="ja">デモを試す</span></h2>
-      <p><span class="en">No server of your own? In the builds made for the Kiroween judges, open Settings, then Add server, and tap “Try the demo server”. A demo machine keeps producing zombie parents, and only those parents can be killed.</span><span class="ja">自分のサーバーが無くても試せます。Kiroween の審査員向けの build で、設定 → サーバーを追加を開き、「デモサーバーを試す」を押します。デモ機はゾンビを抱えた親を作り続けていて、kill できるのはその親だけです。</span></p>
-      <p><span class="en">The demo is shared. A parent that someone else kills disappears from your screen too.</span><span class="ja">デモは全員で共有です。ほかの人が kill した親は、あなたの画面からも消えます。</span></p>
+      <p class="muted note"><span class="en">The pair command shows a 6-character code and a QR code. In the app, open Settings, then Add server, and enter the code.</span><span class="ja">pair コマンドが、6 文字のコードと QR コードを表示します。アプリの設定 → サーバーを追加で、そのコードを入力します。</span></p>
     </section>
   </main>
 
