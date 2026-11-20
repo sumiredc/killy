@@ -10,9 +10,9 @@ permissions:
 
 jobs:
   go:
-    # Every job runs on the self-hosted runner while the repository is private. Write the runner
-    # name literally on the runs-on line, so the switch to GitHub-hosted runners finds every job by grep.
-    runs-on: arc-runner-killy
+    # Every job uses a GitHub-hosted runner: a runner inside the home LAN would let a pull request
+    # from a fork run code there.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -28,9 +28,9 @@ jobs:
       - run: go test -race -count=1 -v ./...
 
   app:
-    # Every job runs on the self-hosted runner while the repository is private. Write the runner
-    # name literally on the runs-on line, so the switch to GitHub-hosted runners finds every job by grep.
-    runs-on: arc-runner-killy
+    # Every job uses a GitHub-hosted runner: a runner inside the home LAN would let a pull request
+    # from a fork run code there.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
       run:

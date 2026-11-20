@@ -1,2 +1,4 @@
 # Kiro settings for this machine (sandbox, permissions). The rest of .kiro/ is committed.
 .kiro/settings/
+# The agent definitions used while building Killy (implementer, reviewer) are not published.
+.kiro/agents/
