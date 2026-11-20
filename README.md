@@ -16,9 +16,9 @@ Killy is a small, silent apprentice reaper. It never speaks; everything that nee
 
 | Platform | How |
 |---|---|
-| iOS | TestFlight public link: <!-- Replace "coming soon" with the TestFlight public link once Apple issues it. -->coming soon |
-| Android | Google Play open testing, join through a link: <!-- Replace "coming soon" with the Google Play open testing link once the review passes. -->coming soon |
 | Android (APK) | `killy-android.apk` on the latest [GitHub Release](https://github.com/sumiredc/killy/releases/latest). Allow installing from unknown sources, or run `adb install killy-android.apk` |
+
+The iOS build (TestFlight) and the Android build on Google Play are installed from the links in our Kiroween submission.
 
 These builds connect to the staging Killy server, `https://stg-killy.sumire.pink`, and show the demo button. A phone connects only to the one Killy server its build was made for.
 
