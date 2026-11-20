@@ -1,0 +1,283 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 360" width="720" height="360">
+<defs>
+  <clipPath id="card"><rect width="720" height="360" rx="24"/></clipPath>
+  <radialGradient id="glow" cx=".7" cy=".7" r=".6"><stop offset="0" stop-color="#9046ff" stop-opacity=".22"/><stop offset="1" stop-color="#9046ff" stop-opacity="0"/></radialGradient>
+  <radialGradient id="moon" cx=".38" cy=".36" r=".7"><stop offset="0" stop-color="#f3edff"/><stop offset=".55" stop-color="#cdb8ff"/><stop offset="1" stop-color="#9f7ae6"/></radialGradient>
+  <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#211c29"/><stop offset="1" stop-color="#15121a"/></linearGradient>
+  <filter id="halo" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="22"/></filter>
+</defs>
+<style>.face-dead { display: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .bob { animation: bob 2.8s ease-in-out infinite; }
+  .float { animation: float 3.2s ease-in-out infinite; }
+  .work { transform-box: fill-box; transform-origin: 50% 20%; animation: work 1.6s ease-in-out infinite; }
+  .glow { animation: glow 2.4s ease-in-out infinite; }
+  .puppet { transform-box: fill-box; transform-origin: 50% 100%; animation: puppet 1.6s ease-in-out infinite; }
+  .puppet.odd { animation-delay: -.8s; }
+  .eye { transform-box: fill-box; transform-origin: center; animation: blink 4.5s infinite; }
+}
+@keyframes bob { 50% { transform: translateY(-5px); } }
+@keyframes float { 50% { transform: translateY(-8px); } }
+@keyframes work { 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
+@keyframes glow { 50% { opacity: .45; } }
+@keyframes puppet { 25% { transform: translateY(-5px) rotate(-4deg); } 50% { transform: none; } 75% { transform: translateY(-3px) rotate(3deg); } }
+@keyframes blink { 0%, 94%, 100% { transform: scaleY(1); } 97% { transform: scaleY(.1); } }</style>
+<g clip-path="url(#card)">
+  <rect width="720" height="360" fill="#19161f"/>
+  <rect width="720" height="360" fill="url(#glow)"/>
+  <circle cx="129.6" cy="151.2" r="1.2" fill="#fff" opacity="0.53"/><circle cx="302.4" cy="108.0" r="1" fill="#fff" opacity="0.4"/><circle cx="417.6" cy="172.8" r="1.4" fill="#fff" opacity="0.47"/><circle cx="216.0" cy="208.8" r="1" fill="#fff" opacity="0.33"/><circle cx="633.6" cy="93.6" r="1.2" fill="#fff" opacity="0.4"/><circle cx="86.4" cy="252.0" r="1" fill="#fff" opacity="0.27"/>
+  <circle cx="453.6" cy="83" r="80" fill="#bf9eff" opacity=".3" filter="url(#halo)"/>
+  <circle cx="453.6" cy="83" r="75" fill="url(#moon)" opacity=".85"/>
+  <circle cx="483.6" cy="103" r="9" fill="#7859be" opacity=".35"/>
+  <circle cx="413.6" cy="113" r="6" fill="#7859be" opacity=".25"/>
+  <rect y="316" width="720" height="44" fill="url(#ground)"/>
+  <rect y="316" width="720" height="1" fill="#3a3443"/>
+
+  <g font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, 'Hiragino Sans', monospace">
+    <rect x="20" y="20" width="118" height="24" rx="12" fill="#9046ff" fill-opacity=".14"/>
+    <circle cx="33" cy="32" r="3.5" fill="#bf9eff"/>
+    <text x="43" y="36" font-size="12.5" fill="#e2d4ff">demo-linux-01</text>
+    <text x="20" y="98" font-size="56" font-weight="600" letter-spacing="-2" fill="#fafafa">6</text>
+    <text x="62" y="98" font-size="14" fill="#958f9e">体のゾンビプロセス</text>
+    <text x="20" y="122" font-size="12.5" fill="#bf9eff">PID 3801</text>
+    <text x="20" y="140" font-size="12" fill="#958f9e">node evil_daemon.js</text>
+  </g>
+
+  <g class="float" stroke="#bf9eff" stroke-width="1" opacity=".6"><line x1="390.6" y1="116.0" x2="362.4" y2="263.7"/><line x1="422.6" y1="116.0" x2="341.4" y2="293.3"/><line x1="484.6" y1="116.0" x2="477.6" y2="263.7"/><line x1="453.6" y1="129.0" x2="456.6" y2="293.3"/><line x1="516.6" y1="116.0" x2="592.8" y2="263.7"/><line x1="484.6" y1="116.0" x2="571.8" y2="293.3"/><line x1="422.6" y1="116.0" x2="420.0" y2="218.0"/><line x1="390.6" y1="116.0" x2="402.4" y2="241.9"/><line x1="516.6" y1="116.0" x2="535.2" y2="218.0"/><line x1="484.6" y1="116.0" x2="517.6" y2="241.9"/><line x1="516.6" y1="116.0" x2="650.4" y2="218.0"/><line x1="484.6" y1="116.0" x2="632.8" y2="241.9"/></g>
+
+  <g class="bob">
+    
+<svg x="24" y="201" width="164" height="123" viewBox="0 0 200 150" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+    <linearGradient id="killyBody" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0.45" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#d9d0f0"/>
+    </linearGradient>
+    <linearGradient id="killyBlade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b6a9da"/>
+      <stop offset="0.55" stop-color="#e3ddf5"/>
+      <stop offset="1" stop-color="#f8f6ff"/>
+    </linearGradient>
+  </defs>
+
+  <g class="ghost">
+    <path d="M80 16 C102 16 116 34 116 56 C116 74 112 88 108 100 Q100 112 92 102 Q84 114 74 104 Q64 116 54 106 Q40 113 26 106 Q14 101 8 88 Q28 95 40 84 C46 77 46 66 46 56 C46 34 58 16 80 16 Z" fill="url(#killyBody)"/>
+    <ellipse class="eye" cx="88" cy="56" rx="4.8" ry="7.2" fill="#000"/>
+    <ellipse class="eye" cx="105" cy="55" rx="3.8" ry="6.6" fill="#000"/>
+  </g>
+
+  <g class="scythe">
+    <!-- snath: a gently curved shaft with a highlight -->
+    <path d="M100 146 Q119 82 127 16" fill="none" stroke="#2f2740" stroke-width="7" stroke-linecap="round"/>
+    <path d="M98.6 143 Q117 82 125 18" fill="none" stroke="#5c4f78" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="100" cy="146" r="4.5" fill="#9046ff"/>
+
+    <!-- blade: broad at the heel, sweeping forward to a sharp point -->
+    <path d="M124 6 C148 -8 184 -2 199 46 C186 24 160 16 130 24 Z" fill="url(#killyBlade)"/>
+    <path d="M131 21 C160 13 185 21 197 41" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"/>
+    <path d="M126 5.5 C150 -6.5 183 -1.5 198 43" fill="none" stroke="#8a7db3" stroke-width="1.6" stroke-linecap="round"/>
+    <path d="M150 6 C164 5 176 10 184 20" fill="none" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" opacity=".7"/>
+
+    <!-- the Enter key works as the collar that joins blade and shaft -->
+    <g transform="translate(127 15) rotate(8)">
+      <rect x="-13" y="-10" width="26" height="23" rx="5" fill="#5b22b8"/>
+      <rect x="-13" y="-12" width="26" height="21" rx="5" fill="#9046ff"/>
+      <rect x="-10" y="-10" width="20" height="15" rx="3.5" fill="#a46dff"/>
+      <path d="M5 -6.5 V-1 H-5 M-2.4 -3.6 L-5 -1 L-2.4 1.6" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+
+  <circle class="arm" cx="115" cy="82" r="7.5" fill="#ffffff"/>
+</svg>
+    <g>
+      <rect x="36" y="172" width="72" height="26" rx="12" fill="#fafafa"/>
+      <path d="M87 197 H96 V207 Z" fill="#fafafa"/>
+      <text x="72" y="190" font-family="'Geist', system-ui, 'Hiragino Sans', sans-serif" font-size="13" text-anchor="middle" fill="#000">……！</text>
+    </g>
+  </g>
+
+  <g class="puppet odd">
+<svg x="399.84000000000003" y="206.4" width="40.32" height="57.599999999999994" viewBox="0 0 56 80" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <rect x="20" y="58" width="8" height="16" rx="3" fill="#3b4360"/>
+  <rect x="32" y="58" width="8" height="16" rx="3" fill="#3b4360"/>
+  <rect x="15" y="72" width="13" height="6" rx="3" fill="#262b3d"/>
+  <rect x="28" y="72" width="13" height="6" rx="3" fill="#262b3d"/>
+  <g class="arm-back"><rect x="4" y="37" width="22" height="7" rx="3.5" fill="#6f9a5c"/></g>
+  <path d="M16 33 H44 V60 L40 56 L36 61 L31 56 L26 61 L21 56 L16 60 Z" fill="#6b5a8e"/>
+  <rect x="12" y="4" width="32" height="30" rx="13" fill="#8fbf74"/>
+  <path d="M15 11 Q21 2 29 6 Q36 0 43 9 Q35 8 30 11 Q23 7 15 11 Z" fill="#3d6b35"/>
+  <path d="M36 23 L40 27 M40 23 L36 27" stroke="#3d6b35" stroke-width="1.4" stroke-linecap="round"/>
+  <path d="M17 27.5 H28 M20 25.5 V29.5 M24 25.5 V29.5" stroke="#2f5228" stroke-width="1.5" stroke-linecap="round"/>
+  <g class="face-normal">
+    <circle cx="20" cy="19" r="4.2" fill="#fff"/>
+    <circle cx="19" cy="19.6" r="1.9" fill="#1c1922"/>
+    <circle cx="31" cy="18" r="3" fill="#fff"/>
+    <circle cx="30.2" cy="18.5" r="1.4" fill="#1c1922"/>
+  </g>
+  <g class="face-dead">
+    <path d="M16.5 15.5 L23 22 M23 15.5 L16.5 22 M28.5 15 L33.5 20 M33.5 15 L28.5 20" stroke="#1c1922" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <g class="arm-front">
+    <rect x="1" y="43" width="25" height="7" rx="3.5" fill="#8fbf74"/>
+    <circle class="hand" cx="3.5" cy="46.5" r="3.6" fill="#8fbf74"/>
+  </g>
+  <circle class="head-pt" cx="28" cy="5" r="1" fill="none"/>
+</svg></g><g class="puppet">
+<svg x="515.0400000000001" y="206.4" width="40.32" height="57.599999999999994" viewBox="0 0 56 80" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <rect x="20" y="58" width="8" height="16" rx="3" fill="#3b4360"/>
+  <rect x="32" y="58" width="8" height="16" rx="3" fill="#3b4360"/>
+  <rect x="15" y="72" width="13" height="6" rx="3" fill="#262b3d"/>
+  <rect x="28" y="72" width="13" height="6" rx="3" fill="#262b3d"/>
+  <g class="arm-back"><rect x="4" y="37" width="22" height="7" rx="3.5" fill="#6f9a5c"/></g>
+  <path d="M16 33 H44 V60 L40 56 L36 61 L31 56 L26 61 L21 56 L16 60 Z" fill="#6b5a8e"/>
+  <rect x="12" y="4" width="32" height="30" rx="13" fill="#8fbf74"/>
+  <path d="M15 11 Q21 2 29 6 Q36 0 43 9 Q35 8 30 11 Q23 7 15 11 Z" fill="#3d6b35"/>
+  <path d="M36 23 L40 27 M40 23 L36 27" stroke="#3d6b35" stroke-width="1.4" stroke-linecap="round"/>
+  <path d="M17 27.5 H28 M20 25.5 V29.5 M24 25.5 V29.5" stroke="#2f5228" stroke-width="1.5" stroke-linecap="round"/>
+  <g class="face-normal">
+    <circle cx="20" cy="19" r="4.2" fill="#fff"/>
+    <circle cx="19" cy="19.6" r="1.9" fill="#1c1922"/>
+    <circle cx="31" cy="18" r="3" fill="#fff"/>
+    <circle cx="30.2" cy="18.5" r="1.4" fill="#1c1922"/>
+  </g>
+  <g class="face-dead">
+    <path d="M16.5 15.5 L23 22 M23 15.5 L16.5 22 M28.5 15 L33.5 20 M33.5 15 L28.5 20" stroke="#1c1922" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <g class="arm-front">
+    <rect x="1" y="43" width="25" height="7" rx="3.5" fill="#8fbf74"/>
+    <circle class="hand" cx="3.5" cy="46.5" r="3.6" fill="#8fbf74"/>
+  </g>
+  <circle class="head-pt" cx="28" cy="5" r="1" fill="none"/>
+</svg></g><g class="puppet odd">
+<svg x="630.24" y="206.4" width="40.32" height="57.599999999999994" viewBox="0 0 56 80" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <rect x="20" y="58" width="8" height="16" rx="3" fill="#3b4360"/>
+  <rect x="32" y="58" width="8" height="16" rx="3" fill="#3b4360"/>
+  <rect x="15" y="72" width="13" height="6" rx="3" fill="#262b3d"/>
+  <rect x="28" y="72" width="13" height="6" rx="3" fill="#262b3d"/>
+  <g class="arm-back"><rect x="4" y="37" width="22" height="7" rx="3.5" fill="#6f9a5c"/></g>
+  <path d="M16 33 H44 V60 L40 56 L36 61 L31 56 L26 61 L21 56 L16 60 Z" fill="#6b5a8e"/>
+  <rect x="12" y="4" width="32" height="30" rx="13" fill="#8fbf74"/>
+  <path d="M15 11 Q21 2 29 6 Q36 0 43 9 Q35 8 30 11 Q23 7 15 11 Z" fill="#3d6b35"/>
+  <path d="M36 23 L40 27 M40 23 L36 27" stroke="#3d6b35" stroke-width="1.4" stroke-linecap="round"/>
+  <path d="M17 27.5 H28 M20 25.5 V29.5 M24 25.5 V29.5" stroke="#2f5228" stroke-width="1.5" stroke-linecap="round"/>
+  <g class="face-normal">
+    <circle cx="20" cy="19" r="4.2" fill="#fff"/>
+    <circle cx="19" cy="19.6" r="1.9" fill="#1c1922"/>
+    <circle cx="31" cy="18" r="3" fill="#fff"/>
+    <circle cx="30.2" cy="18.5" r="1.4" fill="#1c1922"/>
+  </g>
+  <g class="face-dead">
+    <path d="M16.5 15.5 L23 22 M23 15.5 L16.5 22 M28.5 15 L33.5 20 M33.5 15 L28.5 20" stroke="#1c1922" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <g class="arm-front">
+    <rect x="1" y="43" width="25" height="7" rx="3.5" fill="#8fbf74"/>
+    <circle class="hand" cx="3.5" cy="46.5" r="3.6" fill="#8fbf74"/>
+  </g>
+  <circle class="head-pt" cx="28" cy="5" r="1" fill="none"/>
+</svg></g>
+  <g class="puppet">
+<svg x="338.4" y="251.42857142857144" width="48" height="68.57142857142857" viewBox="0 0 56 80" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <rect x="20" y="58" width="8" height="16" rx="3" fill="#3b4360"/>
+  <rect x="32" y="58" width="8" height="16" rx="3" fill="#3b4360"/>
+  <rect x="15" y="72" width="13" height="6" rx="3" fill="#262b3d"/>
+  <rect x="28" y="72" width="13" height="6" rx="3" fill="#262b3d"/>
+  <g class="arm-back"><rect x="4" y="37" width="22" height="7" rx="3.5" fill="#6f9a5c"/></g>
+  <path d="M16 33 H44 V60 L40 56 L36 61 L31 56 L26 61 L21 56 L16 60 Z" fill="#6b5a8e"/>
+  <rect x="12" y="4" width="32" height="30" rx="13" fill="#8fbf74"/>
+  <path d="M15 11 Q21 2 29 6 Q36 0 43 9 Q35 8 30 11 Q23 7 15 11 Z" fill="#3d6b35"/>
+  <path d="M36 23 L40 27 M40 23 L36 27" stroke="#3d6b35" stroke-width="1.4" stroke-linecap="round"/>
+  <path d="M17 27.5 H28 M20 25.5 V29.5 M24 25.5 V29.5" stroke="#2f5228" stroke-width="1.5" stroke-linecap="round"/>
+  <g class="face-normal">
+    <circle cx="20" cy="19" r="4.2" fill="#fff"/>
+    <circle cx="19" cy="19.6" r="1.9" fill="#1c1922"/>
+    <circle cx="31" cy="18" r="3" fill="#fff"/>
+    <circle cx="30.2" cy="18.5" r="1.4" fill="#1c1922"/>
+  </g>
+  <g class="face-dead">
+    <path d="M16.5 15.5 L23 22 M23 15.5 L16.5 22 M28.5 15 L33.5 20 M33.5 15 L28.5 20" stroke="#1c1922" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <g class="arm-front">
+    <rect x="1" y="43" width="25" height="7" rx="3.5" fill="#8fbf74"/>
+    <circle class="hand" cx="3.5" cy="46.5" r="3.6" fill="#8fbf74"/>
+  </g>
+  <circle class="head-pt" cx="28" cy="5" r="1" fill="none"/>
+</svg></g><g class="puppet odd">
+<svg x="453.6" y="251.42857142857144" width="48" height="68.57142857142857" viewBox="0 0 56 80" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <rect x="20" y="58" width="8" height="16" rx="3" fill="#3b4360"/>
+  <rect x="32" y="58" width="8" height="16" rx="3" fill="#3b4360"/>
+  <rect x="15" y="72" width="13" height="6" rx="3" fill="#262b3d"/>
+  <rect x="28" y="72" width="13" height="6" rx="3" fill="#262b3d"/>
+  <g class="arm-back"><rect x="4" y="37" width="22" height="7" rx="3.5" fill="#6f9a5c"/></g>
+  <path d="M16 33 H44 V60 L40 56 L36 61 L31 56 L26 61 L21 56 L16 60 Z" fill="#6b5a8e"/>
+  <rect x="12" y="4" width="32" height="30" rx="13" fill="#8fbf74"/>
+  <path d="M15 11 Q21 2 29 6 Q36 0 43 9 Q35 8 30 11 Q23 7 15 11 Z" fill="#3d6b35"/>
+  <path d="M36 23 L40 27 M40 23 L36 27" stroke="#3d6b35" stroke-width="1.4" stroke-linecap="round"/>
+  <path d="M17 27.5 H28 M20 25.5 V29.5 M24 25.5 V29.5" stroke="#2f5228" stroke-width="1.5" stroke-linecap="round"/>
+  <g class="face-normal">
+    <circle cx="20" cy="19" r="4.2" fill="#fff"/>
+    <circle cx="19" cy="19.6" r="1.9" fill="#1c1922"/>
+    <circle cx="31" cy="18" r="3" fill="#fff"/>
+    <circle cx="30.2" cy="18.5" r="1.4" fill="#1c1922"/>
+  </g>
+  <g class="face-dead">
+    <path d="M16.5 15.5 L23 22 M23 15.5 L16.5 22 M28.5 15 L33.5 20 M33.5 15 L28.5 20" stroke="#1c1922" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <g class="arm-front">
+    <rect x="1" y="43" width="25" height="7" rx="3.5" fill="#8fbf74"/>
+    <circle class="hand" cx="3.5" cy="46.5" r="3.6" fill="#8fbf74"/>
+  </g>
+  <circle class="head-pt" cx="28" cy="5" r="1" fill="none"/>
+</svg></g><g class="puppet">
+<svg x="568.8000000000001" y="251.42857142857144" width="48" height="68.57142857142857" viewBox="0 0 56 80" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <rect x="20" y="58" width="8" height="16" rx="3" fill="#3b4360"/>
+  <rect x="32" y="58" width="8" height="16" rx="3" fill="#3b4360"/>
+  <rect x="15" y="72" width="13" height="6" rx="3" fill="#262b3d"/>
+  <rect x="28" y="72" width="13" height="6" rx="3" fill="#262b3d"/>
+  <g class="arm-back"><rect x="4" y="37" width="22" height="7" rx="3.5" fill="#6f9a5c"/></g>
+  <path d="M16 33 H44 V60 L40 56 L36 61 L31 56 L26 61 L21 56 L16 60 Z" fill="#6b5a8e"/>
+  <rect x="12" y="4" width="32" height="30" rx="13" fill="#8fbf74"/>
+  <path d="M15 11 Q21 2 29 6 Q36 0 43 9 Q35 8 30 11 Q23 7 15 11 Z" fill="#3d6b35"/>
+  <path d="M36 23 L40 27 M40 23 L36 27" stroke="#3d6b35" stroke-width="1.4" stroke-linecap="round"/>
+  <path d="M17 27.5 H28 M20 25.5 V29.5 M24 25.5 V29.5" stroke="#2f5228" stroke-width="1.5" stroke-linecap="round"/>
+  <g class="face-normal">
+    <circle cx="20" cy="19" r="4.2" fill="#fff"/>
+    <circle cx="19" cy="19.6" r="1.9" fill="#1c1922"/>
+    <circle cx="31" cy="18" r="3" fill="#fff"/>
+    <circle cx="30.2" cy="18.5" r="1.4" fill="#1c1922"/>
+  </g>
+  <g class="face-dead">
+    <path d="M16.5 15.5 L23 22 M23 15.5 L16.5 22 M28.5 15 L33.5 20 M33.5 15 L28.5 20" stroke="#1c1922" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <g class="arm-front">
+    <rect x="1" y="43" width="25" height="7" rx="3.5" fill="#8fbf74"/>
+    <circle class="hand" cx="3.5" cy="46.5" r="3.6" fill="#8fbf74"/>
+  </g>
+  <circle class="head-pt" cx="28" cy="5" r="1" fill="none"/>
+</svg></g>
+  <g font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, 'Hiragino Sans', monospace" font-size="10" fill="#958f9e" text-anchor="middle">
+    <text x="362.4" y="333.0">3812</text><text x="477.6" y="333.0">3813</text><text x="592.8" y="333.0">3814</text><text x="420.0" y="277.0">3815</text><text x="535.2" y="277.0">3816</text><text x="650.4" y="277.0">3817</text>
+  </g>
+
+  <g class="float"><g class="work" style="filter: drop-shadow(0 0 18px rgba(144,70,255,.35))">
+<svg x="378.6" y="20" width="150" height="150" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M86 6 C64 4 46 18 39 40 C28 50 17 66 12 82 Q26 76 38 78 C38 100 48 118 60 134 Q67 126 75 142 Q83 126 90 134 C102 118 112 100 112 78 Q124 76 138 82 C133 66 121 52 111 44 C113 30 110 18 102 10 Q112 6 118 12 Q110 2 86 6 Z" fill="#2a2433" stroke="#4a4157" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M90 18 Q100 36 94 62" fill="none" stroke="#1e1a25" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M58 70 Q66 96 64 126 M92 70 Q84 96 86 126" fill="none" stroke="#1e1a25" stroke-width="2"/>
+  <ellipse cx="61" cy="42" rx="15" ry="18" fill="#000" transform="rotate(-8 61 42)"/>
+  <ellipse class="glow" cx="54" cy="43" rx="3.4" ry="4.6" fill="#bf9eff"/>
+  <ellipse class="glow" cx="66" cy="42" rx="2.6" ry="4.2" fill="#bf9eff"/>
+
+  <!-- marionette control: a cross bar held in both hands -->
+  <rect x="8" y="91" width="134" height="6" rx="3" fill="#6b5a8e"/>
+  <rect x="72" y="80" width="6" height="30" rx="3" fill="#6b5a8e"/>
+  <circle cx="13" cy="86" r="6.5" fill="#b8a9cc"/>
+  <circle cx="137" cy="86" r="6.5" fill="#b8a9cc"/>
+  <circle class="anchor" cx="12" cy="96" r="2.2" fill="#bf9eff"/>
+  <circle class="anchor" cx="44" cy="96" r="2.2" fill="#bf9eff"/>
+  <circle class="anchor" cx="75" cy="109" r="2.2" fill="#bf9eff"/>
+  <circle class="anchor" cx="106" cy="96" r="2.2" fill="#bf9eff"/>
+  <circle class="anchor" cx="138" cy="96" r="2.2" fill="#bf9eff"/>
+</svg></g></g>
+</g>
+<rect x=".5" y=".5" width="719" height="359" rx="23.5" fill="none" stroke="#3a3443"/>
+</svg>

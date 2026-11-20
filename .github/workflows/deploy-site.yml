@@ -1,0 +1,74 @@
+name: deploy-site
+
+# site/ is the introduction site at https://killy.sumire-sakamoto.co.jp, and its /privacy/ page is the
+# privacy policy registered with Google Play. A change to site/ on main goes live as soon as it is
+# merged, so the page the store links to never differs from main. The subdomain, TLS and .htaccess
+# belong to sumiredc/sumire-sakamoto, not to this repository.
+on:
+  push:
+    branches: [main]
+    paths: ['site/**', '.github/workflows/deploy-site.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-site
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Every job runs on the self-hosted runner while the repository is private. Write the runner
+    # name literally on the runs-on line, so the switch to GitHub-hosted runners finds every job by grep.
+    runs-on: arc-runner-killy
+    if: github.ref == 'refs/heads/main'
+    timeout-minutes: 10
+    env:
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+      DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+      SITE_URL: https://killy.sumire-sakamoto.co.jp
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Settings are present
+        run: |
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_PATH; do
+            if [ -z "$(printenv "$name")" ]; then echo "::error::Variable $name is not set"; exit 1; fi
+          done
+      - name: Install rsync and ssh if the runner has none
+        run: |
+          if command -v rsync >/dev/null && command -v ssh >/dev/null; then exit 0; fi
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends rsync openssh-client
+      - name: Install the deploy key
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$DEPLOY_SSH_KEY" ] || [ -z "$DEPLOY_KNOWN_HOSTS" ]; then
+            echo "::error::Secret DEPLOY_SSH_KEY and Variable DEPLOY_KNOWN_HOSTS are required"; exit 1
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # The host key is checked against the Variable; StrictHostKeyChecking stays on.
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      # No --delete: the destination holds the .htaccess that sumire-sakamoto puts there.
+      - name: Upload
+        run: >
+          rsync -rvz --checksum --chmod=D755,F644
+          -e "ssh -i ~/.ssh/deploy_key -p $DEPLOY_PORT -o IdentitiesOnly=yes"
+          site/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+      - name: Verify
+        run: |
+          for path in / /privacy/ /style.css /lang.js /scene.svg /scene-ja.svg /ogp.png /favicon.png /apple-touch-icon.png; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$SITE_URL$path")
+            echo "$code $path"
+            [ "$code" = 200 ] || exit 1
+          done
+          # The page Google Play links to is the policy itself, not an error page that answers 200.
+          curl -fsS "$SITE_URL/privacy/" | grep -q 'Killy — Privacy Policy'
