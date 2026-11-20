@@ -19,9 +19,9 @@ concurrency:
 
 jobs:
   deploy:
-    # Every job runs on the self-hosted runner while the repository is private. Write the runner
-    # name literally on the runs-on line, so the switch to GitHub-hosted runners finds every job by grep.
-    runs-on: arc-runner-killy
+    # Every job uses a GitHub-hosted runner: a runner inside the home LAN would let a pull request
+    # from a fork run code there.
+    runs-on: ubuntu-24.04
     if: github.ref == 'refs/heads/main'
     timeout-minutes: 10
     env:

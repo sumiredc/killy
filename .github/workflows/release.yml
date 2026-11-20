@@ -11,9 +11,9 @@ permissions:
 
 jobs:
   binaries:
-    # Every job runs on the self-hosted runner while the repository is private. Write the runner
-    # name literally on the runs-on line, so the switch to GitHub-hosted runners finds every job by grep.
-    runs-on: arc-runner-killy
+    # Every job uses a GitHub-hosted runner: a runner inside the home LAN would let a pull request
+    # from a fork run code there.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     # Only this job may write: it creates the Release and uploads to it with GITHUB_TOKEN.
     permissions:
@@ -46,7 +46,7 @@ jobs:
           TAG: ${{ github.ref_name }}
           REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
-        # The runner image has no gh, so this talks to the REST API with curl.
+        # Talks to the REST API with curl, so the job needs nothing but curl.
         run: |
           set -euo pipefail
           api=https://api.github.com/repos/${REPO}
