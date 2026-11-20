@@ -65,7 +65,7 @@ jobs:
           site/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
       - name: Verify
         run: |
-          for path in / /privacy/ /style.css /lang.js /scene.svg /scene-ja.svg /ogp.png /favicon.png /apple-touch-icon.png; do
+          for path in / /privacy/ /style.css /lang.js /scene.svg /scene-ja.svg /badges/app-store-en.svg /badges/app-store-ja.svg /badges/google-play-en.png /badges/google-play-ja.png /ogp.png /favicon.png /apple-touch-icon.png; do
             code=$(curl -s -o /dev/null -w '%{http_code}' "$SITE_URL$path")
             echo "$code $path"
             [ "$code" = 200 ] || exit 1
