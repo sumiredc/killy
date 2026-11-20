@@ -1,0 +1,106 @@
+/* Colours and radii are the app's design tokens (docs/DESIGN.md). Fonts are the system's: the
+   site loads nothing from a third party. */
+:root {
+  --bg: #000;
+  --elev-1: #19161f;
+  --elev-2: #26222d;
+  --line: #3a3443;
+  --text: #fafafa;
+  --muted: #958f9e;
+  --purple: #9046ff;
+  --purple-300: #bf9eff;
+  --purple-100: #e2d4ff;
+  --green: #4fdb8f;
+  --sans: "Geist", system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Sans", "Zen Kaku Gothic New", "Noto Sans JP", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, "Hiragino Sans", "Noto Sans JP", monospace;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+}
+html[lang="en"] .ja, html[lang="ja"] .en { display: none; }
+html[lang="ja"] body { line-height: 1.85; }
+a { color: var(--purple-300); }
+a:focus-visible, button:focus-visible { outline: 3px solid var(--purple-300); outline-offset: 3px; border-radius: 4px; }
+img { max-width: 100%; height: auto; display: block; }
+code, pre { font-family: var(--mono); }
+code { font-size: 0.9em; background: var(--elev-2); border-radius: 6px; padding: 0.1em 0.4em; }
+.wrap { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+header.top { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; }
+.brand { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-weight: 600; font-size: 1.25rem; color: var(--text); text-decoration: none; }
+.brand img { width: 36px; height: 36px; border-radius: 8px; }
+.lang { margin: 0; min-width: 0; display: flex; gap: 2px; border: 1px solid var(--line); border-radius: 999px; padding: 2px; background: var(--elev-1); }
+.lang button { font: inherit; font-size: 0.875rem; border: 0; background: none; color: var(--muted); padding: 4px 12px; border-radius: 999px; cursor: pointer; }
+.lang button[aria-pressed="true"] { background: var(--purple); color: #fff; }
+
+.hero { padding: 40px 0 24px; }
+.hero h1 { font-family: var(--mono); font-weight: 600; font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 20px; max-width: 16em; }
+html[lang="ja"] .hero h1 { font-size: clamp(1.75rem, 4.4vw, 2.75rem); line-height: 1.35; letter-spacing: 0; }
+.hero p { font-size: 1.1875rem; color: var(--muted); margin: 0 0 12px; max-width: 36em; }
+.hero p.entry { font-family: var(--mono); font-size: 0.9375rem; color: var(--purple-300); }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+.button { display: inline-block; padding: 14px 22px; border-radius: 16px; font-weight: 600; text-decoration: none; border: 1px solid var(--purple); }
+.button.primary { background: var(--purple); color: #fff; }
+.button.secondary { color: var(--purple-100); }
+
+.scene { margin: 32px 0 0; }
+.scene img { width: 100%; border-radius: 24px; }
+.scene figcaption { margin-top: 12px; color: var(--muted); font-size: 0.9375rem; max-width: 46em; }
+
+section { padding: 56px 0; border-top: 1px solid var(--line); }
+section.first { border-top: 0; }
+h2 { font-family: var(--mono); font-weight: 600; font-size: clamp(1.4rem, 3vw, 1.9rem); line-height: 1.3; margin: 0 0 16px; }
+h3 { font-family: var(--mono); font-weight: 600; font-size: 1.0625rem; margin: 0 0 6px; }
+section > p { max-width: 42em; margin: 0 0 16px; }
+.muted { color: var(--muted); }
+.note { margin-top: 16px; }
+
+.steps { list-style: none; margin: 28px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; counter-reset: step; }
+.steps li { background: var(--elev-1); border: 1px solid var(--line); border-radius: 24px; padding: 24px; counter-increment: step; min-width: 0; }
+.steps h3::before { content: counter(step); display: inline-grid; place-items: center; width: 1.7em; height: 1.7em; margin-right: 10px; border-radius: 50%; background: var(--purple); color: #fff; font-size: 0.85em; }
+.steps p { margin: 0 0 12px; color: var(--muted); }
+.push { margin-top: 16px; background: var(--elev-2); border-radius: 16px; padding: 12px 14px; font-size: 0.875rem; line-height: 1.5; }
+.push b { font-weight: 600; }
+.push .line { font-family: var(--mono); font-size: 0.8125rem; }
+.push .sym { color: var(--purple-300); }
+
+.cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 24px; }
+.card { background: var(--elev-1); border: 1px solid var(--line); border-radius: 24px; padding: 24px; min-width: 0; }
+.card p { margin: 0 0 8px; color: var(--muted); }
+.card p:last-child { margin-bottom: 0; }
+.card .where { color: var(--text); font-weight: 600; }
+.card a.link { font-weight: 600; }
+.soon { display: inline-block; margin-top: 4px; padding: 2px 12px; border-radius: 999px; border: 1px dashed var(--line); color: var(--muted); font-size: 0.875rem; }
+
+pre { margin: 12px 0 0; padding: 14px 16px; background: #000; border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; font-size: 0.875rem; line-height: 1.6; }
+pre .prompt { color: var(--muted); user-select: none; }
+
+footer { border-top: 1px solid var(--line); padding: 32px 0 48px; color: var(--muted); font-size: 0.9375rem; }
+footer nav { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 8px 0; }
+
+/* The privacy policy page */
+.doc { padding: 24px 0 56px; max-width: 46rem; }
+.doc h1 { font-family: var(--mono); font-weight: 600; font-size: clamp(1.6rem, 4vw, 2.25rem); line-height: 1.25; margin: 0 0 20px; }
+.doc h2 { margin: 40px 0 12px; }
+.doc p, .doc ul { margin: 0 0 16px; }
+.doc ul { padding-left: 1.4em; }
+.doc li { margin-bottom: 6px; }
+.table-wrap { overflow-x: auto; margin: 0 0 16px; }
+.doc table { border-collapse: collapse; width: 100%; font-size: 0.9375rem; }
+.doc th, .doc td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.doc th { color: var(--muted); font-weight: 500; font-family: var(--mono); font-size: 0.8125rem; }
+.doc td:first-child { min-width: 14em; }
+
+@media (max-width: 760px) {
+  .wrap { padding: 0 16px; }
+  .steps, .cards { grid-template-columns: 1fr; }
+  section { padding: 40px 0; }
+}
