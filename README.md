@@ -34,12 +34,12 @@ The Killy server runs on the team's home Kubernetes cluster as a single instance
 
 You need Linux 5.3 or later (the agent signals through a pidfd), `amd64` or `arm64`, and root. The agent only connects out to the Killy server; it opens no port.
 
-Download the binary from the latest [GitHub Release](https://github.com/sumiredc/killy/releases/latest), check it and put it in `/usr/local/bin`:
+Download the binary from the [introduction site](https://killy.sumire-sakamoto.co.jp/download/) (the site serves it, not GitHub, so it stays available when this repository is private), check it and put it in `/usr/local/bin`. For the store release of the app, which connects to `https://killy.sumire.pink`, follow the [support page](https://killy.sumire-sakamoto.co.jp/support/) instead; the steps are the same except for the `--server` URL:
 
 ```sh
 arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
-curl -fLO "https://github.com/sumiredc/killy/releases/latest/download/killy-linux-$arch"
-curl -fLO https://github.com/sumiredc/killy/releases/latest/download/SHA256SUMS
+curl -fLO "https://killy.sumire-sakamoto.co.jp/download/killy-linux-$arch"
+curl -fLO https://killy.sumire-sakamoto.co.jp/download/SHA256SUMS
 grep " killy-linux-$arch\$" SHA256SUMS | sha256sum -c -
 sudo install -m 0755 "killy-linux-$arch" /usr/local/bin/killy
 ```
@@ -50,10 +50,10 @@ Pair the server with the Killy server the app connects to. It prints a 6-charact
 sudo killy agent pair --server https://stg-killy.sumire.pink
 ```
 
-In the app, open **Settings → Add server**, enter the code (or scan the QR code) and tap **Add**. Then keep the agent running with the unit from this repository. It needs the `agent.json` that `pair` wrote, so enable it after pairing:
+In the app, open **Settings → Add server**, enter the code (or scan the QR code) and tap **Add**. Then keep the agent running with the systemd unit from the same site. It needs the `agent.json` that `pair` wrote, so enable it after pairing:
 
 ```sh
-sudo curl -fL -o /etc/systemd/system/killy-agent.service https://raw.githubusercontent.com/sumiredc/killy/main/deploy/systemd/killy-agent.service
+sudo curl -fL -o /etc/systemd/system/killy-agent.service https://killy.sumire-sakamoto.co.jp/download/killy-agent.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now killy-agent.service
 ```
@@ -69,7 +69,7 @@ Docker Desktop and OrbStack run Linux containers, so you can run the agent and a
 Download the binary that matches your Mac: `killy-linux-arm64` on Apple silicon, `killy-linux-amd64` on an Intel Mac. An `amd64` container on Apple silicon runs under emulation, where pidfd is not available, so the agent refuses every kill. Start the container with `--init`, so that PID 1 collects the zombies once their parent is killed:
 
 ```sh
-curl -fL -o killy https://github.com/sumiredc/killy/releases/latest/download/killy-linux-arm64
+curl -fL -o killy https://killy.sumire-sakamoto.co.jp/download/killy-linux-arm64
 chmod +x killy
 docker run -d --init --name killy-lab -v "$PWD/killy:/usr/local/bin/killy:ro" alpine sleep infinity
 docker exec -d killy-lab killy summon

@@ -82,8 +82,8 @@ Killy is our entry to the **Kiroween 2026** hackathon in the **Frankenstein** ca
 | Languages | Backend (agent, server, summon) in Go 1.27 (toolchain go1.27.3). Mobile app in React Native with Expo. |
 | Hosting | Killy server on the team's home Kubernetes cluster at `killy.sumire.pink`, exposed through the existing Cloudflare Tunnel, one replica. The home cluster gives no uptime guarantee. |
 | Notifications | Expo Push Service (APNs and FCM credentials managed by EAS). |
-| Distribution | iOS through a TestFlight public link. Android through a Google Play open testing link, with the APK on the repository's GitHub Releases as well. The agent binaries are downloaded from the GitHub Releases. |
-| Introduction site | Static pages in this repository's `site/`, published at `https://killy.sumire-sakamoto.co.jp` on the team's web host, not by the Killy server. They say what Killy is and where to get it (the App Store and Google Play badges, and the agent download), in English and Japanese. The privacy policy registered with Google Play is its `/privacy/` page, whose text is [PRIVACY.md](PRIVACY.md). |
+| Distribution | iOS through a TestFlight public link. Android through a Google Play open testing link, with the APK on the repository's GitHub Releases as well. The agent binaries and the systemd unit are downloaded from the introduction site, not from GitHub, so they stay available when the repository is private. |
+| Introduction site | Static pages in this repository's `site/`, published at `https://killy.sumire-sakamoto.co.jp` on the team's web host, not by the Killy server. They say what Killy is and where to get it (the App Store and Google Play badges, and the agent download), in English and Japanese. A support page on it, for people who use the store release, says how to install the agent for the production Killy server, what Killy promises about the processes it kills, and has the contact form. The privacy policy registered with Google Play is its `/privacy/` page, whose text is [PRIVACY.md](PRIVACY.md). |
 | Character | Killy never speaks. See the character rules. |
 
 ## Use cases
@@ -92,7 +92,7 @@ Killy is our entry to the **Kiroween 2026** hackathon in the **Frankenstein** ca
 
 The operator wants a server to be watched.
 
-- Preconditions: the agent binary (from the GitHub Releases) is installed on the server; the server can reach the Killy server over HTTPS.
+- Preconditions: the agent binary (from the introduction site's download page) is installed on the server; the server can reach the Killy server over HTTPS.
 - Main flow: the operator runs `killy agent pair` on the server; it shows a 6-character code and a QR code. The operator opens Settings → Add server, enters the code (or scans the QR) and optionally a display name, and taps Add. The app shows "Added ‹name›" as soon as the code is accepted; the agent does not have to be running at that moment.
 - Alternative: no display name is given → the server's hostname is used.
 - Alternative: the same server is paired from a second phone → both phones see it and are notified; each phone keeps its own display name and notification switch for it.

@@ -41,7 +41,7 @@ func TestSiteLinksPointAtFilesInTheSite(t *testing.T) {
 		}
 		for _, m := range attr.FindAllStringSubmatch(comment.ReplaceAllString(string(src), ""), -1) {
 			target := m[1]
-			if strings.HasPrefix(target, "https://") || strings.HasPrefix(target, "#") {
+			if strings.HasPrefix(target, "https://") || strings.HasPrefix(target, "#") || target == formURLToken {
 				continue
 			}
 			if strings.Contains(target, ":") || strings.HasPrefix(target, "/") {
