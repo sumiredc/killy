@@ -76,8 +76,8 @@ jobs:
           set -euo pipefail
           # The contact form URL: the page carries a mark, never a made-up address.
           url=$(tr -d '[:space:]' < site/support/form-url)
-          if ! grep -Eq '^https://docs\.google\.com/forms/d/e/[A-Za-z0-9_-]+/viewform\?embedded=true$' <<<"$url"; then
-            echo "::error::site/support/form-url is empty or not a Google Forms embed URL (…/viewform?embedded=true); nothing is published until it is"; exit 1
+          if ! grep -Eq '^https://docs\.google\.com/forms/d/e/[A-Za-z0-9_-]+/viewform$' <<<"$url"; then
+            echo "::error::site/support/form-url is empty or not a Google Forms URL (…/viewform); nothing is published until it is"; exit 1
           fi
           # The agent release to serve.
           tag=$(tr -d '[:space:]' < site/download/VERSION)

@@ -122,15 +122,15 @@ func TestPinnedVersionIsOneReleaseTag(t *testing.T) {
 
 func TestContactFormURLIsInOnePlace(t *testing.T) {
 	page := readSite(t, "support/index.html")
-	if n := strings.Count(page, formURLToken); n != 2 {
-		t.Errorf("the page has %d %s marks, want 2 (the frame and the new-tab link)", n, formURLToken)
+	if n := strings.Count(page, formURLToken); n != 1 {
+		t.Errorf("the page has %d %s marks, want 1 (the new-tab link)", n, formURLToken)
 	}
 	if regexp.MustCompile(`docs\.google\.com`).MatchString(page) {
 		t.Error("the form URL must be only in site/support/form-url")
 	}
 	// Empty until the form exists; deploy-site.yml publishes nothing while it is empty.
 	url := strings.TrimSpace(readSite(t, "support/form-url"))
-	if url != "" && !regexp.MustCompile(`^https://docs\.google\.com/forms/d/e/[A-Za-z0-9_-]+/viewform\?embedded=true$`).MatchString(url) {
-		t.Errorf("site/support/form-url must be empty or a Google Forms embed URL (…/viewform?embedded=true), got %q", url)
+	if url != "" && !regexp.MustCompile(`^https://docs\.google\.com/forms/d/e/[A-Za-z0-9_-]+/viewform$`).MatchString(url) {
+		t.Errorf("site/support/form-url must be empty or a Google Forms URL (…/viewform), got %q", url)
 	}
 }
