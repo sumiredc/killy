@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#000000">
+<title>Killy — Support / サポート</title>
+<meta name="description" content="How to install the Killy agent on your Linux server, what Killy promises about the processes it kills, and how to contact us.">
+<link rel="icon" href="../favicon.png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="../"><img src="../favicon.png" alt="" width="36" height="36">Killy</a>
+    <fieldset class="lang">
+      <legend class="visually-hidden">Language</legend>
+      <button type="button" data-lang="en" aria-pressed="true">EN</button>
+      <button type="button" data-lang="ja" aria-pressed="false">日本語</button>
+    </fieldset>
+  </header>
+
+  <main>
+    <div class="hero">
+      <h1><span class="en">Support</span><span class="ja">サポート</span></h1>
+      <p><span class="en">The Killy app shows the zombie processes of your Linux servers. Each server needs the Killy agent, which reports to the Killy server and signals a process only when your phone asks.</span><span class="ja">Killy アプリは、Linux サーバーのゾンビプロセスを表示します。サーバーごとに Killy agent が必要です。agent は Killy サーバーに報告し、スマホから頼まれたときだけプロセスに信号を送ります。</span></p>
+      <nav class="toc" aria-label="Contents">
+        <a href="#agent"><span class="en">Install the agent</span><span class="ja">agent を入れる</span></a>
+        <a href="#safety"><span class="en">What Killy promises</span><span class="ja">Killy が守ること</span></a>
+        <a href="#contact"><span class="en">Contact</span><span class="ja">お問い合わせ</span></a>
+      </nav>
+    </div>
+
+    <section id="agent">
+      <h2><span class="en">Install the agent</span><span class="ja">agent を入れる</span></h2>
+      <p><span class="en">Do this on each Linux server you want watched. The agent only connects out to the Killy server, so the server opens no inbound port.</span><span class="ja">見張りたい Linux サーバーごとに行います。agent は Killy サーバーへ外向きにつなぐだけなので、サーバーに受け口は開きません。</span></p>
+
+      <h3><span class="en">Requirements</span><span class="ja">必要な環境</span></h3>
+      <ul class="list">
+        <li><span class="en">Linux 5.3 or later (the agent signals through a pidfd)</span><span class="ja">Linux 5.3 以降（agent は pidfd を通して信号を送ります）</span></li>
+        <li><span class="en"><code>amd64</code> or <code>arm64</code></span><span class="ja"><code>amd64</code> または <code>arm64</code></span></li>
+        <li><span class="en">root, so that the agent can signal other users' processes</span><span class="ja">root 権限（agent が他のユーザーのプロセスに信号を送るため）</span></li>
+        <li><span class="en">HTTPS access from the server to <code>killy.sumire.pink</code></span><span class="ja">サーバーから <code>killy.sumire.pink</code> への HTTPS 接続</span></li>
+      </ul>
+
+      <h3><span class="en">1. Download and check the binary</span><span class="ja">1. バイナリを取得して確かめる</span></h3>
+      <p><span class="en">The commands pick the file for your CPU, compare it with the published checksum, and put it in <code>/usr/local/bin</code>. <code>sha256sum -c</code> prints <code>OK</code> when the file matches.</span><span class="ja">コマンドは、CPU に合うファイルを選び、公開しているチェックサムと照合して、<code>/usr/local/bin</code> に置きます。ファイルが一致すると、<code>sha256sum -c</code> は <code>OK</code> と表示します。</span></p>
+      <pre><span class="prompt">$ </span>arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+<span class="prompt">$ </span>curl -fLO "https://killy.sumire-sakamoto.co.jp/download/killy-linux-$arch"
+<span class="prompt">$ </span>curl -fLO https://killy.sumire-sakamoto.co.jp/download/SHA256SUMS
+<span class="prompt">$ </span>grep " killy-linux-$arch\$" SHA256SUMS | sha256sum -c -
+<span class="prompt">$ </span>sudo install -m 0755 "killy-linux-$arch" /usr/local/bin/killy</pre>
+
+      <h3><span class="en">2. Pair the server</span><span class="ja">2. サーバーをペアリングする</span></h3>
+      <p><span class="en">The command shows a 6-character code and a QR code. A code works once and expires after 10 minutes.</span><span class="ja">コマンドが、6 文字のコードと QR コードを表示します。コードは 1 回だけ使え、10 分で失効します。</span></p>
+      <pre><span class="prompt">$ </span>sudo killy agent pair --server https://killy.sumire.pink</pre>
+      <p><span class="en">In the app, open Settings, then Add server. Enter the code (or scan the QR code), optionally enter a name, and tap Add. Without a name, the server's hostname is used.</span><span class="ja">アプリで、設定 → サーバーを追加を開きます。コードを入力（または QR コードを読み取り）し、必要なら名前を入力して、追加をタップします。名前を入れなければ、サーバーのホスト名になります。</span></p>
+
+      <h3><span class="en">3. Keep the agent running</span><span class="ja">3. agent を常駐させる</span></h3>
+      <p><span class="en">The systemd unit starts <code>killy agent run</code> as root and restarts it when it stops. It needs the file that <code>pair</code> wrote, so enable it after pairing.</span><span class="ja">systemd の unit は、<code>killy agent run</code> を root で起動し、止まれば再起動します。<code>pair</code> が書いたファイルが要るので、ペアリングのあとに有効にします。</span></p>
+      <pre><span class="prompt">$ </span>sudo curl -fL -o /etc/systemd/system/killy-agent.service https://killy.sumire-sakamoto.co.jp/download/killy-agent.service
+<span class="prompt">$ </span>sudo systemctl daemon-reload
+<span class="prompt">$ </span>sudo systemctl enable --now killy-agent.service</pre>
+
+      <h3><span class="en">4. Check the connection</span><span class="ja">4. 接続を確かめる</span></h3>
+      <p><span class="en">In the app, open Settings, tap the server, and tap Check under Connection. The app shows "Connected" with the agent version when a command can reach the agent and come back.</span><span class="ja">アプリで、設定を開き、サーバーをタップして、接続の「確認する」をタップします。命令が agent に届いて戻れるとき、アプリは agent のバージョンと一緒に「接続できました」と表示します。</span></p>
+      <table class="plain">
+        <thead><tr><th><span class="en">The app shows</span><span class="ja">アプリの表示</span></th><th><span class="en">What to do</span><span class="ja">対処</span></th></tr></thead>
+        <tbody>
+          <tr><td><span class="en">The connection could not be checked</span><span class="ja">接続を確認できませんでした</span></td><td><span class="en">The phone cannot reach the Killy server. Check the phone's network and try again.</span><span class="ja">スマホから Killy サーバーに届いていません。スマホのネットワークを確認して、もう一度お試しください。</span></td></tr>
+          <tr><td><span class="en">No response from the agent</span><span class="ja">エージェントから応答がありません</span></td><td><span class="en">The agent is not connected to the Killy server. On the server, run <code>systemctl status killy-agent</code>.</span><span class="ja">agent が Killy サーバーにつながっていません。サーバーで <code>systemctl status killy-agent</code> を実行してください。</span></td></tr>
+          <tr><td><span class="en">Commands are not reaching the agent</span><span class="ja">命令がエージェントに届いていません</span></td><td><span class="en">The agent is connected but does not answer. Run <code>sudo systemctl restart killy-agent</code>.</span><span class="ja">agent はつながっていますが、応答しません。<code>sudo systemctl restart killy-agent</code> を実行してください。</span></td></tr>
+        </tbody>
+      </table>
+      <p class="muted note"><span class="en">To stop watching a server, open Settings, tap the server and remove it. The agent keeps running for other paired phones; to stop it, run <code>sudo systemctl disable --now killy-agent</code>.</span><span class="ja">サーバーの見張りをやめるには、設定でサーバーをタップして削除します。ほかのペアリング済みのスマホのために agent は動き続けます。agent を止めるには、<code>sudo systemctl disable --now killy-agent</code> を実行します。</span></p>
+    </section>
+
+    <section id="safety">
+      <h2><span class="en">What Killy promises</span><span class="ja">Killy が守ること</span></h2>
+      <div class="cards">
+        <div class="card">
+          <h3><span class="en">Only <code>SIGKILL</code></span><span class="ja"><code>SIGKILL</code> だけ</span></h3>
+          <p><span class="en">Killy sends no other signal and runs no other command on your server.</span><span class="ja">Killy は、ほかの信号を送らず、サーバーでほかのコマンドも実行しません。</span></p>
+        </div>
+        <div class="card">
+          <h3><span class="en">Only the process you were shown</span><span class="ja">見せたプロセスだけ</span></h3>
+          <p><span class="en">Right before signalling, the agent checks that the process still has the PID and start time shown in the app, and still has zombie children. A reused PID is not killed.</span><span class="ja">信号を送る直前に、agent は、アプリに見せたものと同じ PID と開始時刻のプロセスで、まだゾンビの子がいることを確かめます。再利用された PID は kill しません。</span></p>
+        </div>
+        <div class="card">
+          <h3><span class="en">Protected processes</span><span class="ja">守られるプロセス</span></h3>
+          <p><span class="en">The agent never kills PID 1, itself or its own ancestors, whatever the Killy server asks.</span><span class="ja">agent は、Killy サーバーに何を頼まれても、PID 1・自分自身・自分の祖先は kill しません。</span></p>
+        </div>
+        <div class="card">
+          <h3><span class="en">Only your phone</span><span class="ja">ペアリングしたスマホだけ</span></h3>
+          <p><span class="en">Only a phone paired with a server can see its zombies or send it a kill. The agent opens no inbound port.</span><span class="ja">サーバーのゾンビを見られるのも、kill を送れるのも、そのサーバーとペアリングしたスマホだけです。agent は受け口を開きません。</span></p>
+        </div>
+      </div>
+      <p class="note"><span class="en">Killy shows the server, PID and command line it will kill. Whether that parent is safe to kill is your decision. Killing a parent stops the work it does.</span><span class="ja">Killy は、kill するサーバー・PID・コマンドラインを見せます。その親を kill してよいかの判断は、あなたのものです。親を kill すると、その親の仕事は止まります。</span></p>
+      <p class="muted"><span class="en">What the Killy server and the app keep is listed in the <a href="../privacy/">privacy policy</a>.</span><span class="ja">Killy サーバーとアプリが保存するものは、<a href="../privacy/">プライバシーポリシー</a>に書いてあります。</span></p>
+    </section>
+
+    <section id="contact">
+      <h2><span class="en">Contact</span><span class="ja">お問い合わせ</span></h2>
+      <p><span class="en">Use the contact form for questions, problems and requests to delete a phone's or a server's record. Include the app version and what the app showed.</span><span class="ja">質問、困りごと、端末やサーバーの記録の削除の依頼は、お問い合わせフォームから送ってください。アプリのバージョンと、アプリに出た表示を書いてください。</span></p>
+      <p><a class="link" href="__CONTACT_FORM_URL__" target="_blank" rel="noopener"><span class="en">Open the contact form (opens in a new tab)</span><span class="ja">お問い合わせフォームを開く（別のタブで開きます）</span></a></p>
+      <p class="muted note"><span class="en">The form is a Google Form. It opens on Google's site, so the site itself loads nothing from Google.</span><span class="ja">フォームは Google フォームです。Google のサイトで開くので、このサイトが Google から何かを読み込むことはありません。</span></p>
+    </section>
+  </main>
+
+  <footer>
+    <div>Killy — SUMIRE SAKAMOTO Inc. / 株式会社スミレサカモト</div>
+    <nav>
+      <a href="../"><span class="en">Home</span><span class="ja">トップ</span></a>
+      <a href="../privacy/"><span class="en">Privacy policy</span><span class="ja">プライバシーポリシー</span></a>
+    </nav>
+    <div>© 2026 SUMIRE SAKAMOTO Inc.</div>
+  </footer>
+</div>
+<script src="../lang.js"></script>
+</body>
+</html>

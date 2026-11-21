@@ -4,10 +4,17 @@ name: deploy-site
 # privacy policy registered with Google Play. A change to site/ on main goes live as soon as it is
 # merged, so the page the store links to never differs from main. The subdomain, TLS and .htaccess
 # belong to sumiredc/sumire-sakamoto, not to this repository.
+#
+# The site also serves the agent: /download/ holds the binaries of the release tag named in
+# site/download/VERSION (taken from that tag's GitHub Release, which release.yml builds), their
+# SHA256SUMS and the systemd unit from deploy/systemd/. So changing the tag in VERSION is how a new
+# agent is published, and nothing downloads from GitHub once the repository is private. The
+# support page's contact form URL is written once, in site/support/form-url; nothing is
+# published while it is empty.
 on:
   push:
     branches: [main]
-    paths: ['site/**', '.github/workflows/deploy-site.yml']
+    paths: ['site/**', 'deploy/systemd/killy-agent.service', '.github/workflows/deploy-site.yml']
   workflow_dispatch:
 
 permissions:
@@ -34,6 +41,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
       - name: Settings are present
         run: |
           for name in DEPLOY_HOST DEPLOY_USER DEPLOY_PATH; do
@@ -57,18 +67,58 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           # The host key is checked against the Variable; StrictHostKeyChecking stays on.
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      # Nothing is built or uploaded before every check here has passed, so a failure leaves the
+      # live site as it was.
+      - name: Build the upload directory
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # The contact form URL: the page carries a mark, never a made-up address.
+          url=$(tr -d '[:space:]' < site/support/form-url)
+          if ! grep -Eq '^https://docs\.google\.com/forms/d/e/[A-Za-z0-9_-]+/viewform$' <<<"$url"; then
+            echo "::error::site/support/form-url is empty or not a Google Forms URL (…/viewform); nothing is published until it is"; exit 1
+          fi
+          # The agent release to serve.
+          tag=$(tr -d '[:space:]' < site/download/VERSION)
+          if ! grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' <<<"$tag"; then
+            echo "::error::site/download/VERSION must be one release tag like v1.2.3"; exit 1
+          fi
+          rm -rf out
+          mkdir out
+          cp -R site/. out/
+          rm out/support/form-url
+          sed "s|__CONTACT_FORM_URL__|$url|g" site/support/index.html > out/support/index.html
+          if grep -rq '__CONTACT_FORM_URL__' out; then echo "::error::a form URL mark is left in the site"; exit 1; fi
+          mkdir -p out/download
+          gh release download "$tag" -R "$GITHUB_REPOSITORY" -D out/download \
+            -p killy-linux-amd64 -p killy-linux-arm64 -p SHA256SUMS
+          # The files must be the ones SHA256SUMS lists, built with this tag as their version.
+          (cd out/download && sha256sum -c SHA256SUMS)
+          for f in killy-linux-amd64 killy-linux-arm64; do
+            go version -m "out/download/$f" | grep -F "version.Version=${tag}"
+          done
+          cp deploy/systemd/killy-agent.service out/download/
+          cp site/download/VERSION out/download/VERSION
+          ls -l out/download
       # No --delete: the destination holds the .htaccess that sumire-sakamoto puts there.
       - name: Upload
         run: >
           rsync -rvz --checksum --chmod=D755,F644
           -e "ssh -i ~/.ssh/deploy_key -p $DEPLOY_PORT -o IdentitiesOnly=yes"
-          site/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+          out/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
       - name: Verify
         run: |
-          for path in / /privacy/ /style.css /lang.js /scene.svg /scene-ja.svg /badges/app-store-en.svg /badges/app-store-ja.svg /badges/google-play-en.png /badges/google-play-ja.png /ogp.png /favicon.png /apple-touch-icon.png; do
+          for path in / /privacy/ /support/ /download/VERSION /download/killy-agent.service /style.css /lang.js /scene.svg /scene-ja.svg /badges/app-store-en.svg /badges/app-store-ja.svg /badges/google-play-en.png /badges/google-play-ja.png /ogp.png /favicon.png /apple-touch-icon.png; do
             code=$(curl -s -o /dev/null -w '%{http_code}' "$SITE_URL$path")
             echo "$code $path"
             [ "$code" = 200 ] || exit 1
           done
           # The page Google Play links to is the policy itself, not an error page that answers 200.
           curl -fsS "$SITE_URL/privacy/" | grep -q 'Killy — Privacy Policy'
+          # The agent is downloadable from the site and is the release the repository pins.
+          curl -fsS "$SITE_URL/support/" | grep -q 'docs.google.com/forms/'
+          mkdir verify && cd verify
+          for f in killy-linux-amd64 killy-linux-arm64 SHA256SUMS; do curl -fsSO "$SITE_URL/download/$f"; done
+          sha256sum -c SHA256SUMS
+          test "$(curl -fsS "$SITE_URL/download/VERSION")" = "$(cat ../site/download/VERSION)"

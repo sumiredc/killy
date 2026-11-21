@@ -3,7 +3,7 @@
 # which writes /etc/killy/agent.json; without it `killy agent run` exits at start.
 [Unit]
 Description=Killy agent
-Documentation=https://github.com/sumiredc/killy
+Documentation=https://killy.sumire-sakamoto.co.jp/support/
 After=network-online.target
 Wants=network-online.target
 # Only one agent may use /etc/killy/agent.json; the demo machine runs the demo agent instead.

@@ -1,7 +1,9 @@
 name: release
 
 # A version tag (v1.2.3) builds the killy binaries for Linux and puts them on a GitHub Release of
-# that tag. The Android APK (built by EAS) is attached to the same Release by hand.
+# that tag. The Android APK (built by EAS) is attached to the same Release by hand. Users do not
+# download from the Release: deploy-site.yml copies the files of the tag in site/download/VERSION
+# to the site's /download/, so a new tag reaches users only when that file changes.
 on:
   push:
     tags: ['v*']

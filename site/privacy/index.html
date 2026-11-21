@@ -24,7 +24,7 @@
   <main class="doc">
     <div class="en" lang="en">
 <h1>Killy — Privacy Policy</h1>
-<p>This policy covers the Killy mobile app (iOS and Android) and the Killy server it connects to. It says what data they handle, why, who else receives it, and how to remove it. Last updated: 2026-11-19.</p>
+<p>This policy covers the Killy mobile app (iOS and Android), the Killy server it connects to and the contact form on the support page. It says what data they handle, why, who else receives it, and how to remove it. Last updated: 2026-11-22.</p>
 <p>Killy has no accounts, no advertising and no analytics. It does not sell or share data for any other purpose than the ones below.</p>
 <h2>What the app sends and why</h2>
 <div class="table-wrap"><table>
@@ -47,28 +47,42 @@
 </ul>
 <p>It keeps in memory only, and loses on restart: the latest report from each agent (process IDs, start times and command lines of parent processes holding zombies, and the zombies&#39; process IDs), pairing codes, and request counts per client address used to limit how fast requests can be made.</p>
 <p>The agent on a Linux server keeps the outcome of each kill (its ID, the result and how many zombies were reaped) in a file on that server.</p>
+<h2>What the contact form collects</h2>
+<p>The contact form on the support page (<a href="https://killy.sumire-sakamoto.co.jp/support/">https://killy.sumire-sakamoto.co.jp/support/</a>) is a Google Form. It asks for:</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Data</th><th>Why</th></tr></thead>
+<tbody><tr><td>Email address</td><td>To reply to your message</td></tr>
+<tr><td>Name (optional)</td><td>To address you in the reply</td></tr>
+<tr><td>Type of inquiry</td><td>To route the message</td></tr>
+<tr><td>Device (optional)</td><td>To reproduce a problem on the app</td></tr>
+<tr><td>App version (optional)</td><td>To reproduce a problem on the app</td></tr>
+<tr><td>The server&#39;s operating system and CPU (optional)</td><td>To reproduce a problem with the agent</td></tr>
+<tr><td>Your message</td><td>To answer it</td></tr>
+</tbody></table></div>
+<p>We use these answers only to reply to you and to carry out requests to delete data. Google stores the answers of the form. The form is opened on Google&#39;s site; the Killy app, the Killy server and the support page do not send it anything else.</p>
 <h2>Who else receives data</h2>
 <ul>
 <li><strong>Expo, Apple and Google</strong> deliver push notifications. They receive the push token and the notification text: the number of zombie processes and the server&#39;s display name.</li>
+<li><strong>Google</strong> stores the answers to the contact form (see above) and receives what you enter into it.</li>
 <li><strong>Cloudflare</strong> carries all traffic between the app, the agents and the Killy server, and sees the address each request comes from.</li>
 <li>The Killy server and its web server may record the address and time of requests in their logs.</li>
 </ul>
 <h2>The public demo</h2>
-<p>The builds for the Kiroween 2026 hackathon judges connect to the team&#39;s staging Killy server and offer a public demo server. Processes shown in the demo are created on a demo machine only for that purpose. Kills sent to the demo are visible to everyone using it: a parent killed by one person disappears for everyone.</p>
+<p>This section applies only to the builds made for the Kiroween 2026 hackathon judges. They connect to the team&#39;s staging Killy server and offer a public demo server. The store release of the app (App Store and Google Play) connects to the production Killy server and has no demo. Processes shown in the demo are created on a demo machine only for that purpose. Kills sent to the demo are visible to everyone using it: a parent killed by one person disappears for everyone.</p>
 <h2>Removing data</h2>
 <ul>
 <li>Removing a server in the app (Settings → server → Remove) deletes that phone&#39;s link to it, with its display name and notification switch.</li>
 <li>Turning notifications off in the app stops pushes; uninstalling the app stops it from using its device token.</li>
-<li>To have a phone&#39;s record or a server&#39;s record deleted from the Killy server, open an issue at <a href="https://github.com/sumiredc/killy/issues">https://github.com/sumiredc/killy/issues</a>.</li>
+<li>To have a phone&#39;s record or a server&#39;s record deleted from the Killy server, send a request through the contact form on the support page, <a href="https://killy.sumire-sakamoto.co.jp/support/">https://killy.sumire-sakamoto.co.jp/support/</a>. Answers you gave in the form are deleted on request too.</li>
 </ul>
 <h2>Children</h2>
 <p>Killy is a tool for people who run Linux servers and is not directed at children.</p>
 <h2>Contact</h2>
-<p>Questions about this policy: <a href="https://github.com/sumiredc/killy/issues">https://github.com/sumiredc/killy/issues</a>.</p>
+<p>Questions about this policy: the contact form on the support page, <a href="https://killy.sumire-sakamoto.co.jp/support/">https://killy.sumire-sakamoto.co.jp/support/</a>.</p>
     </div>
     <div class="ja" lang="ja">
 <h1>Killy — プライバシーポリシー</h1>
-<p>このポリシーは、Killy のモバイル app（iOS と Android）と、それがつなぐ Killy サーバーに適用されます。どんなデータを扱い、何のために使い、誰が受け取り、どう消せるかを書きます。最終更新: 2026-11-19。この文書は英語版 <code>PRIVACY.md</code> の日本語訳で、正は英語版です。食い違ったときは英語版に従ってください。</p>
+<p>このポリシーは、Killy のモバイル app（iOS と Android）、それがつなぐ Killy サーバー、サポートページのお問い合わせフォームに適用されます。どんなデータを扱い、何のために使い、誰が受け取り、どう消せるかを書きます。最終更新: 2026-11-22。この文書は英語版 <code>PRIVACY.md</code> の日本語訳で、正は英語版です。食い違ったときは英語版に従ってください。</p>
 <p>Killy にはアカウントも広告も解析もありません。以下に書く目的以外で、データを販売することも共有することもありません。</p>
 <h2>app が送るデータと目的</h2>
 <div class="table-wrap"><table>
@@ -91,24 +105,38 @@
 </ul>
 <p>メモリにだけ持ち、再起動で失うものは次のとおりです。各エージェントの最新の報告（ゾンビを持つ親プロセスのプロセス ID・開始時刻・コマンドラインと、ゾンビのプロセス ID）、ペアリングコード、リクエストの速さを制限するためのアドレスごとのリクエスト数。</p>
 <p>Linux サーバー上のエージェントは、kill ごとの結果（ID、結果、回収したゾンビの数）を、そのサーバー上のファイルに残します。</p>
+<h2>お問い合わせフォームが集めるデータ</h2>
+<p>サポートページ（<a href="https://killy.sumire-sakamoto.co.jp/support/">https://killy.sumire-sakamoto.co.jp/support/</a>）のお問い合わせフォームは、Google フォームです。次のことを尋ねます。</p>
+<div class="table-wrap"><table>
+<thead><tr><th>データ</th><th>目的</th></tr></thead>
+<tbody><tr><td>メールアドレス</td><td>返信するため</td></tr>
+<tr><td>名前（任意）</td><td>返信で呼びかけるため</td></tr>
+<tr><td>お問い合わせの種類</td><td>内容を振り分けるため</td></tr>
+<tr><td>端末（任意）</td><td>app の問題を再現するため</td></tr>
+<tr><td>app のバージョン（任意）</td><td>app の問題を再現するため</td></tr>
+<tr><td>サーバーの OS と CPU（任意）</td><td>エージェントの問題を再現するため</td></tr>
+<tr><td>お問い合わせの内容</td><td>答えるため</td></tr>
+</tbody></table></div>
+<p>これらの回答は、返信と、データの削除の依頼への対応のためだけに使います。回答は Google がフォームの回答として保存します。フォームは Google のサイトで開きます。Killy の app・Killy サーバー・サポートページが、フォームにほかのものを送ることはありません。</p>
 <h2>他に受け取る相手</h2>
 <ul>
 <li><strong>Expo、Apple、Google</strong> が push 通知を届けます。受け取るのは、push token と通知の文面（ゾンビプロセスの数とサーバーの表示名）です。</li>
+<li><strong>Google</strong> が、お問い合わせフォームの回答を保存し、入力した内容を受け取ります（上の節を参照）。</li>
 <li><strong>Cloudflare</strong> が、app・エージェント・Killy サーバーの間のすべての通信を運び、各リクエストの送信元アドレスを見ます。</li>
 <li>Killy サーバーとその web サーバーは、リクエストのアドレスと時刻をログに記録することがあります。</li>
 </ul>
 <h2>公開デモ</h2>
-<p>Kiroween 2026 ハッカソンの審査員向けの build は、チームの staging の Killy サーバーにつながり、公開のデモサーバーを出します。デモに出るプロセスは、そのためだけにデモ機で作ったものです。デモに送った kill は、使っている全員に見えます。1 人が kill した親は、全員の画面から消えます。</p>
+<p>この節は、Kiroween 2026 ハッカソンの審査員向けに作った build だけの話です。その build は、チームの staging の Killy サーバーにつながり、公開のデモサーバーを出します。ストアの製品版の app（App Store と Google Play）は production の Killy サーバーにつながり、デモはありません。デモに出るプロセスは、そのためだけにデモ機で作ったものです。デモに送った kill は、使っている全員に見えます。1 人が kill した親は、全員の画面から消えます。</p>
 <h2>データを消す</h2>
 <ul>
 <li>app でサーバーを削除する（設定 → サーバー → 削除）と、この端末のそのサーバーへのひも付けが、表示名と通知スイッチごと消えます。</li>
 <li>app の通知をオフにすると push が止まります。app をアンインストールすると、device token は使われなくなります。</li>
-<li>端末の記録やサーバーの記録を Killy サーバーから消してほしいときは、<a href="https://github.com/sumiredc/killy/issues">https://github.com/sumiredc/killy/issues</a> で issue を立ててください。</li>
+<li>端末の記録やサーバーの記録を Killy サーバーから消してほしいときは、サポートページ <a href="https://killy.sumire-sakamoto.co.jp/support/">https://killy.sumire-sakamoto.co.jp/support/</a> のお問い合わせフォームから依頼してください。フォームに書いた回答も、依頼があれば消します。</li>
 </ul>
 <h2>子ども</h2>
 <p>Killy は Linux サーバーを運用する人のための道具で、子どもを対象にしていません。</p>
 <h2>連絡先</h2>
-<p>このポリシーへの質問: <a href="https://github.com/sumiredc/killy/issues">https://github.com/sumiredc/killy/issues</a>。</p>
+<p>このポリシーへの質問: サポートページ <a href="https://killy.sumire-sakamoto.co.jp/support/">https://killy.sumire-sakamoto.co.jp/support/</a> のお問い合わせフォーム。</p>
     </div>
   </main>
 
@@ -116,8 +144,7 @@
     <div>Killy — SUMIRE SAKAMOTO Inc. / 株式会社スミレサカモト</div>
     <nav>
       <a href="../"><span class="en">Home</span><span class="ja">トップ</span></a>
-      <a href="https://github.com/sumiredc/killy/issues"><span class="en">Support</span><span class="ja">サポート</span></a>
-      <a href="https://github.com/sumiredc/killy">GitHub</a>
+      <a href="../support/"><span class="en">Support</span><span class="ja">サポート</span></a>
     </nav>
     <div>© 2026 SUMIRE SAKAMOTO Inc.</div>
   </footer>
