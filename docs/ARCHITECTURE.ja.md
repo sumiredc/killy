@@ -259,17 +259,18 @@ production の前に:
 | Push | `expo-notifications` |
 | QR | `expo-camera` |
 | 秘密情報 | device token は `expo-secure-store` に置く |
-| Build | EAS：iOS は TestFlight（公開リンク）、Android は Google Play のオープンテストと、GitHub Release に添付する APK（「配布」を参照）。Killy server は build ごとに `EXPO_PUBLIC_KILLY_SERVER_URL` で決まる。`EXPO_PUBLIC_KILLY_DEMO=1` で「デモサーバーを試す」が出る（「デモ環境」を参照）。ハッカソンの審査員向けの build は、staging につなぎ、デモを出す |
+| Build | EAS：iOS は TestFlight（公開リンク）、Android は Google Play のオープンテストと、GitHub Release に添付する APK（「配布」を参照）。Killy server は build ごとに `EXPO_PUBLIC_KILLY_SERVER_URL` で決まる。`EXPO_PUBLIC_KILLY_DEMO=1` で「デモサーバーを試す」が出る（「デモ環境」を参照）。ハッカソンの審査員向けの build（profile `testflight`・`play`・`apk`）は、staging につなぎ、デモを出す。ストアの製品版の build（profile `production`。App Store と Google Play の Production）は `https://killy.sumire.pink` につなぎ、`EXPO_PUBLIC_KILLY_DEMO` を付けないので、デモのボタンが無い |
 
 ## 配布
 
-operator と審査員は、agent のバイナリをこのリポジトリの GitHub Releases から、iOS の app を TestFlight の公開リンクから、Android の app を Google Play のオープンテストのリンクから入手します。Android の APK も GitHub Releases に置きます。Google Play を使わない人のためと、Play の審査が遅れたときの予備です。リポジトリが public になるまでは、Releases からはチームだけがダウンロードできます。
+operator と審査員は、agent のバイナリをこのリポジトリの GitHub Releases から入手します。審査員は iOS の app を TestFlight の公開リンクから、Android の app を Google Play のオープンテストのリンクから入手します（ストアの製品版は App Store と Google Play の Production から配ります。表を参照）。Android の APK も GitHub Releases に置きます。Google Play を使わない人のためと、Play の審査が遅れたときの予備です。リポジトリが public になるまでは、Releases からはチームだけがダウンロードできます。
 
 | 成果物 | 作り方 |
 |---|---|
 | linux/amd64 と linux/arm64 の `killy` | ファイルは `killy-linux-amd64`・`killy-linux-arm64`・`SHA256SUMS`。version の tag（`v*`）が push されたら workflow（`release.yml`）が、static（`CGO_ENABLED=0`）に、tag を version として build する。GitHub-hosted runner で動く（LAN の registry は使わない） |
 | Google Play の Android | オープンテストのトラックで、そのリンクから参加する。Play の開発者アカウントは組織のものなので、先にクローズドテストをする必要は無い。EAS が `mobile/eas.json` の `play` の profile（AAB、staging につなぎ、デモを出す）で build する。EAS の keystore を upload key にし、署名の鍵は Play App Signing が持つ。Play に登録するプライバシーポリシーは、紹介サイト（次の行）の `/privacy/` のページ。リポジトリが private の間も開けるので、public になる前に審査に出せる |
 | 紹介サイト | `site/`。`https://killy.sumire-sakamoto.co.jp` で公開する。static のトップページ（Killy が何か、ストアのページへのリンクになる App Store と Google Play のバッジ、agent の入れ方）と `/privacy/` で、どちらも英語と日本語。`site/badges/` のバッジは、Apple と Google が配る画像を加工せずに置いたもので、英語版と日本語版がある。トップページはページの言語のほうを出し、ストアのページができるまで、バッジのリンク先は無い。`site/` が `main` で変わると、workflow `deploy-site.yml` が rsync で `site/` をチームの web ホストに置く。ホストに `.htaccess` があるので `--delete` は付けない。サブドメイン・TLS・`.htaccess` は sumiredc/sumire-sakamoto リポジトリが持つ。GitHub-hosted runner で動く。`/privacy/` は、正である [PRIVACY.md](PRIVACY.md) とその訳 [PRIVACY.ja.md](PRIVACY.ja.md) から `go run ./tools/privacypage` で生成する。commit 済みのページが文書と違うとき、2 つの文書の構造が違うとき、訳の日付が違うときは、`go test ./...` が落ちる。`tools/siteassets/build.sh` が、`mock/art.js` と app のアイコンからサイトの画像を作る。サイトは第三者から何も読み込まない |
+| ストアの製品版（App Store と Google Play の Production） | `mobile/eas.json` の `production` の profile。`distribution: store`、`autoIncrement`、Android は AAB、`EXPO_PUBLIC_KILLY_SERVER_URL=https://killy.sumire.pink`、`EXPO_PUBLIC_KILLY_DEMO` は付けないので、app にデモのボタンが無い。`submit.production` は iOS の App Store Connect の app ID で、`submit.testflight` と同じ値。Android の submit の設定は無い。Play のサービスアカウントの鍵をリポジトリに置かないため。build と提出は人が行う（`npx eas-cli build --profile production`、iOS は続けて `npx eas-cli submit --profile production`、Android は Play Console）。審査員向けの build は TestFlight と Play のオープンテストに残し、製品版の build で置き換えない |
 | Android の APK | ファイルは `killy-android.apk`。EAS が `mobile/eas.json` の `apk` の profile（staging につなぎ、デモを出す）で build し、組になるバイナリの Release に手で添付する。EAS のダウンロード用のリンクは、保存期間が分からないので使わない |
 | systemd の unit | `deploy/systemd/`：`killy-agent.service`（`killy agent run` を root で）、`killy-agent-demo.service`（`killy agent run --demo`）、`killy-summon.service`（`killy summon`） |
 
