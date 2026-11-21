@@ -1,6 +1,6 @@
 # Killy — Privacy Policy
 
-This policy covers the Killy mobile app (iOS and Android) and the Killy server it connects to. It says what data they handle, why, who else receives it, and how to remove it. Last updated: 2026-11-19.
+This policy covers the Killy mobile app (iOS and Android), the Killy server it connects to and the contact form on the support page. It says what data they handle, why, who else receives it, and how to remove it. Last updated: 2026-11-22.
 
 Killy has no accounts, no advertising and no analytics. It does not sell or share data for any other purpose than the ones below.
 
@@ -31,21 +31,38 @@ It keeps in memory only, and loses on restart: the latest report from each agent
 
 The agent on a Linux server keeps the outcome of each kill (its ID, the result and how many zombies were reaped) in a file on that server.
 
+## What the contact form collects
+
+The contact form on the support page (<https://killy.sumire-sakamoto.co.jp/support/>) is a Google Form. It asks for:
+
+| Data | Why |
+|---|---|
+| Email address | To reply to your message |
+| Name (optional) | To address you in the reply |
+| Type of inquiry | To route the message |
+| Device (optional) | To reproduce a problem on the app |
+| App version (optional) | To reproduce a problem on the app |
+| The server's operating system and CPU (optional) | To reproduce a problem with the agent |
+| Your message | To answer it |
+
+We use these answers only to reply to you and to carry out requests to delete data. Google stores the answers of the form. The form is opened on Google's site; the Killy app, the Killy server and the support page do not send it anything else.
+
 ## Who else receives data
 
 - **Expo, Apple and Google** deliver push notifications. They receive the push token and the notification text: the number of zombie processes and the server's display name.
+- **Google** stores the answers to the contact form (see above) and receives what you enter into it.
 - **Cloudflare** carries all traffic between the app, the agents and the Killy server, and sees the address each request comes from.
 - The Killy server and its web server may record the address and time of requests in their logs.
 
 ## The public demo
 
-The builds for the Kiroween 2026 hackathon judges connect to the team's staging Killy server and offer a public demo server. Processes shown in the demo are created on a demo machine only for that purpose. Kills sent to the demo are visible to everyone using it: a parent killed by one person disappears for everyone.
+This section applies only to the builds made for the Kiroween 2026 hackathon judges. They connect to the team's staging Killy server and offer a public demo server. The store release of the app (App Store and Google Play) connects to the production Killy server and has no demo. Processes shown in the demo are created on a demo machine only for that purpose. Kills sent to the demo are visible to everyone using it: a parent killed by one person disappears for everyone.
 
 ## Removing data
 
 - Removing a server in the app (Settings → server → Remove) deletes that phone's link to it, with its display name and notification switch.
 - Turning notifications off in the app stops pushes; uninstalling the app stops it from using its device token.
-- To have a phone's record or a server's record deleted from the Killy server, open an issue at <https://github.com/sumiredc/killy/issues>.
+- To have a phone's record or a server's record deleted from the Killy server, send a request through the contact form on the support page, <https://killy.sumire-sakamoto.co.jp/support/>. Answers you gave in the form are deleted on request too.
 
 ## Children
 
@@ -53,4 +70,4 @@ Killy is a tool for people who run Linux servers and is not directed at children
 
 ## Contact
 
-Questions about this policy: <https://github.com/sumiredc/killy/issues>.
+Questions about this policy: the contact form on the support page, <https://killy.sumire-sakamoto.co.jp/support/>.

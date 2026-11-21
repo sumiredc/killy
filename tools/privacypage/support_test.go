@@ -74,20 +74,27 @@ func TestSupportPageIsForProductionOnly(t *testing.T) {
 }
 
 func TestSiteDoesNotPointAtGitHub(t *testing.T) {
-	// The repository goes private after the hackathon. The privacy policy text still names the
-	// issues page (docs/PRIVACY.md); everything else on the site must not.
-	for _, name := range []string{"index.html", "support/index.html", "download/VERSION"} {
+	// The repository goes private after the hackathon: no page for users may point at it.
+	for _, name := range []string{"index.html", "support/index.html", "privacy/index.html", "download/VERSION"} {
 		if strings.Contains(strings.ToLower(readSite(t, name)), "github") {
 			t.Errorf("%s points at GitHub", name)
 		}
 	}
 	privacy := readSite(t, "privacy/index.html")
-	footer := privacy[strings.Index(privacy, "<footer>"):]
-	if strings.Contains(strings.ToLower(footer), "github") {
-		t.Error("the privacy page's footer points at GitHub")
-	}
-	if !strings.Contains(footer, `href="../support/"`) {
+	if !strings.Contains(privacy[strings.Index(privacy, "<footer>"):], `href="../support/"`) {
 		t.Error("the privacy page's footer does not link to the support page")
+	}
+	for _, doc := range []string{"../../docs/PRIVACY.md", "../../docs/PRIVACY.ja.md"} {
+		b, err := os.ReadFile(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(strings.ToLower(string(b)), "github") {
+			t.Errorf("%s points at GitHub", doc)
+		}
+		if !strings.Contains(string(b), "https://killy.sumire-sakamoto.co.jp/support/") {
+			t.Errorf("%s does not name the support page as the contact", doc)
+		}
 	}
 }
 
