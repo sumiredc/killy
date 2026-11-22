@@ -52,6 +52,15 @@ export class FakeServer {
     this.routes.set(route, async () => textResponse(status, JSON.stringify(body)));
   }
 
+  /** Answers the first request with the first response, the second with the second, and so on; the last one repeats. */
+  respondInOrder(route: string, answers: [status: number, body: unknown][]) {
+    let n = 0;
+    this.routes.set(route, async () => {
+      const [status, body] = answers[Math.min(n++, answers.length - 1)];
+      return textResponse(status, JSON.stringify(body));
+    });
+  }
+
   respondText(route: string, status: number, text: string) {
     this.routes.set(route, async () => textResponse(status, text));
   }

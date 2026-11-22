@@ -4,7 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import type { FetchLike } from './client';
 import { makeNotifications, type NotificationsDeps } from './notifications';
 
-/** Where the device token is kept between starts. */
+/** Where the device token for this build's Killy server is kept between starts. */
 export type TokenStore = {
   get(): Promise<string | null>;
   set(token: string): Promise<void>;
@@ -20,18 +20,27 @@ export type Deps = {
   notifications: NotificationsDeps;
 };
 
-const tokenKey = 'device_token';
+/**
+ * The key of the device token for one Killy server. A server registers its own devices, so a token
+ * is good only there; one key per server keeps a staging token from being sent to production when
+ * both builds are on one phone (iOS keeps Keychain items when an app is replaced). SecureStore keys
+ * allow only letters, digits, `.`, `-` and `_`; anything else in the URL becomes `_`.
+ */
+export function tokenKey(baseURL: string): string {
+  return 'device_token.' + baseURL.trim().replace(/\/+$/, '').toLowerCase().replace(/[^a-z0-9._-]/g, '_');
+}
 
 /**
  * The real ones. Screen tests replace this function. Expo installs expo/fetch as the global fetch,
  * which streams response bodies, so the event stream needs no extra library.
  */
-export function makeDeps(): Deps {
+export function makeDeps(baseURL: string): Deps {
+  const key = tokenKey(baseURL);
   return {
     fetch: (url, init) => fetch(url, init),
     tokens: {
-      get: () => SecureStore.getItemAsync(tokenKey),
-      set: (token) => SecureStore.setItemAsync(tokenKey, token),
+      get: () => SecureStore.getItemAsync(key),
+      set: (token) => SecureStore.setItemAsync(key, token),
     },
     random: Math.random,
     randomBytes: getRandomBytes,

@@ -71,6 +71,17 @@ describe('Try the demo server', () => {
     await waitFor(() => expect(screen.queryByTestId('add-server-sheet')).toBeNull(), { timeout: 3000 });
   });
 
+  test('a saved token the Killy server does not know is replaced, and the demo server is added', async () => {
+    const server = new FakeServer();
+    server.respondInOrder(demoRoute, [[401, { error: 'unauthorized' }], [200, demo]]);
+    server.respond('POST /app/v1/devices', 200, { device_token: 'tok-new' });
+    await startApp(server);
+    await fireEvent.press(screen.getByRole('button', { name: 'Try the demo server' }));
+    expect(await screen.findByText('Added demo-linux-01')).toBeOnTheScreen();
+    expect(server.requests.filter((r) => r.route === demoRoute).map((r) => r.authorization)).toEqual(['Bearer dev-token', 'Bearer tok-new']);
+    expect(server.count('POST /app/v1/devices')).toBe(1);
+  });
+
   test.each([
     ['demo_not_configured', (s: FakeServer) => s.respond(demoRoute, 404, { error: 'demo_not_configured' }), 'The demo server is not available right now'],
     ['unauthorized', (s: FakeServer) => s.respond(demoRoute, 401, { error: 'unauthorized' }), 'The server could not be added. Try again in a while.'],

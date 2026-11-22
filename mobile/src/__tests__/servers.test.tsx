@@ -85,6 +85,25 @@ describe('device registration', () => {
     expect(server.requests.at(-1)?.authorization).toBe('Bearer tok-1');
   });
 
+  test('a saved token the Killy server does not know is replaced, and Add then works', async () => {
+    const server = new FakeServer();
+    server.respond('POST /app/v1/devices', 200, { device_token: 'tok-new' });
+    server.respondInOrder('POST /app/v1/pairings/claim', [
+      [401, { error: 'unauthorized' }],
+      [200, { id: 'a1', name: 'my box', hostname: 'ip-10-0-0-1', notify: true }],
+    ]);
+    const tokens = registered(server);
+    await startApp(server, tokens);
+    await openAddSheet();
+    await fireEvent.changeText(screen.getByLabelText('Pairing code'), 'K7Q4XP');
+    await fireEvent.press(screen.getByRole('button', { name: 'Add' }));
+    expect(await screen.findByText('Added my box')).toBeOnTheScreen();
+    expect(tokens.saved).toBe('tok-new');
+    expect(server.count('POST /app/v1/devices')).toBe(1);
+    const claims = server.requests.filter((r) => r.route === 'POST /app/v1/pairings/claim');
+    expect(claims.map((r) => r.authorization)).toEqual(['Bearer dev-token', 'Bearer tok-new']);
+  });
+
   test('a start with a saved device token does not register again', async () => {
     const server = new FakeServer();
     const tokens = registered(server);

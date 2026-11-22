@@ -29,9 +29,19 @@ export function KillyProvider({ children }: { children: ReactNode }) {
   const baseURL = useServerURL();
   // Made once: the URL is fixed for the build, and the token is set once registration is done.
   const [{ client, deps, setToken }] = useState(() => {
-    const deps = makeDeps();
+    const deps = makeDeps(baseURL);
     let token: string | null = null;
-    const client = createKillyClient({ baseURL, fetch: deps.fetch, random: deps.random, deviceToken: () => token });
+    const client = createKillyClient({
+      baseURL,
+      fetch: deps.fetch,
+      random: deps.random,
+      deviceToken: () => token,
+      // A token the server does not know (its device record is gone) is replaced by a new registration.
+      renewToken: async (t) => {
+        await deps.tokens.set(t);
+        token = t;
+      },
+    });
     return { client, deps, setToken: (t: string) => (token = t) };
   });
   const [registration, setRegistration] = useState<Registration>('pending');
