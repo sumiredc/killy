@@ -78,6 +78,8 @@ type Server struct {
 	DemoAgentID string
 	// Pushes sends push notifications of the parents in applied snapshots; nil sends none.
 	Pushes interface{ Wake(agentID string) }
+	// CORSOrigins are the origins whose pages may call /app/v1/ (KILLY_CORS_ORIGINS); empty adds no CORS header.
+	CORSOrigins []string
 	// HeartbeatInterval is how often a stream sends ": hb"; zero means sse.HeartbeatInterval.
 	HeartbeatInterval time.Duration
 
@@ -102,7 +104,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PATCH /app/v1/servers/{id}", s.patchServer)
 	mux.HandleFunc("DELETE /app/v1/servers/{id}", s.deleteServer)
 	mux.HandleFunc("POST /app/v1/servers/{id}/check", s.checkServer)
-	return mux
+	return s.withCORS(mux)
 }
 
 type pairingRequest struct {

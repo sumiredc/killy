@@ -40,6 +40,14 @@ func runServer(args []string, stderr io.Writer) int {
 		return 1
 	}
 
+	// Checked before anything is opened: a mistake here must stop the server, not open it to every
+	// origin or leave the setting silently matching nothing.
+	corsOrigins, err := server.ParseCORSOrigins(os.Getenv("KILLY_CORS_ORIGINS"))
+	if err != nil {
+		log.Error("KILLY_CORS_ORIGINS is not a list of origins", "err", err)
+		return 1
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -67,6 +75,7 @@ func runServer(args []string, stderr io.Writer) int {
 		Broker:              sse.NewBroker(),
 		Pushes:              pushes,
 		DemoAgentID:         demoAgentID(os.Getenv("KILLY_DEMO_AGENT_ID"), log),
+		CORSOrigins:         corsOrigins,
 		Log:                 log,
 	}
 	go func() {
