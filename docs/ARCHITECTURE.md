@@ -183,6 +183,17 @@ The request and response shapes, status codes and error codes are specified in [
 - The Go handlers disable write deadlines for SSE routes with `http.ResponseController` and flush after every event.
 - Clients reconnect with exponential backoff (1 s → 30 s) plus random jitter, so a server restart does not cause a reconnect burst.
 
+### CORS
+
+A browser page of another origin may call the App API only if the Killy server says so. The Web version of the demo (see "Demo environment") is such a page: it is served from `https://killy.sumire-sakamoto.co.jp` and calls `https://stg-killy.sumire.pink`. The native app is not a browser page and needs none of this.
+
+- `KILLY_CORS_ORIGINS` is a comma-separated list of origins (scheme, host and an optional port; no path and no `*`). The server refuses to start when an item is not an origin. Unset or empty, the server adds no CORS header to any response, as before. The default port is left out of an origin, as a browser does.
+- A request under `/app/v1/` whose `Origin` equals one of the listed origins gets `Access-Control-Allow-Origin` with that origin, on every response: successes, errors (`401`, `429`; without it the page cannot read the status) and the event stream. Every response under `/app/v1/` also has `Vary: Origin`. `*` is never returned, and neither is `Access-Control-Allow-Credentials`, because the app sends a Bearer token and no cookie.
+- A preflight (`OPTIONS` with `Origin` and `Access-Control-Request-Method`) from a listed origin is answered `204` with `Access-Control-Allow-Methods: GET, POST, PATCH, DELETE`, `Access-Control-Allow-Headers: Authorization, Content-Type` and `Access-Control-Max-Age: 600`, before authentication and the rate limits, so a preflight uses up no limit. From any other origin it gets no CORS header and the answer it always had (`405`).
+- `/agent/v1/` gets none of this: agents are not browsers.
+- CORS does not authenticate anyone. A listed origin's request without a valid token is `401` like any other, and the rate limits are unchanged.
+- Only `deploy/overlays/stg/` sets it, to `https://killy.sumire-sakamoto.co.jp`. Production sets none.
+
 ## Timing
 
 | Value | Setting |
@@ -234,7 +245,7 @@ No DNS record, tunnel route or certificate is added: the tunnel already sends `*
 | Image | `10.1.1.10:5000/killy/server:<immutable tag>`, pinned by digest in kustomize `images[]`; base images pulled through the mirror at `10.1.1.10:5001` |
 | Image build | This repository has no image workflow, and its workflows (CI, release, site) run on GitHub-hosted runners (`ubuntu-24.04`), because a self-hosted runner would let fork pull requests run code inside the LAN once the repository is public. GitHub-hosted runners cannot reach the LAN registry. The last image built from this repository (on the cluster's self-hosted runner, before it was removed) is the one pinned in `deploy/overlays/stg/` and `deploy/overlays/prd/`. After the repository is public, a production image is built by a `workflow_dispatch` workflow in the aidd-infra repository that takes a Killy commit SHA, builds it with the shared BuildKit, pushes `10.1.1.10:5000/killy/server:<commit SHA>` and reports the digest; Killy then pins that digest in `deploy/overlays/` by pull request. The infrastructure owner has been asked for that workflow; it does not exist yet. The registry allows overwriting tags, so deploy only by digest |
 | Secrets | `EXPO_ACCESS_TOKEN`, the PostgreSQL password and similar only as `SealedSecret` (`kubeseal --controller-namespace kube-system --controller-name sealed-secrets-controller --scope strict`), one per overlay: strict scope binds the ciphertext to the Secret's name and namespace, so staging and production cannot share one, and their values differ. No plain secrets in the repository or in chat |
-| Configuration | `KILLY_DATABASE_URL` (from the `SealedSecret`, because it contains the PostgreSQL password), `KILLY_DEMO_AGENT_ID` (see "Demo environment"); `EXPO_ACCESS_TOKEN` only if Expo's push security is turned on (it is not) |
+| Configuration | `KILLY_DATABASE_URL` (from the `SealedSecret`, because it contains the PostgreSQL password), `KILLY_DEMO_AGENT_ID` (see "Demo environment"), `KILLY_CORS_ORIGINS` (see "CORS"; staging only); `EXPO_ACCESS_TOKEN` only if Expo's push security is turned on (it is not) |
 | Client address | Read `CF-Connecting-IP`; the TCP peer address is the cluster's, not the client's. Used for the pairing rate limits |
 | Access control | All authorization is in the app (tokens). The cluster does not enforce NetworkPolicy; the pairing rate limits are in the server, and further rate limiting, if needed, is set in the Cloudflare dashboard |
 | CPU | x86_64 without AVX; the static Go binary needs nothing special |
