@@ -9,20 +9,22 @@
     - _Requirements: 1.2, 1.3_
 
 - [ ] 2. server：CORS を許可するオリジンを環境変数で受け取り、staging だけで許可する（#130。前提：#128）
-  - [ ] 2.1 `ParseCORSOrigins` と、CORS の層（`Server.CORSOrigins`）の最小のスタブを置く
+  - [x] 2.1 `ParseCORSOrigins` と、CORS の層（`Server.CORSOrigins`）の最小のスタブを置く
     - _Requirements: 2.1_
-  - [ ] 2.2 `ParseCORSOrigins` の表のテスト（正しい値・空・空白と末尾の `/`・`*`・パス・クエリ・`http`/`https` でないスキーム・空の項目）と、CORS の層のテスト（許可したオリジンの通常の応答・エラーの応答・SSE・preflight、許可していないオリジン・`Origin` なし・未設定、`/agent/v1/`、`Allow-Credentials` が無いこと、token の無い要求が `401` のまま）を書き、赤を確かめる
+  - [x] 2.2 `ParseCORSOrigins` の表のテスト（正しい値・空・空白と末尾の `/`・`*`・パス・クエリ・`http`/`https` でないスキーム・空の項目）と、CORS の層のテスト（許可したオリジンの通常の応答・エラーの応答・SSE・preflight、許可していないオリジン・`Origin` なし・未設定、`/agent/v1/`、`Allow-Credentials` が無いこと、token の無い要求が `401` のまま）を書き、赤を確かめる
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9_
-  - [ ] 2.3 `ParseCORSOrigins` と CORS の層を実装し、`Handler()` に差し、`cmd/killy/server.go` で `KILLY_CORS_ORIGINS` を読む。テストを緑にする
+  - [x] 2.3 `ParseCORSOrigins` と CORS の層を実装し、`Handler()` に差し、`cmd/killy/server.go` で `KILLY_CORS_ORIGINS` を読む。テストを緑にする
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9_
-  - [ ] 2.4 `*` を返す・完全一致を前方一致に変える・`/agent/v1/` にも付ける・preflight が認証に進む、のそれぞれにすると対応するテストが落ちることを確かめ、PR 本文に書く
+  - [x] 2.4 `*` を返す・完全一致を前方一致に変える・`/agent/v1/` にも付ける・preflight が認証に進む、のそれぞれにすると対応するテストが落ちることを確かめ、PR 本文に書く
     - _Requirements: 2.4, 2.5, 2.6, 2.8_
-  - [ ] 2.5 `deploy/overlays/stg/` に `KILLY_CORS_ORIGINS` を足す（prd には足さない）。`kustomize build` の出力で確かめる
+  - [x] 2.5 `deploy/overlays/stg/` に `KILLY_CORS_ORIGINS` を足す（prd には足さない）。`kustomize build` の出力で確かめる
     - _Requirements: 2.10_
-  - [ ] 2.6 `docs/ARCHITECTURE.md` と `docs/ARCHITECTURE.ja.md` に CORS を書き、`docs/openapi.yaml` に preflight を書くか判断する
+  - [x] 2.6 `docs/ARCHITECTURE.md` と `docs/ARCHITECTURE.ja.md` に CORS を書き、`docs/openapi.yaml` に preflight を書くか判断する
     - _Requirements: 2.11_
-  - [ ] 2.7 手元の PostgreSQL（`make db-up`）に向けて `KILLY_CORS_ORIGINS` つきで `killy server` を動かし、`curl` で preflight と SSE の応答のヘッダを確かめ、PR 本文に書く。staging の image を審査の前に更新する期限を PR 本文に書く
-    - _Requirements: 2.4, 2.5, 2.12_
+  - [x] 2.7 手元の PostgreSQL に向けて `KILLY_CORS_ORIGINS` つきで `killy server` を動かし、`curl` で preflight と SSE の応答のヘッダを確かめ、PR 本文に書く
+    - _Requirements: 2.4, 2.5_
+  - [ ] 2.8 staging の image を、審査が始まる前に更新する（人が行う。aidd-infra の image の build が要る。期限を PR 本文に書く）
+    - _Requirements: 2.12_
 
 - [ ] 3. app：Web では device token と設定を localStorage に保存し、通知とカメラを出さない（#131。前提：#128、#129）
   - [ ] 3.1 `tokenKey` を `token-key.ts` に移し（`deps.ts` からも同じ名前で読める）、native のテストが変わらず緑であることを確かめる
