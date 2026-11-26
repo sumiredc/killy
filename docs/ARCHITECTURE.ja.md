@@ -187,11 +187,11 @@ sequenceDiagram
 
 ### CORS
 
-別のオリジンのブラウザのページは、Killy server が許可したときだけ App API を呼べます。デモの Web 版（「デモ環境」を参照）がそのページです。`https://killy.sumire-sakamoto.co.jp` から配られ、`https://stg-killy.sumire.pink` を呼びます。ネイティブの app はブラウザのページではなく、この設定を要りません。
+別のオリジンのブラウザのページは、Killy server が許可したときだけ App API を呼べます。デモの Web 版（「デモ環境」を参照）がそのページです。`https://killy.sumire-sakamoto.co.jp` から配られ、`https://stg-killy.sumire.pink` を呼びます。ネイティブの app はブラウザのページではなく、この設定は要りません。
 
-- `KILLY_CORS_ORIGINS` は、オリジン（scheme、host、あれば port。path と `*` は不可）をカンマで区切った一覧。項目がオリジンでなければ、server は起動しない。未設定か空なら、今までどおり、どの応答にも CORS のヘッダを付けない。既定の port は、ブラウザと同じく、オリジンから省く。
-- `/app/v1/` の下で `Origin` が一覧のどれかと一致する要求には、すべての応答に、そのオリジンを入れた `Access-Control-Allow-Origin` を付ける。成功、エラー（`401`・`429`。無いとページが status を読めない）、イベントの stream のどれにも付ける。`/app/v1/` の下の応答には `Vary: Origin` も付く。`*` は返さず、`Access-Control-Allow-Credentials` も返さない。app は cookie を使わず、Bearer token だけを送るため。
-- 一覧のオリジンからの preflight（`Origin` と `Access-Control-Request-Method` を持つ `OPTIONS`）には、認証と回数制限より前に、`204` と `Access-Control-Allow-Methods: GET, POST, PATCH, DELETE`・`Access-Control-Allow-Headers: Authorization, Content-Type`・`Access-Control-Max-Age: 600` を返す。そのため preflight は回数制限を使わない。それ以外のオリジンには、CORS のヘッダを付けず、今までの応答（`405`）を返す。
+- `KILLY_CORS_ORIGINS` は、オリジン（scheme、host、あれば port。path と `*` は不可）をカンマで区切った一覧。項目がオリジンでなければ、server は起動しない。項目は、ブラウザが送る形（scheme と host は小文字、既定の port は省く）で読む。未設定か空なら、今までどおり、どの応答にも CORS のヘッダ（`Vary: Origin` を含む）を付けない。
+- `/app/v1/` の下で `Origin` が一覧のどれかと一致する要求には、すべての応答に、そのオリジンを入れた `Access-Control-Allow-Origin` を付ける。成功、エラー（`401`・`429`。無いとページが status を読めない）、イベントの stream のどれにも付ける。一覧を設定している間は、`/app/v1/` の下のすべての応答に、オリジンによらず `Vary: Origin` も付く。`*` は返さず、`Access-Control-Allow-Credentials` も返さない。app は cookie を使わず、Bearer token だけを送るため。
+- 一覧のオリジンからの preflight（`Origin` と `Access-Control-Request-Method` を持つ `OPTIONS`）には、認証と回数制限より前に、`204` と `Access-Control-Allow-Methods: GET, POST, PATCH, DELETE`・`Access-Control-Allow-Headers: Authorization, Content-Type`・`Access-Control-Max-Age: 600` を返す。そのため preflight は回数制限を使わない。それ以外のオリジンには、`Access-Control-*` のヘッダを付けず、今までの応答（`405`）を返す。
 - `/agent/v1/` には何も付けない。agent はブラウザではないため。
 - CORS は認証ではない。一覧のオリジンからでも、有効な token の無い要求は、ほかと同じく `401`。回数制限も変わらない。
 - 設定するのは `deploy/overlays/stg/` だけで、値は `https://killy.sumire-sakamoto.co.jp`。production には設定しない。
