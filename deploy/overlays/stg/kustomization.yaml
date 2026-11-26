@@ -27,3 +27,10 @@ patches:
       - op: add
         path: /spec/template/spec/containers/0/env/-
         value: { name: KILLY_DEMO_AGENT_ID, value: a8fd6189-f2b7-4f53-abeb-ddfa41f03565 }
+  # The pages allowed to call the app's API from a browser: the Web version of the demo on the
+  # introduction site (not a secret). Production sets none, so it sends no CORS header.
+  - target: { kind: Deployment, name: killy-server }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: { name: KILLY_CORS_ORIGINS, value: "https://killy.sumire-sakamoto.co.jp" }
