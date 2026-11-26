@@ -151,6 +151,22 @@ func TestAnAllowedOriginCanReadAnErrorResponse(t *testing.T) {
 	}
 }
 
+func TestAnAllowedOriginCanReadARateLimitedResponse(t *testing.T) {
+	s := corsServer(t)
+	for range DeviceRegistrationLimit {
+		if w := s.serve("POST", "/app/v1/devices", webOrigin); w.Code != http.StatusOK {
+			t.Fatalf("registration: status %d, want 200", w.Code)
+		}
+	}
+	w := s.serve("POST", "/app/v1/devices", webOrigin)
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("status %d, want 429 over the registration limit", w.Code)
+	}
+	if got := w.Header().Get("Access-Control-Allow-Origin"); got != webOrigin {
+		t.Errorf("Access-Control-Allow-Origin %q on a 429, want %q", got, webOrigin)
+	}
+}
+
 func TestAllowingAnOriginDoesNotLetARequestWithoutATokenIn(t *testing.T) {
 	s := corsServer(t)
 	for _, tc := range []struct{ method, path string }{
@@ -203,8 +219,8 @@ func TestAPreflightFromAnAllowedOriginIsAnsweredBeforeAnythingElse(t *testing.T)
 			t.Errorf("%s %q, want %q", field, got, want)
 		}
 	}
-	if w.Header().Get("Access-Control-Max-Age") == "" {
-		t.Error("no Access-Control-Max-Age, so the browser asks again before every request")
+	if got := w.Header().Get("Access-Control-Max-Age"); got != "600" {
+		t.Errorf("Access-Control-Max-Age %q, want 600: without it the browser asks again before every request", got)
 	}
 	if w.Body.Len() != 0 {
 		t.Errorf("body %q, want none", w.Body.String())
