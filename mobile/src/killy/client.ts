@@ -105,6 +105,11 @@ export type ClientOptions = {
   baseURL: string;
   fetch: FetchLike;
   deviceToken: () => string | null;
+  /**
+   * Keeps a newly registered device token (saves it, and makes `deviceToken` return it). Without
+   * it, a call the server answers with 401 is not retried after registering again.
+   */
+  renewToken?: (token: string) => Promise<void>;
   /** Math.random in the app; the reconnection jitter. */
   random: () => number;
 };
@@ -117,7 +122,7 @@ export const streamIdleTimeout = 60_000;
 
 type Answer = { status: number; body: unknown };
 
-export function createKillyClient({ baseURL, fetch, deviceToken, random }: ClientOptions): KillyClient {
+export function createKillyClient({ baseURL, fetch, deviceToken, renewToken, random }: ClientOptions): KillyClient {
   // Resolves with the status and the parsed JSON body (undefined when it is not JSON), or rejects
   // when no answer came.
   async function request(method: string, path: string, body: unknown, token: string | null): Promise<Answer> {
@@ -136,6 +141,56 @@ export function createKillyClient({ baseURL, fetch, deviceToken, random }: Clien
     }
   }
 
+  // The token that registering again produced. It is never renewed away from: a server that
+  // rejects a token it just issued gets no second registration, so nothing loops.
+  let renewed: string | null = null;
+  let renewing: Promise<string | null> | null = null;
+
+  // Registers the device again, once for all the calls waiting on it. Resolves with the new token,
+  // or null when it could not be had or kept.
+  function renew(): Promise<string | null> {
+    renewing ??= (async () => {
+      try {
+        const res = await request('POST', '/app/v1/devices', {}, null);
+        const token = field(res.body, 'device_token');
+        if (res.status !== 200 || !token || !renewToken) {
+          return null;
+        }
+        await renewToken(token);
+        renewed = token;
+        return token;
+      } catch {
+        return null;
+      } finally {
+        renewing = null;
+      }
+    })();
+    return renewing;
+  }
+
+  // The token to send again after a 401 for `used`, or null when there is nothing new to try.
+  async function replacement(used: string): Promise<string | null> {
+    if (used === renewed || !renewToken) {
+      return null;
+    }
+    const current = deviceToken();
+    // Another call has already replaced it.
+    return current !== null && current !== used ? current : renew();
+  }
+
+  // A call with the device token. When the server does not know the token (401), registers the
+  // device again and sends the call once more with the new token.
+  async function authed(method: string, path: string, body: unknown): Promise<Answer> {
+    const token = deviceToken();
+    const answer = await request(method, path, body, token);
+    if (answer.status !== 401 || token === null) {
+      if (token === renewed) renewed = null; // the server accepts it: a later 401 is a new case
+      return answer;
+    }
+    const next = await replacement(token);
+    return next === null ? answer : request(method, path, body, next);
+  }
+
   async function changeServer(method: 'PATCH' | 'DELETE', id: string, body: unknown): Promise<void> {
     const token = deviceToken();
     if (token === null) {
@@ -143,7 +198,7 @@ export function createKillyClient({ baseURL, fetch, deviceToken, random }: Clien
     }
     let answer: Answer;
     try {
-      answer = await request(method, `/app/v1/servers/${encodeURIComponent(id)}`, body, token);
+      answer = await authed(method, `/app/v1/servers/${encodeURIComponent(id)}`, body);
     } catch {
       throw new ServerError('unreachable');
     }
@@ -176,7 +231,7 @@ export function createKillyClient({ baseURL, fetch, deviceToken, random }: Clien
       const body = { ...(pushToken !== undefined && { push_token: pushToken }), ...(notify !== undefined && { notify }) };
       let answer: Answer;
       try {
-        answer = await request('PATCH', '/app/v1/devices/me', body, token);
+        answer = await authed('PATCH', '/app/v1/devices/me', body);
       } catch {
         throw new UpdateError('unreachable');
       }
@@ -193,7 +248,7 @@ export function createKillyClient({ baseURL, fetch, deviceToken, random }: Clien
       const trimmed = name?.trim();
       let answer: Answer;
       try {
-        answer = await request('POST', '/app/v1/pairings/claim', trimmed ? { code, name: trimmed } : { code }, token);
+        answer = await authed('POST', '/app/v1/pairings/claim', trimmed ? { code, name: trimmed } : { code });
       } catch {
         throw new ClaimError('unreachable');
       }
@@ -219,7 +274,7 @@ export function createKillyClient({ baseURL, fetch, deviceToken, random }: Clien
       }
       let answer: Answer;
       try {
-        answer = await request('POST', '/app/v1/demo', undefined, token);
+        answer = await authed('POST', '/app/v1/demo', undefined);
       } catch {
         throw new ClaimError('unreachable');
       }
@@ -237,11 +292,11 @@ export function createKillyClient({ baseURL, fetch, deviceToken, random }: Clien
       const body = { id, server_id: serverId, ppid, starttime };
       let answer: Answer;
       try {
-        answer = await request('POST', '/app/v1/kills', body, token);
+        answer = await authed('POST', '/app/v1/kills', body);
       } catch {
         // No answer at all: the same ID once more is safe, since the agent never signals twice for it.
         try {
-          answer = await request('POST', '/app/v1/kills', body, token);
+          answer = await authed('POST', '/app/v1/kills', body);
         } catch {
           throw new KillError('unreachable');
         }
@@ -270,7 +325,7 @@ export function createKillyClient({ baseURL, fetch, deviceToken, random }: Clien
       }
       let answer: Answer;
       try {
-        answer = await request('POST', `/app/v1/servers/${encodeURIComponent(id)}/check`, undefined, token);
+        answer = await authed('POST', `/app/v1/servers/${encodeURIComponent(id)}/check`, undefined);
       } catch {
         return { kind: 'unreachable' };
       }
@@ -307,14 +362,25 @@ export function createKillyClient({ baseURL, fetch, deviceToken, random }: Clien
           return;
         }
         controller = new AbortController();
-        const res = await fetch(baseURL + '/app/v1/events', {
-          method: 'GET',
-          headers: { Authorization: `Bearer ${token}`, Accept: 'text/event-stream' },
-          signal: controller.signal,
-        });
+        const open = (t: string) =>
+          fetch(baseURL + '/app/v1/events', {
+            method: 'GET',
+            headers: { Authorization: `Bearer ${t}`, Accept: 'text/event-stream' },
+            signal: controller!.signal,
+          });
+        let res = await open(token);
+        if (res.status === 401) {
+          // The token is unknown to the server: register again and open the stream with the new one.
+          const next = await replacement(token);
+          if (next === null || stopped) {
+            return;
+          }
+          res = await open(next);
+        }
         if (res.status !== 200 || res.body === null) {
           return;
         }
+        if (deviceToken() === renewed) renewed = null;
         // Reached the server: the next wait starts again from 1 second, however this stream ends.
         onOpen();
         const r = res.body.getReader();

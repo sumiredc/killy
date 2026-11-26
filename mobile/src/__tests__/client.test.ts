@@ -1,5 +1,5 @@
-import { ClaimError, createKillyClient, KillError, RegisterError, ServerError, UpdateError } from '../killy/client';
-import { FakeServer } from '../testing/fake-server';
+import { ClaimError, createKillyClient, type FetchLike, KillError, type KillyClient, RegisterError, ServerError, UpdateError } from '../killy/client';
+import { FakeServer, settle } from '../testing/fake-server';
 
 const url = 'https://killy.example';
 
@@ -540,5 +540,123 @@ describe('addDemoServer', () => {
     const server = new FakeServer();
     await expect(client(server, null).addDemoServer()).rejects.toEqual(new ClaimError('not_registered'));
     expect(server.requests).toEqual([]);
+  });
+});
+
+describe('a token the server does not know (401)', () => {
+  const unauthorized = [401, { error: 'unauthorized' }] as [number, unknown];
+  const added = { id: 'a1', name: 'web-01', hostname: 'web-01', notify: true };
+
+  /** A client whose token is held in `held`, as the app holds it; renewToken replaces it. */
+  function renewing(server: FakeServer, held = { token: 'old-token' as string | null }) {
+    const kept: string[] = [];
+    const c = createKillyClient({
+      baseURL: url,
+      fetch: server.fetch,
+      deviceToken: () => held.token,
+      renewToken: async (t) => {
+        kept.push(t);
+        held.token = t;
+      },
+      random: () => 0,
+    });
+    return { c, kept, held };
+  }
+
+  test('a claim registers the device once and sends the same claim again with the new token', async () => {
+    const server = new FakeServer();
+    server.respondInOrder('POST /app/v1/pairings/claim', [unauthorized, [200, added]]);
+    server.respond('POST /app/v1/devices', 200, { device_token: 'new-token' });
+    const { c, kept } = renewing(server);
+    await expect(c.claim('K7Q4XP', 'box')).resolves.toEqual(added);
+    expect(kept).toEqual(['new-token']);
+    expect(server.requests.map((r) => [r.route, r.authorization])).toEqual([
+      ['POST /app/v1/pairings/claim', 'Bearer old-token'],
+      ['POST /app/v1/devices', undefined],
+      ['POST /app/v1/pairings/claim', 'Bearer new-token'],
+    ]);
+    expect(server.requests[2].body).toEqual({ code: 'K7Q4XP', name: 'box' });
+  });
+
+  test('a second 401 after registering is the answer: no more registrations, no loop', async () => {
+    const server = new FakeServer();
+    server.respond('POST /app/v1/pairings/claim', 401, { error: 'unauthorized' });
+    server.respond('POST /app/v1/devices', 200, { device_token: 'new-token' });
+    const { c } = renewing(server);
+    await expect(c.claim('K7Q4XP')).rejects.toEqual(new ClaimError('other'));
+    await expect(c.claim('K7Q4XP')).rejects.toEqual(new ClaimError('other'));
+    expect(server.count('POST /app/v1/devices')).toBe(1);
+    expect(server.count('POST /app/v1/pairings/claim')).toBe(3);
+  });
+
+  test('calls that fail together register once, and each is sent again', async () => {
+    const server = new FakeServer();
+    server.respondInOrder('PATCH /app/v1/servers/a1', [unauthorized, unauthorized, [204, null]]);
+    server.respond('POST /app/v1/devices', 200, { device_token: 'new-token' });
+    const { c } = renewing(server);
+    await Promise.all([c.updateServer('a1', { name: 'x' }), c.updateServer('a1', { notify: false })]);
+    expect(server.count('POST /app/v1/devices')).toBe(1);
+    expect(server.count('PATCH /app/v1/servers/a1')).toBe(4);
+    expect(server.requests.filter((r) => r.route === 'PATCH /app/v1/servers/a1').slice(2).map((r) => r.authorization)).toEqual(['Bearer new-token', 'Bearer new-token']);
+  });
+
+  test('when registering fails, the 401 is the answer as before', async () => {
+    const server = new FakeServer();
+    server.respond('POST /app/v1/pairings/claim', 401, { error: 'unauthorized' });
+    server.respond('POST /app/v1/devices', 429, { error: 'rate_limited' });
+    const { c, kept } = renewing(server);
+    await expect(c.claim('K7Q4XP')).rejects.toEqual(new ClaimError('other'));
+    expect(kept).toEqual([]);
+    expect(server.count('POST /app/v1/pairings/claim')).toBe(1);
+  });
+
+  test('without renewToken a 401 is not retried', async () => {
+    const server = new FakeServer();
+    server.respond('POST /app/v1/pairings/claim', 401, { error: 'unauthorized' });
+    await expect(client(server).claim('K7Q4XP')).rejects.toEqual(new ClaimError('other'));
+    expect(server.requests).toHaveLength(1);
+  });
+
+  test('every call that carries the device token recovers', async () => {
+    const calls: [string, string, (c: KillyClient) => Promise<unknown>, number, unknown][] = [
+      ['POST', '/app/v1/demo', (c) => c.addDemoServer(), 200, added],
+      ['PATCH', '/app/v1/devices/me', (c) => c.updateDevice({ notify: false }), 204, null],
+      ['DELETE', '/app/v1/servers/a1', (c) => c.removeServer('a1'), 204, null],
+      ['POST', '/app/v1/servers/a1/check', (c) => c.check('a1'), 200, { result: 'ok', version: 'v1' }],
+      ['POST', '/app/v1/kills', (c) => c.kill({ id: 'k', serverId: 'a1', ppid: 7, starttime: 70 }), 200, { outcome: 'killed', reaped: 1 }],
+    ];
+    for (const [method, path, call, status, body] of calls) {
+      const server = new FakeServer();
+      server.respondInOrder(`${method} ${path}`, [unauthorized, [status, body]]);
+      server.respond('POST /app/v1/devices', 200, { device_token: 'new-token' });
+      const { c } = renewing(server);
+      if (path === '/app/v1/devices/me') server.respondInOrder('PATCH /app/v1/devices/me', [unauthorized, [204, null]]);
+      await call(c);
+      const sent = server.requests.filter((r) => r.route === `${method} ${path}`);
+      expect(sent.map((r) => r.authorization)).toEqual(['Bearer old-token', 'Bearer new-token']);
+    }
+  });
+
+  test('the event stream registers again and opens with the new token', async () => {
+    const server = new FakeServer();
+    server.stream();
+    server.respond('POST /app/v1/devices', 200, { device_token: 'new-token' });
+    let rejected = false;
+    const fetch: FetchLike = async (u, init) => {
+      if (u.endsWith('/app/v1/events') && !rejected) {
+        rejected = true;
+        return { status: 401, text: async () => '{"error":"unauthorized"}', body: null };
+      }
+      return server.fetch(u, init);
+    };
+    const held = { token: 'old-token' as string | null };
+    const c = createKillyClient({ baseURL: url, fetch, deviceToken: () => held.token, renewToken: async (t) => void (held.token = t), random: () => 0 });
+    const stop = c.events(() => {});
+    await settle();
+    expect(server.requests.map((r) => [r.route, r.authorization])).toEqual([
+      ['POST /app/v1/devices', undefined],
+      ['GET /app/v1/events', 'Bearer new-token'],
+    ]);
+    stop();
   });
 });
