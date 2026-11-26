@@ -56,6 +56,12 @@ func TestParseCORSOriginsRefusesWhatIsNotAnOrigin(t *testing.T) {
 		"an empty item in the middle": webOrigin + ",," + evilOrigin,
 		"an empty item at the end":    webOrigin + ",",
 		"null":                        "null",
+		"an empty port":               "https://killy.sumire-sakamoto.co.jp:",
+		"a port that is not a number": "https://killy.sumire-sakamoto.co.jp:https",
+		"a port with a leading zero":  "https://killy.sumire-sakamoto.co.jp:0443",
+		"port 0":                      "https://killy.sumire-sakamoto.co.jp:0",
+		"a port above 65535":          "https://killy.sumire-sakamoto.co.jp:65536",
+		"a host outside ASCII":        "https://キリー.example",
 	} {
 		t.Run(name, func(t *testing.T) {
 			if got, err := ParseCORSOrigins(value); err == nil {

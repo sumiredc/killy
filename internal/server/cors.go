@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -48,6 +49,9 @@ func parseCORSOrigin(item string) (string, error) {
 	if (scheme != "http" && scheme != "https") || u.Hostname() == "" ||
 		u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || u.Opaque != "" {
 		return "", fmt.Errorf("origin %q: want a scheme (http or https), a host and an optional port only", item)
+	}
+	if err := checkCORSHost(item, u); err != nil {
+		return "", err
 	}
 	host := strings.ToLower(u.Host)
 	// A browser leaves the default port out of the Origin it sends, so it is left out here too.
@@ -97,4 +101,25 @@ func (s *Server) withCORS(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// checkCORSHost refuses a host and port that no browser would send in an Origin, so the setting
+// cannot start without ever matching: a host with a byte outside ASCII (a browser sends the
+// punycode form), an empty port, and a port that is not a plain number from 1 to 65535.
+func checkCORSHost(item string, u *url.URL) error {
+	for i := 0; i < len(u.Host); i++ {
+		if u.Host[i] >= 0x80 {
+			return fmt.Errorf("origin %q: write the host in ASCII (punycode for an international name)", item)
+		}
+	}
+	if strings.HasSuffix(u.Host, ":") {
+		return fmt.Errorf("origin %q: the port is empty", item)
+	}
+	if port := u.Port(); port != "" {
+		n, err := strconv.Atoi(port)
+		if err != nil || n < 1 || n > 65535 || strconv.Itoa(n) != port {
+			return fmt.Errorf("origin %q: the port is not a number from 1 to 65535", item)
+		}
+	}
+	return nil
 }
