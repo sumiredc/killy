@@ -126,6 +126,14 @@ There is no permanent connection indicator. Each request that fails shows its ow
 
 84px including the home-indicator area, translucent black with blur, top border `line`. Two tabs: Battle (ghost outline icon, "撃退" / "Battle") and Settings (gear icon, "設定" / "Settings"). Active tab in `purple-300`. The Settings tab is disabled while a kill animation is running. Hidden on the lock-screen preview.
 
+### Web version (demo)
+
+The Web version, at `/demo/` on the introduction site, is the same app for the public demo only (not in the mock). On a screen wider than 430 px it sits in a 430 px frame in the middle of the page, with a 1px `line` border on each side and `bg` around it; on a narrower one it fills the screen. It adds the public demo server itself when it opens, so:
+
+- Settings has no "＋ サーバーを追加" button, no QR code and no Notifications row (a browser gets no push from the Killy server); the Language row and the server rows are as in the app.
+- While the demo server is not there, the battle screen shows no empty-state text (the text points to Add server, which is not there). If it cannot be added, a red notice at the top of the battle screen says why, in the words of the Add server errors: "デモサーバーは今使えません" / "The demo server is not available right now", the Killy server unreachable, or "The server could not be added. Try again in a while."; and when the browser could not register, the registration messages. A reload tries again.
+- The hold-to-kill button selects no text and opens no menu when held.
+
 ## Characters
 
 All artwork is flat vector, drawn in `mock/art.js` (`killySVG`, `parentSVG`, `zombieSVG`, `soulSVG`, `hoodIconSVG`). Port each to a `react-native-svg` component, keeping the class-named parts below as separately animatable elements.
