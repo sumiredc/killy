@@ -65,13 +65,19 @@
       "ja": "./locales/ja.json"
     },
     "experiments": {
-      "reactCompiler": true
+      "reactCompiler": true,
+      "baseUrl": "/demo"
     },
     "extra": {
       "eas": {
         "projectId": "fd79de26-81ac-4ab1-8152-c6081d1b0730"
       }
     },
-    "owner": "sumire-sakamoto"
+    "owner": "sumire-sakamoto",
+    "web": {
+      "output": "static",
+      "bundler": "metro",
+      "favicon": "./assets/images/icon.png"
+    }
   }
 }
