@@ -306,7 +306,7 @@ gh release upload "$TAG" killy-android.apk -R sumiredc/killy
 
 ```text
 killy/
-├── .kiro/            # steering and specs for Kiro (committed)
+├── .kiro/            # steering, specs and hooks for Kiro (committed; settings/ and agents/ stay on the author's machine)
 ├── cmd/killy/        # main: agent, server, summon subcommands
 ├── internal/
 │   ├── proc/         # /proc parsing
@@ -318,7 +318,7 @@ killy/
 ├── deploy/           # kustomize base and overlays (stg, prd), applied by Argo CD
 │   └── systemd/      # units for the agent and summon on Linux servers
 ├── site/             # introduction site and privacy policy page, copied to the web host (see "Distribution")
-├── tools/            # mergegate (merge hook), privacypage and siteassets (generate site/)
+├── tools/            # mergegate (merge hook), privacypage and siteassets (generate site/), and the scripts CI runs: dbcheck, e2e, k8scheck, submissioncheck (lib/ is their shared shell)
 ├── docs/             # PRD, ARCHITECTURE, DESIGN, PRIVACY (and Japanese translations), openapi.yaml
 └── mock/             # HTML prototype of the app (reference, not shipped)
 ```

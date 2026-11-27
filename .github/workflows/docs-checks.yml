@@ -1,0 +1,102 @@
+name: docs-checks
+
+# Three checks on what is published or submitted rather than run:
+#   openapi      docs/openapi.yaml, the source of truth for the wire format, is a valid OpenAPI document.
+#   links        links between files in site/ (which deploy-site.yml publishes), README.md, docs/ and .kiro/
+#                resolve to a file, and to an anchor where the link names one. Links to other websites
+#                are not checked: they fail for reasons that are not ours.
+#   submission   LICENSE is MIT and .kiro/ is committed and not git-ignored (tools/submissioncheck).
+# They run only when something they read changes: a check that is skipped on other pull requests
+# cannot be a required check.
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'site/**'
+      - 'README.md'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.kiro/**'
+      - 'tools/submissioncheck/**'
+      - '.github/workflows/docs-checks.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'site/**'
+      - 'README.md'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.kiro/**'
+      - 'tools/submissioncheck/**'
+      - '.github/workflows/docs-checks.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  REDOCLY_VERSION: 2.84.0
+  LYCHEE_VERSION: 0.24.2
+  # SHA-256 of lychee-x86_64-unknown-linux-gnu.tar.gz, from the release's .sha256 file.
+  LYCHEE_SHA256: 1f4e0ef7f6554a6ed33dd7ac144fb2e1bbed98598e7af973042fc5cd43951c9a
+
+jobs:
+  openapi:
+    # Every job uses a GitHub-hosted runner: a runner inside the home LAN would let a pull request
+    # from a fork run code there.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: mobile/.nvmrc
+      # Run at a fixed version; it is not a dependency of the app. docs/redocly.yaml makes warnings errors.
+      - run: npx --yes "@redocly/cli@${REDOCLY_VERSION}" lint openapi.yaml --config redocly.yaml
+        working-directory: docs
+        env:
+          REDOCLY_TELEMETRY: 'off'
+
+  links:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install lychee
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/lychee.tar.gz" \
+            "https://github.com/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/lychee-x86_64-unknown-linux-gnu.tar.gz"
+          echo "${LYCHEE_SHA256}  $RUNNER_TEMP/lychee.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/lychee.tar.gz" -C "$RUNNER_TEMP" --strip-components=1 lychee-x86_64-unknown-linux-gnu/lychee
+          "$RUNNER_TEMP/lychee" --version
+      # --offline: only links to files and anchors. A page links to a directory as `support/`, which is
+      # its index.html on the site, so site/ is checked with index files; the contact form link of
+      # the support page is a mark that deploy-site.yml replaces with the form's URL.
+      - name: Links in site/
+        run: >
+          "$RUNNER_TEMP/lychee" --offline --no-progress --include-fragments
+          --index-files index.html --exclude '__CONTACT_FORM_URL__' 'site/**/*.html'
+      # The README links to directories (cmd/killy, deploy), which have no index file. The specs and
+      # steering in .kiro/ link to anchors in the PRD and ARCHITECTURE, which a changed heading breaks.
+      - name: Links in README.md, docs/ and .kiro/
+        run: >
+          "$RUNNER_TEMP/lychee" --offline --no-progress --include-fragments
+          README.md 'docs/*.md' '.kiro/**/*.md'
+
+  submission:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: tools/submissioncheck/run.sh

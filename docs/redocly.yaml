@@ -1,0 +1,8 @@
+# Settings for `redocly lint docs/openapi.yaml` (.github/workflows/docs-checks.yml).
+# recommended-strict: the warnings of `recommended` are errors, so a lint finding fails the check.
+extends:
+  - recommended-strict
+rules:
+  # PingCommand, KillCommand, State and the other schemas of the event streams are used through
+  # `x-sse-events`, which the linter does not follow, so it reports them as unused.
+  no-unused-components: off

@@ -308,7 +308,7 @@ gh release upload "$TAG" killy-android.apk -R sumiredc/killy
 
 ```text
 killy/
-├── .kiro/            # Kiro の steering と spec（commit する）
+├── .kiro/            # Kiro の steering・spec・hook（commit する。settings/ と agents/ は作者の手元に置く）
 ├── cmd/killy/        # main：agent・server・summon のサブコマンド
 ├── internal/
 │   ├── proc/         # /proc の解析
@@ -320,7 +320,7 @@ killy/
 ├── deploy/           # kustomize の base と overlay（stg、prd）。Argo CD が適用する
 │   └── systemd/      # Linux サーバーで agent と summon を動かす unit
 ├── site/             # 紹介サイトとプライバシーポリシーのページ。web ホストに置く（「配布」を参照）
-├── tools/            # mergegate（merge の hook）、privacypage と siteassets（site/ を生成する）
+├── tools/            # mergegate（merge の hook）、privacypage と siteassets（site/ を生成する）、CI が走らせる dbcheck・e2e・k8scheck・submissioncheck（lib/ はその共通のシェル）
 ├── docs/             # PRD、ARCHITECTURE、DESIGN、PRIVACY（と日本語訳）、openapi.yaml
 └── mock/             # app の HTML のプロトタイプ（参考用。配布しない）
 ```
