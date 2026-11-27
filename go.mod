@@ -1,6 +1,6 @@
 module github.com/sumiredc/killy
 
-go 1.27
+go 1.99
 
 toolchain go1.27.4
 
