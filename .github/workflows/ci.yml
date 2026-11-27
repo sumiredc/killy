@@ -8,6 +8,13 @@ on:
 permissions:
   contents: read
 
+# A newer push to a pull request makes the older run pointless. Every other run (main, schedule) has a
+# group of its own, because a group keeps only one waiting run and would drop the one in between:
+# every commit on main must keep its result.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   go:
     # Every job uses a GitHub-hosted runner: a runner inside the home LAN would let a pull request
