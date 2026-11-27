@@ -1,0 +1,60 @@
+name: docker-build
+
+# The server image is built on the home cluster (see docs/ARCHITECTURE.md, "Image build"), where a
+# broken Dockerfile or a go.mod that the image's Go cannot read is found only when a production image
+# is made. This builds the same Dockerfile on a GitHub-hosted runner, without pushing it anywhere, and
+# starts the binary once. It runs only when something the image is built from changes: a check that
+# is skipped on other pull requests cannot be a required check.
+on:
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'go.mod'
+      - 'go.sum'
+      - 'cmd/**'
+      - 'internal/**'
+      - '.github/workflows/docker-build.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'go.mod'
+      - 'go.sum'
+      - 'cmd/**'
+      - 'internal/**'
+      - '.github/workflows/docker-build.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    # Every job uses a GitHub-hosted runner: a runner inside the home LAN would let a pull request
+    # from a fork run code there.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The base image is the one the Dockerfile pins by digest, pulled from Docker Hub here (the
+      # cluster pulls the same digest through its mirror). Nothing is pushed.
+      - name: Build the image
+        run: docker build --build-arg VERSION=ci --tag killy-server:ci .
+      # The image has only the binary, its CA roots and a non-root user. Starting it without a
+      # database must stop at the server's own check, which shows that the binary runs in the image.
+      - name: Start the binary
+        run: |
+          set -uo pipefail
+          user=$(docker image inspect killy-server:ci --format '{{.Config.User}}')
+          test "$user" = 65532:65532
+          out=$(docker run --rm killy-server:ci 2>&1) && status=0 || status=$?
+          echo "$out"
+          test "$status" -eq 1
+          grep -q 'KILLY_DATABASE_URL is not set' <<<"$out"
