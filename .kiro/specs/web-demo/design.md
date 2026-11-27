@@ -96,7 +96,7 @@ Metro は Web のビルドで `name.web.ts` を `name.ts` より先に選ぶ。n
 | `localStorage` が使えない | 読み出しは `null`、書き込みは何もしない。アクセスで例外が出る場合も同じ | 保存できないブラウザでも、そのページの間は動く。token が読めない場合に再登録しない native の規則（「読めない token を置き換えない」）は、token が既に存在し得ない Web には当てはまらない |
 | 保存先の共通部 | `mobile/src/killy/web-storage.ts`（`readStorage`・`writeStorage`）に `try/catch` で包んだ `localStorage` を置き、`deps.web.ts` と `prefs.web.ts` が使う。`localStorage` が無いことも、断られることも、同じ例外として扱う |
 | kill ボタン | Web のときだけ `userSelect: 'none'`・`WebkitTouchCallout: 'none'` と `onContextMenu` で `preventDefault`（`KillButton.tsx`）。`WebkitTouchCallout` は Chrome が捨てるので、実機の iOS Safari でだけ効く（確かめていない） |
-| 通知の許可 | `denied` | `NotificationsProvider` は `denied` のとき push token を取らず、送らない。`prepare`・`requestPermission` も呼ばれない |
+| 通知の許可 | `denied` | `NotificationsProvider` は `denied` のとき push token を取らず、送らず、`requestPermission` も呼ばない（`prepare` は呼ばれるが、Web では何もしない） |
 | 通知の行（Settings） | Web では描かない | `denied` を出すと、実在しない「システムの設定」への案内が出る |
 | QR | `AddServerSheet` で、Web ではカメラのボタンを描かない | Web のデモ専用では Add server 自体を出さないが、Requirement 3.6 は専用でない Web のビルドでも守る |
 
