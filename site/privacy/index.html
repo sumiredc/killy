@@ -24,12 +24,12 @@
   <main class="doc">
     <div class="en" lang="en">
 <h1>Killy — Privacy Policy</h1>
-<p>This policy covers the Killy mobile app (iOS and Android), the Killy server it connects to and the contact form on the support page. It says what data they handle, why, who else receives it, and how to remove it. Last updated: 2026-11-22.</p>
+<p>This policy covers the Killy mobile app (iOS and Android), the Web demo at <a href="https://killy.sumire-sakamoto.co.jp/demo/">https://killy.sumire-sakamoto.co.jp/demo/</a>, the Killy server they connect to and the contact form on the support page. It says what data they handle, why, who else receives it, and how to remove it. Last updated: 2026-11-27.</p>
 <p>Killy has no accounts, no advertising and no analytics. It does not sell or share data for any other purpose than the ones below.</p>
 <h2>What the app sends and why</h2>
 <div class="table-wrap"><table>
 <thead><tr><th>Data</th><th>Why</th></tr></thead>
-<tbody><tr><td>A random device token, created by the Killy server when the app first starts</td><td>To recognise this phone. Only its SHA-256 hash is stored on the server; the token itself stays in the phone&#39;s secure storage</td></tr>
+<tbody><tr><td>A random device token, created by the Killy server when the app first starts</td><td>To recognise this phone. Only its SHA-256 hash is stored on the server; the token itself stays in the phone&#39;s secure storage (in the Web demo, in the browser&#39;s local storage; see &#34;The public demo&#34;)</td></tr>
 <tr><td>The phone&#39;s push token (from Apple or Google, through Expo), only if notifications are allowed</td><td>To send a notification when a server has new zombie processes</td></tr>
 <tr><td>The app-wide notification switch, and for each server: its display name and its notification switch</td><td>To show the servers with the names chosen on this phone and to notify only when asked to</td></tr>
 <tr><td>Pairing codes typed or scanned</td><td>To link this phone to a server. A code is used once and expires after 10 minutes</td></tr>
@@ -68,11 +68,13 @@
 <li>The Killy server and its web server may record the address and time of requests in their logs.</li>
 </ul>
 <h2>The public demo</h2>
-<p>This section applies only to the builds made for the Kiroween 2026 hackathon judges. They connect to the team&#39;s staging Killy server and offer a public demo server. The store release of the app (App Store and Google Play) connects to the production Killy server and has no demo. Processes shown in the demo are created on a demo machine only for that purpose. Kills sent to the demo are visible to everyone using it: a parent killed by one person disappears for everyone.</p>
+<p>This section applies only to the builds made for the Kiroween 2026 hackathon judges and to the Web demo (below). They connect to the team&#39;s staging Killy server and offer a public demo server. The store release of the app (App Store and Google Play) connects to the production Killy server and has no demo. Processes shown in the demo are created on a demo machine only for that purpose. Kills sent to the demo are visible to everyone using it: a parent killed by one person disappears for everyone.</p>
+<p>The Web demo, at <a href="https://killy.sumire-sakamoto.co.jp/demo/">https://killy.sumire-sakamoto.co.jp/demo/</a>, is the same app in a browser, for the demo only. It connects to the staging Killy server and adds the demo server by itself when it opens, with no pairing code. It keeps the device token and the language setting in the browser&#39;s local storage (<code>localStorage</code>) for the site killy.sumire-sakamoto.co.jp, where the phone app uses its secure storage. It sends no push token and uses no camera. The page and its scripts, images and fonts come from the introduction site only, and the page loads nothing from a third party; the introduction site&#39;s web server may record the address and time of requests in its logs.</p>
 <h2>Removing data</h2>
 <ul>
 <li>Removing a server in the app (Settings → server → Remove) deletes that phone&#39;s link to it, with its display name and notification switch.</li>
 <li>Turning notifications off in the app stops pushes; uninstalling the app stops it from using its device token.</li>
+<li>In the Web demo, clearing the site data of killy.sumire-sakamoto.co.jp in the browser deletes the device token and the language setting; the next visit creates a new device. The old device&#39;s record on the Killy server is deleted on request, as below.</li>
 <li>To have a phone&#39;s record or a server&#39;s record deleted from the Killy server, send a request through the contact form on the support page, <a href="https://killy.sumire-sakamoto.co.jp/support/">https://killy.sumire-sakamoto.co.jp/support/</a>. Answers you gave in the form are deleted on request too.</li>
 </ul>
 <h2>Children</h2>
@@ -82,12 +84,12 @@
     </div>
     <div class="ja" lang="ja">
 <h1>Killy — プライバシーポリシー</h1>
-<p>このポリシーは、Killy のモバイル app（iOS と Android）、それがつなぐ Killy サーバー、サポートページのお問い合わせフォームに適用されます。どんなデータを扱い、何のために使い、誰が受け取り、どう消せるかを書きます。最終更新: 2026-11-22。この文書は英語版 <code>PRIVACY.md</code> の日本語訳で、正は英語版です。食い違ったときは英語版に従ってください。</p>
+<p>このポリシーは、Killy のモバイル app（iOS と Android）、Web のデモ（<a href="https://killy.sumire-sakamoto.co.jp/demo/">https://killy.sumire-sakamoto.co.jp/demo/</a>）、それらがつなぐ Killy サーバー、サポートページのお問い合わせフォームに適用されます。どんなデータを扱い、何のために使い、誰が受け取り、どう消せるかを書きます。最終更新: 2026-11-27。この文書は英語版 <code>PRIVACY.md</code> の日本語訳で、正は英語版です。食い違ったときは英語版に従ってください。</p>
 <p>Killy にはアカウントも広告も解析もありません。以下に書く目的以外で、データを販売することも共有することもありません。</p>
 <h2>app が送るデータと目的</h2>
 <div class="table-wrap"><table>
 <thead><tr><th>データ</th><th>目的</th></tr></thead>
-<tbody><tr><td>app の初回起動時に Killy サーバーが作る、ランダムな device token</td><td>この端末を見分けるため。サーバーに保存するのは SHA-256 のハッシュだけで、token そのものは端末の安全な保管領域に残ります</td></tr>
+<tbody><tr><td>app の初回起動時に Killy サーバーが作る、ランダムな device token</td><td>この端末を見分けるため。サーバーに保存するのは SHA-256 のハッシュだけで、token そのものは端末の安全な保管領域（Web のデモでは、ブラウザのローカルストレージ。「公開デモ」を参照）に残ります</td></tr>
 <tr><td>端末の push token（Apple または Google が Expo を通して発行する）。通知を許可した場合だけ</td><td>サーバーに新しいゾンビプロセスが現れたとき、通知を送るため</td></tr>
 <tr><td>app 全体の通知スイッチと、サーバーごとの表示名と通知スイッチ</td><td>この端末で付けた名前でサーバーを表示し、求められたときだけ通知するため</td></tr>
 <tr><td>入力またはスキャンしたペアリングコード</td><td>この端末をサーバーにひも付けるため。コードは 1 回だけ使え、10 分で失効します</td></tr>
@@ -126,11 +128,13 @@
 <li>Killy サーバーとその web サーバーは、リクエストのアドレスと時刻をログに記録することがあります。</li>
 </ul>
 <h2>公開デモ</h2>
-<p>この節は、Kiroween 2026 ハッカソンの審査員向けに作った build だけの話です。その build は、チームの staging の Killy サーバーにつながり、公開のデモサーバーを出します。ストアの製品版の app（App Store と Google Play）は production の Killy サーバーにつながり、デモはありません。デモに出るプロセスは、そのためだけにデモ機で作ったものです。デモに送った kill は、使っている全員に見えます。1 人が kill した親は、全員の画面から消えます。</p>
+<p>この節は、Kiroween 2026 ハッカソンの審査員向けに作った build と、Web のデモ（下）だけの話です。それらは、チームの staging の Killy サーバーにつながり、公開のデモサーバーを出します。ストアの製品版の app（App Store と Google Play）は production の Killy サーバーにつながり、デモはありません。デモに出るプロセスは、そのためだけにデモ機で作ったものです。デモに送った kill は、使っている全員に見えます。1 人が kill した親は、全員の画面から消えます。</p>
+<p>Web のデモ（<a href="https://killy.sumire-sakamoto.co.jp/demo/">https://killy.sumire-sakamoto.co.jp/demo/</a>）は、同じ app をブラウザで動かすもので、デモのためだけにあります。staging の Killy サーバーにつながり、開くとペアリングコードなしで、デモサーバーを自分で追加します。device token と言語の設定は、モバイル app が安全な保管領域に置く代わりに、サイト killy.sumire-sakamoto.co.jp のブラウザのローカルストレージ（<code>localStorage</code>）に置きます。push token は送らず、カメラも使いません。ページと、その script・画像・フォントは紹介サイトだけから読み込み、ページが第三者から読み込むものはありません。紹介サイトの web サーバーは、リクエストのアドレスと時刻をログに記録することがあります。</p>
 <h2>データを消す</h2>
 <ul>
 <li>app でサーバーを削除する（設定 → サーバー → 削除）と、この端末のそのサーバーへのひも付けが、表示名と通知スイッチごと消えます。</li>
 <li>app の通知をオフにすると push が止まります。app をアンインストールすると、device token は使われなくなります。</li>
+<li>Web のデモでは、ブラウザで killy.sumire-sakamoto.co.jp のサイトのデータを消すと、device token と言語の設定が消えます。次に開くと、新しい端末として作られます。古い端末の Killy サーバー上の記録は、下のとおり依頼があれば消します。</li>
 <li>端末の記録やサーバーの記録を Killy サーバーから消してほしいときは、サポートページ <a href="https://killy.sumire-sakamoto.co.jp/support/">https://killy.sumire-sakamoto.co.jp/support/</a> のお問い合わせフォームから依頼してください。フォームに書いた回答も、依頼があれば消します。</li>
 </ul>
 <h2>子ども</h2>

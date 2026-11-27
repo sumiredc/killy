@@ -26,6 +26,8 @@ These builds connect to the staging Killy server, `https://stg-killy.sumire.pink
 
 No server of your own? In the app, open **Settings → Add server** and tap **Try the demo server** (in the Japanese UI, **デモサーバーを試す**). A demo machine keeps creating parents that hold zombies, and only those parents can be killed. Hold the kill button for 1 second.
 
+Nothing to install? Open the **Web demo** at <https://killy.sumire-sakamoto.co.jp/demo/> in a browser. It is the same app: it connects to the same staging Killy server and adds the demo server by itself, so the battle screen shows the demo's zombies as soon as it opens (on a computer it sits in a phone-sized frame). Press and hold the kill button for 1 second, with the mouse or a finger. It has no notifications and no Add server. It keeps a device token in your browser's local storage, so a reload is the same device; clear the site's data to start over.
+
 The demo is shared: a parent that someone else kills disappears from your screen too.
 
 The Killy server runs on the team's home Kubernetes cluster as a single instance. Its uptime is not guaranteed, including during judging.
