@@ -5,7 +5,7 @@ metadata:
   labels: { app: killy-server }
 spec:
   # One instance: live state, SSE streams and pending commands are in memory.
-  replicas: 1
+  replicas: "1"
   strategy:
     type: Recreate
   selector:
