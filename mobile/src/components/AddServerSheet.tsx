@@ -6,7 +6,8 @@ import { buildDemoEnabled } from '@/config';
 import { useServerURL } from '@/config-context';
 import type { Key } from '@/i18n';
 import { useI18n } from '@/i18n/context';
-import { ClaimError, type ClaimErrorKind } from '@/killy/client';
+import { ClaimError } from '@/killy/client';
+import { claimMessages } from '@/killy/claim-messages';
 import { useKilly } from '@/killy/context';
 import type { PairLink } from '@/killy/pair-link';
 import { type PairCheck, parsePairURL } from '@/killy/pair-url';
@@ -17,17 +18,6 @@ type Phase = { kind: 'form'; error: Key | null } | { kind: 'adding' } | { kind: 
 
 /** How long "Added ‹name›" stays before the sheet closes (DESIGN: Add server sheet). */
 export const addedFor = 1300;
-
-const claimMessages: Record<ClaimErrorKind, Key> = {
-  code_unknown: 'pairError',
-  code_used: 'pairError',
-  code_expired: 'pairError',
-  rate_limited: 'pairRateLimited',
-  unreachable: 'pairUnreachable',
-  not_registered: 'deviceNotRegistered',
-  demo_not_configured: 'demoNotConfigured',
-  other: 'pairFailed',
-};
 
 /** The message for a pairing link from a QR code or a deep link that was not accepted. */
 export function pairLinkError(reason: Extract<PairCheck, { ok: false }>['reason']): Key {
