@@ -20,12 +20,13 @@ jobs:
     # Every job uses a GitHub-hosted runner: a runner inside the home LAN would let a pull request
     # from a fork run code there.
     # The agent is released for amd64 and arm64 (release.yml), and its tests check the machine they
-    # run on (pidfd, reaping), so both architectures run them.
+    # run on (pidfd, reaping), so both architectures run them. macOS is where the code is developed
+    # (make test), so it must build and pass there too, with the Linux-only tests left out by build tags.
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
