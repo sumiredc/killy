@@ -71,7 +71,7 @@ type Server struct { /* … */ CORSOrigins []string }
 |---|---|---|
 | 掛ける範囲 | path が `/app/v1/` で始まる要求だけ | agent の API はブラウザから呼ばれない。開く面を最小にする |
 | 一致 | 項目と `Origin` ヘッダの完全一致（大文字小文字も区別する） | ブラウザは `Origin` を小文字のスキームとホストで送る。ゆるい一致（部分一致、`*`）は別のオリジンに開いてしまう |
-| 起動時の検査 | `ParseCORSOrigins` が、`*`・パス・クエリ・ユーザー情報・空のホスト・スキームが `http`/`https` でないもの・空の項目を拒み、起動を失敗させる。通した項目は、スキームとホストを小文字にし、既定の port を省く | 設定の間違いが「全部に開く」「黙って無効」にならないようにする |
+| 起動時の検査 | `ParseCORSOrigins` が、`*`・パス・クエリ・ユーザー情報・空のホスト・スキームが `http`/`https` でないもの・空の項目・ASCII でないホスト・空の port と 1〜65535 の数でない port（先頭が 0 のものを含む）を拒み、起動を失敗させる。通した項目は、スキームとホストを小文字にし、既定の port を省く | 設定の間違いが「全部に開く」「黙って無効」にならないようにする |
 | preflight | 許可したオリジンの `OPTIONS` で、`Access-Control-Request-Method` がある要求を、mux より前で `204` で答える | mux は `OPTIONS` の route を持たず、`405` を返してしまう。認証も回数制限も通さない |
 | ヘッダ | `Access-Control-Allow-Origin`（そのオリジン）、`Vary: Origin`、preflight には `Allow-Methods`・`Allow-Headers`・`Max-Age: 600` | `Allow-Credentials` は返さない。app は cookie を使わず、Bearer token だけを送る |
 | 許可していないオリジン | 何も足さずに次の handler へ。`Vary: Origin` は、CORS が有効なときの `/app/v1/` の応答に付ける | キャッシュが、許可したオリジン向けの応答を他のオリジンに返さないようにする |

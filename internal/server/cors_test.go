@@ -250,8 +250,9 @@ func TestAPreflightDoesNotUseUpALimitOrNeedAToken(t *testing.T) {
 	if w := s.serve("POST", "/app/v1/devices", webOrigin); w.Code != http.StatusOK {
 		t.Errorf("registration after the preflights: status %d, want 200", w.Code)
 	}
-	if n := len(s.mem.Links()); n != 0 {
-		t.Errorf("%d links, want none", n)
+	// Only that registration made a device: no preflight reached the handler.
+	if n := len(s.mem.Devices()); n != 1 {
+		t.Errorf("%d devices, want 1", n)
 	}
 }
 
