@@ -129,10 +129,11 @@ flowchart LR
   O --> U["rsync（--delete なし）"] --> V["確認: /demo/ が 200"]
 ```
 
-- `app.json` に `expo.experiments.baseUrl: "/demo"` と `expo.web.output: "static"`（`bundler: "metro"`）を足す。`baseUrl` は Web のビルドにだけ効く（native の build は読まない）。
+- `app.json` に `expo.web.output: "static"`（`bundler: "metro"`）と `favicon` を足す。`baseUrl` は Expo の native の release の bundle も読む（`export:embed`）ので、`app.json` には置かず、`mobile/app.config.js` が `EXPO_PUBLIC_KILLY_WEB_DEMO=1` のときだけ足す。EAS の build はこの変数を設定しないので、`baseUrl` を持たない。
 - 出力（`mobile/dist/`）は `out/demo/` に置く。既存の「確認が全部通るまで何もアップロードしない」の並びに入れる。
 - `mobile/**` の変更で走るので、`paths` に `mobile/**` を足す。`mobile/` の変更が `site/` に影響しなくても、`/demo/` を最新に保つほうを選ぶ。
-- Web のビルドが外のホストを読まないことは、出力に `https://` で始まる URL を `grep` して確かめる（許可するのは `stg-killy.sumire.pink` だけ）。
+- Web のビルドが外のホストを読まないことは、ブラウザで開いて実行時の要求を数えて確かめる（許可するのは配布元と `stg-killy.sumire.pink` だけ）。出力の `https://` を `grep` する方法は使えない：`@expo-google-fonts` の JS に、使われない `fonts.gstatic.com` の文字列が入っている。
+- 配布元の `.htaccess` を書き換えずに、`/demo/settings` を直接開けるようにするため、ビルドのあと `settings.html` を `settings/index.html` にも写す（`index.html`・`+not-found.html`・`_sitemap.html` は除く）。
 
 ## Data Models
 
@@ -166,7 +167,7 @@ flowchart LR
 | 型 | `.ts` と `.web.ts` が同じ型を満たすことは `npm run typecheck` が確かめる |
 | デモ専用の起動 | 既存の画面のテストの流儀（`demo.test.tsx`）に合わせ、`makeDeps` と `fetch` を差し替えて、`WebDemoProvider` を含む画面を描く。登録の有無・`POST /app/v1/demo` の呼び出し回数・失敗の文言・Settings に Add server が出ないこと・native（`Platform.OS` が `ios`）では呼ばないことを確かめる |
 | 枠 | 幅 430px を境に、枠の `maxWidth` が効くことをスタイルで確かめる。実際のブラウザでの見え方は PR 本文に書く |
-| 配置 | 手元で `expo export --platform web` を実行し、出力を `/demo/` の下に置いて静的な server で開く。出力が外の URL を読まないことを `grep` で確かめる |
+| 配置 | 手元で `expo export --platform web` を実行し、出力を `/demo/` の下に置いて静的な server で開く。開いたときの実行時の要求が、配布元と Killy server だけであることをブラウザで確かめる |
 | 実機に近い確認 | 手元の Killy server（CORS を許可、PostgreSQL は `make db-up`）と、snapshot を送る擬似 agent で、Chrome から開いて、ゾンビが出て、1 秒の長押しで kill が送られることを確かめる。結果は #129・#132 に書く |
 
 native の既存のテスト（26 suites）は、変更前に結果を取り、変更後も緑のままにする。

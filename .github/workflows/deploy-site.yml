@@ -11,10 +11,14 @@ name: deploy-site
 # agent is published, and nothing downloads from GitHub once the repository is private. The
 # support page's contact form URL is written once, in site/support/form-url; nothing is
 # published while it is empty.
+#
+# /demo/ is the Web version of the app (mobile/), built here for the public demo: it calls the
+# staging Killy server and adds the demo server by itself (EXPO_PUBLIC_KILLY_WEB_DEMO=1). So a
+# change to mobile/ publishes it too.
 on:
   push:
     branches: [main]
-    paths: ['site/**', 'deploy/systemd/killy-agent.service', '.github/workflows/deploy-site.yml']
+    paths: ['site/**', 'mobile/**', 'deploy/systemd/killy-agent.service', '.github/workflows/deploy-site.yml']
   workflow_dispatch:
 
 permissions:
@@ -30,7 +34,7 @@ jobs:
     # from a fork run code there.
     runs-on: ubuntu-24.04
     if: github.ref == 'refs/heads/main'
-    timeout-minutes: 10
+    timeout-minutes: 20
     env:
       DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
       DEPLOY_USER: ${{ vars.DEPLOY_USER }}
@@ -44,6 +48,11 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: mobile/.nvmrc
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
       - name: Settings are present
         run: |
           for name in DEPLOY_HOST DEPLOY_USER DEPLOY_PATH; do
@@ -54,19 +63,6 @@ jobs:
           if command -v rsync >/dev/null && command -v ssh >/dev/null; then exit 0; fi
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends rsync openssh-client
-      - name: Install the deploy key
-        env:
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
-        run: |
-          if [ -z "$DEPLOY_SSH_KEY" ] || [ -z "$DEPLOY_KNOWN_HOSTS" ]; then
-            echo "::error::Secret DEPLOY_SSH_KEY and Variable DEPLOY_KNOWN_HOSTS are required"; exit 1
-          fi
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          # The host key is checked against the Variable; StrictHostKeyChecking stays on.
-          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
       # Nothing is built or uploaded before every check here has passed, so a failure leaves the
       # live site as it was.
       - name: Build the upload directory
@@ -101,6 +97,49 @@ jobs:
           cp deploy/systemd/killy-agent.service out/download/
           cp site/download/VERSION out/download/VERSION
           ls -l out/download
+      # The Web version of the app, into out/demo/. It runs after the step above, which empties out/,
+      # and before the upload, so a build that fails publishes nothing.
+      - name: Build the Web demo
+        working-directory: mobile
+        env:
+          # Staging only: the public demo is there, and only the judges' builds use it. The Web version
+          # calls this server from the introduction site's origin, which KILLY_CORS_ORIGINS allows there.
+          EXPO_PUBLIC_KILLY_SERVER_URL: https://stg-killy.sumire.pink
+          EXPO_PUBLIC_KILLY_WEB_DEMO: '1'
+          EXPO_NO_TELEMETRY: '1'
+          CI: '1'
+        run: |
+          set -euo pipefail
+          npm ci
+          npx expo export --platform web --output-dir "$GITHUB_WORKSPACE/out/demo"
+          cd "$GITHUB_WORKSPACE/out/demo"
+          # The pages point at /demo/ for their scripts and assets (app.config.js: baseUrl).
+          grep -q '/demo/_expo/static/js/web/' index.html
+          # The host's .htaccess is not ours, so it cannot be asked to find settings.html for
+          # /demo/settings. A directory with an index.html is found by any web host, so a route that is
+          # opened directly (a reload on Settings) works. index.html, the 404 page and the route list stay.
+          for f in *.html; do
+            case "$f" in index.html|+not-found.html|_sitemap.html) continue ;; esac
+            mkdir -p "${f%.html}"
+            cp "$f" "${f%.html}/index.html"
+          done
+          test -f settings/index.html
+          du -sh .
+      # The key is installed only now: the build above runs the code of mobile/'s dependencies, which must not
+      # find it on the disk.
+      - name: Install the deploy key
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$DEPLOY_SSH_KEY" ] || [ -z "$DEPLOY_KNOWN_HOSTS" ]; then
+            echo "::error::Secret DEPLOY_SSH_KEY and Variable DEPLOY_KNOWN_HOSTS are required"; exit 1
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # The host key is checked against the Variable; StrictHostKeyChecking stays on.
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
       # No --delete: the destination holds the .htaccess that sumire-sakamoto puts there.
       - name: Upload
         run: >
@@ -109,13 +148,18 @@ jobs:
           out/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
       - name: Verify
         run: |
-          for path in / /privacy/ /support/ /download/VERSION /download/killy-agent.service /style.css /lang.js /scene.svg /scene-ja.svg /badges/app-store-en.svg /badges/app-store-ja.svg /badges/google-play-en.png /badges/google-play-ja.png /ogp.png /favicon.png /apple-touch-icon.png; do
+          for path in / /demo/ /demo/settings/ /privacy/ /support/ /download/VERSION /download/killy-agent.service /style.css /lang.js /scene.svg /scene-ja.svg /badges/app-store-en.svg /badges/app-store-ja.svg /badges/google-play-en.png /badges/google-play-ja.png /ogp.png /favicon.png /apple-touch-icon.png; do
             code=$(curl -s -o /dev/null -w '%{http_code}' "$SITE_URL$path")
             echo "$code $path"
             [ "$code" = 200 ] || exit 1
           done
           # The page Google Play links to is the policy itself, not an error page that answers 200.
           curl -fsS "$SITE_URL/privacy/" | grep -q 'Killy — Privacy Policy'
+          # The Web demo is the app, not an error page that answers 200, and its first script loads.
+          curl -fsS "$SITE_URL/demo/" | grep -q '/demo/_expo/static/js/web/'
+          script=$(curl -fsS "$SITE_URL/demo/" | grep -o '/demo/_expo/static/js/web/entry-[^"]*\.js' | head -n 1)
+          test -n "$script"
+          curl -fsS -o /dev/null "$SITE_URL$script"
           # The agent is downloadable from the site and is the release the repository pins.
           curl -fsS "$SITE_URL/support/" | grep -q 'docs.google.com/forms/'
           mkdir verify && cd verify
