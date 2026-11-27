@@ -1,6 +1,6 @@
 # Killy — Privacy Policy
 
-This policy covers the Killy mobile app (iOS and Android), the Killy server it connects to and the contact form on the support page. It says what data they handle, why, who else receives it, and how to remove it. Last updated: 2026-11-22.
+This policy covers the Killy mobile app (iOS and Android), the Web demo at <https://killy.sumire-sakamoto.co.jp/demo/>, the Killy server they connect to and the contact form on the support page. It says what data they handle, why, who else receives it, and how to remove it. Last updated: 2026-11-27.
 
 Killy has no accounts, no advertising and no analytics. It does not sell or share data for any other purpose than the ones below.
 
@@ -8,7 +8,7 @@ Killy has no accounts, no advertising and no analytics. It does not sell or shar
 
 | Data | Why |
 |---|---|
-| A random device token, created by the Killy server when the app first starts | To recognise this phone. Only its SHA-256 hash is stored on the server; the token itself stays in the phone's secure storage |
+| A random device token, created by the Killy server when the app first starts | To recognise this phone. Only its SHA-256 hash is stored on the server; the token itself stays in the phone's secure storage (in the Web demo, in the browser's local storage; see "The public demo") |
 | The phone's push token (from Apple or Google, through Expo), only if notifications are allowed | To send a notification when a server has new zombie processes |
 | The app-wide notification switch, and for each server: its display name and its notification switch | To show the servers with the names chosen on this phone and to notify only when asked to |
 | Pairing codes typed or scanned | To link this phone to a server. A code is used once and expires after 10 minutes |
@@ -58,10 +58,13 @@ We use these answers only to reply to you and to carry out requests to delete da
 
 This section applies only to the builds made for the Kiroween 2026 hackathon judges. They connect to the team's staging Killy server and offer a public demo server. The store release of the app (App Store and Google Play) connects to the production Killy server and has no demo. Processes shown in the demo are created on a demo machine only for that purpose. Kills sent to the demo are visible to everyone using it: a parent killed by one person disappears for everyone.
 
+The Web demo, at <https://killy.sumire-sakamoto.co.jp/demo/>, is the same app in a browser, for the demo only. It connects to the staging Killy server and adds the demo server by itself when it opens, with no pairing code. It keeps the device token and the language setting in the browser's local storage (`localStorage`) for the site killy.sumire-sakamoto.co.jp, where the phone app uses its secure storage. It sends no push token and uses no camera. The page and its scripts, images and fonts come from the introduction site only, and the page loads nothing from a third party; the introduction site's web server may record the address and time of requests in its logs.
+
 ## Removing data
 
 - Removing a server in the app (Settings → server → Remove) deletes that phone's link to it, with its display name and notification switch.
 - Turning notifications off in the app stops pushes; uninstalling the app stops it from using its device token.
+- In the Web demo, clearing the site data of killy.sumire-sakamoto.co.jp in the browser deletes the device token and the language setting; the next visit creates a new device. The old device's record on the Killy server is deleted on request, as below.
 - To have a phone's record or a server's record deleted from the Killy server, send a request through the contact form on the support page, <https://killy.sumire-sakamoto.co.jp/support/>. Answers you gave in the form are deleted on request too.
 
 ## Children
