@@ -52,6 +52,33 @@ jobs:
           echo "${{ matrix.os }}: ${n} skipped tests" >> "$GITHUB_STEP_SUMMARY"
           if [ "$n" -gt 0 ]; then echo "::warning::${n} tests were skipped on ${{ matrix.os }}"; fi
 
+  # Things the Go tests do not catch: formatting that gofmt would change, and a go.mod or go.sum that
+  # `go mod tidy` would change (a dependency used but not recorded, or recorded and unused).
+  go-hygiene:
+    # Every job uses a GitHub-hosted runner: a runner inside the home LAN would let a pull request
+    # from a fork run code there.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: |
+          files=$(git ls-files '*.go' | xargs gofmt -l)
+          if [ -n "$files" ]; then
+            echo "::error::gofmt would change these files (run gofmt -w):"
+            echo "$files"
+            exit 1
+          fi
+      - name: go mod tidy
+        run: |
+          # Prints what tidy would change and exits non-zero if there is anything.
+          go mod tidy -diff
+
   app:
     # Every job uses a GitHub-hosted runner: a runner inside the home LAN would let a pull request
     # from a fork run code there.

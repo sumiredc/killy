@@ -11,9 +11,10 @@ updates:
       go-modules:
         update-types: [minor, patch]
 
-  # Expo pins react, react-native and the expo-* packages to the SDK, and a minor of react-native 0.x
-  # or of an expo-* package is a breaking release. Only their patch updates arrive here; the rest
-  # moves with an SDK upgrade (npx expo install --fix).
+  # Expo pins react, react-dom, react-native and react-native-* to exact versions per SDK, so no update
+  # of theirs arrives here (expo-doctor fails on any other version). For expo, expo-* and the other
+  # SDK packages a minor is a breaking release, so only their patch updates arrive. The rest moves
+  # with an SDK upgrade (npx expo install --fix).
   - package-ecosystem: npm
     directory: /mobile
     schedule:
@@ -33,15 +34,11 @@ updates:
       - dependency-name: eslint-config-expo
         update-types: ['version-update:semver-major', 'version-update:semver-minor']
       - dependency-name: react
-        update-types: ['version-update:semver-major', 'version-update:semver-minor']
       - dependency-name: react-dom
-        update-types: ['version-update:semver-major', 'version-update:semver-minor']
       - dependency-name: '@types/react'
         update-types: ['version-update:semver-major', 'version-update:semver-minor']
       - dependency-name: react-native
-        update-types: ['version-update:semver-major', 'version-update:semver-minor']
       - dependency-name: react-native-*
-        update-types: ['version-update:semver-major', 'version-update:semver-minor']
       # The SDK fixes the versions of TypeScript and jest that its tooling supports.
       - dependency-name: typescript
         update-types: ['version-update:semver-major']
