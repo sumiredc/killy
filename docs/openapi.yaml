@@ -640,3 +640,5 @@ components:
         reason:
           type: string
           description: As in `CommandResult`, or `agent_disconnected` / `timeout` for `unknown`
+
+  bad: [unclosed

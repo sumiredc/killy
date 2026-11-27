@@ -2,3 +2,4 @@
 .kiro/settings/
 # The agent definitions used while building Killy (implementer, reviewer) are not published.
 .kiro/agents/
+.kiro/
