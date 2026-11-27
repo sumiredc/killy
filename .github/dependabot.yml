@@ -1,0 +1,74 @@
+version: 2
+
+# One pull request per ecosystem each week (minor and patch updates grouped; a major update is its own
+# pull request, so it is read on its own).
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      go-modules:
+        update-types: [minor, patch]
+
+  # Expo pins react, react-native and the expo-* packages to the SDK, and a minor of react-native 0.x
+  # or of an expo-* package is a breaking release. Only their patch updates arrive here; the rest
+  # moves with an SDK upgrade (npx expo install --fix).
+  - package-ecosystem: npm
+    directory: /mobile
+    schedule:
+      interval: weekly
+    groups:
+      app-dependencies:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: expo
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: expo-*
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: '@expo/*'
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: jest-expo
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: eslint-config-expo
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: react
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: react-dom
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: '@types/react'
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: react-native
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: react-native-*
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      # The SDK fixes the versions of TypeScript and jest that its tooling supports.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+      - dependency-name: jest
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@types/jest'
+        update-types: ['version-update:semver-major']
+
+  # The actions are pinned to commit SHAs; Dependabot moves the SHA and the version comment together.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        update-types: [minor, patch]
+
+  # The Dockerfile is not listed: its only tagged image is golang, whose version must match go.mod's
+  # toolchain line (the image sets GOTOOLCHAIN=local, and Dependabot does not change the toolchain
+  # line), so it is raised by hand with go.mod and CI's Go version.
+
+  # The PostgreSQL image stays on the major version the data directory was created with. A new
+  # version here also needs the version written in docs/ARCHITECTURE.md and ARCHITECTURE.ja.md.
+  - package-ecosystem: docker
+    directory: /deploy/base
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: postgres
+        update-types: ['version-update:semver-major']
