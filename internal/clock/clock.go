@@ -34,3 +34,5 @@ func (f *Fake) Advance(d time.Duration) {
 	defer f.mu.Unlock()
 	f.now = f.now.Add(d)
 }
+
+func  badlyFormatted( ) {  }
