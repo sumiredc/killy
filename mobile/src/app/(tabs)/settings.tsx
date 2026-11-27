@@ -108,7 +108,8 @@ export default function SettingsScreen() {
         <NotificationsError />
       </ScrollView>
       {/* Not over the Server sheet: iOS presents one sheet at a time, so a link waits until it closes. */}
-      {(adding || link !== null) && open === undefined && <AddServerSheet onClose={closeAdd} link={link} />}
+      {/* Nor from a pair link in the demo-only Web version: it has no code to enter. */}
+      {!webDemo.enabled && (adding || link !== null) && open === undefined && <AddServerSheet onClose={closeAdd} link={link} />}
       {open !== undefined && <ServerSheet server={open} onClose={() => setOpenId(null)} />}
     </SafeAreaView>
   );

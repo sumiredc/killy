@@ -1,12 +1,13 @@
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library';
 import * as Localization from 'expo-localization';
-import { Platform, StyleSheet } from 'react-native';
+import { Dimensions, Platform, StyleSheet } from 'react-native';
 
 import * as config from '../config';
 import RootLayout from '../app/_layout';
 import TabsLayout from '../app/(tabs)/_layout';
 import BattleScreen from '../app/(tabs)/index';
 import SettingsScreen from '../app/(tabs)/settings';
+import PairRoute from '../app/pair';
 import * as deps from '../killy/deps';
 import * as prefs from '../prefs';
 import { FakeNotifications, MemoryPrefs } from '../testing/fake-notifications';
@@ -19,6 +20,7 @@ const routes = {
   '(tabs)/_layout': TabsLayout,
   '(tabs)/index': BattleScreen,
   '(tabs)/settings': SettingsScreen,
+  pair: PairRoute,
 };
 
 const demoRoute = 'POST /app/v1/demo';
@@ -150,6 +152,28 @@ describe('the Web version in its demo-only form', () => {
     await startApp(server, { savedToken: null });
     expect(screen.getByText(message)).toBeOnTheScreen();
     expect(server.count(demoRoute)).toBe(0);
+    // One reason is said, not that and a second one about the demo server.
+    expect(screen.queryByText(/The server could not be added|Cannot reach the Killy server|demo server is not available/)).toBeNull();
+    expect(screen.queryAllByText(/registered|registrations/)).toHaveLength(1);
+  });
+
+  test('a failure notice goes away once a server is there, as the answer may only have been lost', async () => {
+    const server = new FakeServer();
+    server.unreachable(demoRoute);
+    const stream = await startApp(server);
+    expect(screen.getByText('Cannot reach the Killy server. Check your network.')).toBeOnTheScreen();
+    await act(() => stream.send(stateOf([{ ...demo, disconnected: false, parents: [parent] }])));
+    expect(screen.queryByTestId('web-demo-notice')).toBeNull();
+    expect(screen.getByTestId('battle-server')).toHaveTextContent('demo-linux-01');
+  });
+
+  test('a killy://pair link opens no sheet to enter a code', async () => {
+    const server = new FakeServer();
+    server.respond(demoRoute, 200, demo);
+    await startApp(server, { url: '/pair?code=ABC234&server=https%3A%2F%2Fkilly.example' });
+    expect(await screen.findByTestId('settings-screen')).toBeOnTheScreen();
+    expect(screen.queryByTestId('add-server-sheet')).toBeNull();
+    expect(screen.queryByLabelText('Pairing code')).toBeNull();
   });
 
   test('says nothing is wrong when the demo server is added', async () => {
@@ -169,6 +193,17 @@ describe('a build that is not the demo-only Web version', () => {
     await startApp(server, { webDemo: false, url: '/settings' });
     expect(server.count(demoRoute)).toBe(0);
     expect(await screen.findByText('Add server')).toBeOnTheScreen();
+  });
+
+  test.each([
+    ['web', 430],
+    ['ios', undefined],
+  ] as const)('on %s the Add server sheet is at most %s wide', async (os, maxWidth) => {
+    await startApp(new FakeServer(), { os, webDemo: false, url: '/settings' });
+    await fireEvent.press(await screen.findByText('Add server'));
+    const style = StyleSheet.flatten((await screen.findByTestId('add-server-sheet')).props.style);
+    if (maxWidth === undefined) expect(style).not.toHaveProperty('maxWidth');
+    else expect(style).toMatchObject({ maxWidth, alignSelf: 'center' });
   });
 
   test('an iOS or Android build adds nothing by itself, even if the variable is set', async () => {
@@ -209,6 +244,18 @@ describe('the frame on a wide screen', () => {
     expect(StyleSheet.flatten(frame.props.style)).toMatchObject({ maxWidth: 430, width: '100%' });
     expect(StyleSheet.flatten(screen.getByTestId('phone-frame-outer').props.style)).toMatchObject({ alignItems: 'center' });
     expect(screen.getByTestId('battle-screen')).toBeOnTheScreen();
+  });
+
+  test.each([
+    [1280, true],
+    [430, false],
+    [390, false],
+  ])('at %ipx the frame has side lines: %s', async (width, lines) => {
+    jest.spyOn(Dimensions, 'get').mockReturnValue({ width, height: 800, scale: 1, fontScale: 1 });
+    await startApp(new FakeServer());
+    const style = StyleSheet.flatten(screen.getByTestId('phone-frame').props.style);
+    if (lines) expect(style).toMatchObject({ borderLeftWidth: 1, borderRightWidth: 1 });
+    else expect(style).not.toHaveProperty('borderLeftWidth');
   });
 
   test('on iOS and Android there is no frame', async () => {

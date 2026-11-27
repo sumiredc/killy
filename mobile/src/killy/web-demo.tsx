@@ -27,7 +27,7 @@ const WebDemoContext = createContext<WebDemo>(off);
  */
 export function WebDemoProvider({ children }: { children: ReactNode }) {
   const enabled = Platform.OS === 'web' && buildWebDemoEnabled();
-  const { client, registration } = useKilly();
+  const { client, registration, state } = useKilly();
   const [failure, setFailure] = useState<Key | null>(null);
 
   useEffect(() => {
@@ -41,7 +41,10 @@ export function WebDemoProvider({ children }: { children: ReactNode }) {
   }, [enabled, client, registration]);
 
   // A registration that is rate limited is said by the battle screen already, for every build.
-  const notice: Key | null = !enabled ? null : registration === 'failed' ? 'deviceNotRegistered' : failure;
+  // Nor once a server is there, whatever the failed call said: it may have been linked all the same
+  // (the answer was lost, or another tab of this browser added it).
+  const hasServer = (state?.servers.length ?? 0) > 0;
+  const notice: Key | null = !enabled || hasServer ? null : registration === 'failed' ? 'deviceNotRegistered' : failure;
   const value = useMemo(() => (enabled ? { enabled, notice } : off), [enabled, notice]);
   return <WebDemoContext.Provider value={value}>{children}</WebDemoContext.Provider>;
 }

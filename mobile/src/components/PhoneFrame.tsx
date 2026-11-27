@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { colors } from '@/theme/tokens';
 
@@ -11,12 +11,13 @@ export const frameWidth = 430;
  * browser, which is narrower, it fills the screen. A native build is not framed.
  */
 export function PhoneFrame({ children }: { children: ReactNode }) {
+  const { width } = useWindowDimensions();
   if (Platform.OS !== 'web') {
     return <>{children}</>;
   }
   return (
     <View style={styles.outer} testID="phone-frame-outer">
-      <View style={styles.frame} testID="phone-frame">
+      <View style={[styles.frame, width > frameWidth && styles.framed]} testID="phone-frame">
         {children}
       </View>
     </View>
@@ -32,8 +33,7 @@ const styles = StyleSheet.create({
     maxWidth: frameWidth,
     position: 'relative',
     overflow: 'hidden',
-    borderColor: colors.line,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
   },
+  // A line on each side, only where the page shows around the frame.
+  framed: { borderColor: colors.line, borderLeftWidth: 1, borderRightWidth: 1 },
 });
