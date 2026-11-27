@@ -18,6 +18,9 @@ jest.mock('expo-camera', () => ({
   CameraView: () => null,
 }));
 
+// In a Web build the './notifications' that deps.web.ts imports is notifications.web.ts.
+jest.mock('../killy/notifications', () => jest.requireActual('../killy/notifications.web'));
+
 const routes = {
   _layout: RootLayout,
   '(tabs)/_layout': TabsLayout,
@@ -66,6 +69,47 @@ describe.each([
     const sheet = within(await screen.findByTestId('add-server-sheet'));
     expect(sheet.getByLabelText('Pairing code')).toBeOnTheScreen();
     expect(sheet.queryByRole('button', { name: 'Scan QR code' }) !== null).toBe(hasNative);
+  });
+});
+
+describe('a browser that keeps nothing', () => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  afterEach(() => {
+    if (original) Object.defineProperty(globalThis, 'localStorage', original);
+    else delete (globalThis as { localStorage?: unknown }).localStorage;
+  });
+
+  test('registers, keeps its token for the page and opens the event stream, as private browsing would leave it', async () => {
+    jest.replaceProperty(Platform, 'OS', 'web');
+    // Every call throws, as localStorage does in a browser that refuses storage.
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: () => {
+          throw new DOMException('denied', 'SecurityError');
+        },
+        setItem: () => {
+          throw new DOMException('denied', 'QuotaExceededError');
+        },
+      },
+    });
+    const server = new FakeServer();
+    server.stream();
+    server.respond('POST /app/v1/devices', 200, { device_token: 'tok-page' });
+    jest.spyOn(globalThis, 'fetch').mockImplementation(server.fetch as never);
+    jest.spyOn(config, 'buildServerURL').mockReturnValue('https://killy.example');
+    jest.mocked(Localization.getLocales).mockReturnValue([{ languageCode: 'en' } as Localization.Locale]);
+    jest.spyOn(deps, 'makeDeps').mockImplementation(jest.requireActual('../killy/deps.web').makeDeps);
+    jest.spyOn(prefs, 'makePrefs').mockImplementation(jest.requireActual('../prefs.web').makePrefs);
+    await renderRouter(routes, { initialUrl: '/' });
+    await act(settle);
+    expect(server.count('POST /app/v1/devices')).toBe(1);
+    const events = server.requests.find((r) => r.route === 'GET /app/v1/events');
+    expect(events?.authorization).toBe('Bearer tok-page');
+    expect(screen.getByTestId('battle-screen')).toBeOnTheScreen();
+    // Settings still opens, with the language, which cannot be saved either.
+    await fireEvent.press(screen.getByLabelText('Settings'));
+    expect(await screen.findByTestId('settings-screen')).toBeOnTheScreen();
   });
 });
 
