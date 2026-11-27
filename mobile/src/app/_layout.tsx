@@ -13,6 +13,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { buildServerURL, ConfigError } from '@/config';
 import { ServerURLProvider } from '@/config-context';
 import { initialLanguage, type Lang } from '@/i18n';
+import { PhoneFrame } from '@/components/PhoneFrame';
 import { I18nProvider } from '@/i18n/context';
 import { BattleProvider } from '@/killy/battle-context';
 import { KillyProvider } from '@/killy/context';
@@ -69,7 +70,9 @@ export default function RootLayout() {
                 <NotificationsProvider>
                   <BattleProvider>
                     <PairLinkProvider>
-                      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+                      <PhoneFrame>
+                        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+                      </PhoneFrame>
                     </PairLinkProvider>
                   </BattleProvider>
                 </NotificationsProvider>

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Modal, Pressable, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Switch, TextInput, View } from 'react-native';
 
 import type { Key } from '@/i18n';
 import { useI18n } from '@/i18n/context';
 import { type CheckResult, ServerError } from '@/killy/client';
 import { useKilly } from '@/killy/context';
 import type { ServerState } from '@/killy/types';
+import { frameWidth } from '@/components/PhoneFrame';
 import { KText } from '@/theme/KText';
 import { colors, fonts, radii } from '@/theme/tokens';
 
@@ -130,7 +131,7 @@ export function ServerSheet({ server, onClose }: { server: ServerState; onClose:
   return (
     <Modal transparent animationType="slide" onRequestClose={close} visible testID="server-sheet-modal">
       <KeyboardAvoidingView style={styles.backdrop} behavior="padding">
-        <View style={styles.sheet} testID="server-sheet">
+        <View style={[styles.sheet, Platform.OS === 'web' && styles.webSheet]} testID="server-sheet">
           <View style={styles.grabber} />
           <KText kind="monoSemiBold" style={styles.title}>
             {t('detailTitle')}
@@ -250,6 +251,8 @@ function ErrorLine({ text, testID }: { text: string; testID: string }) {
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
+  // On a wide browser the sheet is as wide as the app's frame, not the page.
+  webSheet: { width: '100%', maxWidth: frameWidth, alignSelf: 'center' },
   sheet: {
     backgroundColor: colors.elev1,
     borderTopLeftRadius: radii.card,

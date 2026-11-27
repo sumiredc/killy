@@ -11,6 +11,7 @@ import { claimMessages } from '@/killy/claim-messages';
 import { useKilly } from '@/killy/context';
 import type { PairLink } from '@/killy/pair-link';
 import { type PairCheck, parsePairURL } from '@/killy/pair-url';
+import { frameWidth } from '@/components/PhoneFrame';
 import { KText } from '@/theme/KText';
 import { colors, fonts, radii } from '@/theme/tokens';
 
@@ -138,7 +139,7 @@ export function AddServerSheet({ onClose, link }: { onClose: () => void; link?: 
     <Modal transparent animationType="slide" onRequestClose={onClose} visible>
       {/* padding on both: the Modal's window is not resized on Android, so the keyboard would cover Add. */}
       <KeyboardAvoidingView style={styles.backdrop} behavior="padding">
-        <View style={styles.sheet} testID="add-server-sheet">
+        <View style={[styles.sheet, Platform.OS === 'web' && styles.webSheet]} testID="add-server-sheet">
           <View style={styles.grabber} />
           <KText kind="monoSemiBold" style={styles.title}>
             {t('addTitle')}
@@ -272,6 +273,8 @@ export function AddServerSheet({ onClose, link }: { onClose: () => void; link?: 
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
+  // On a wide browser the sheet is as wide as the app's frame, not the page.
+  webSheet: { width: '100%', maxWidth: frameWidth, alignSelf: 'center' },
   sheet: {
     backgroundColor: colors.elev1,
     borderTopLeftRadius: radii.card,

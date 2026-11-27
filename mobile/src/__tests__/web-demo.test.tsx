@@ -1,6 +1,6 @@
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library';
 import * as Localization from 'expo-localization';
-import { Platform } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 
 import * as config from '../config';
 import RootLayout from '../app/_layout';
@@ -182,5 +182,38 @@ describe('a build that is not the demo-only Web version', () => {
   test('says "No servers yet" as before when there is none', async () => {
     await startApp(new FakeServer(), { os: 'ios', webDemo: false });
     expect(screen.getByText('No servers yet')).toBeOnTheScreen();
+  });
+});
+
+describe('the frame on a wide screen', () => {
+  test.each([
+    ['web', 430],
+    ['ios', undefined],
+  ] as const)('on %s the server sheet is at most %s wide', async (os, maxWidth) => {
+    const server = new FakeServer();
+    server.respond(demoRoute, 200, demo);
+    const stream = await startApp(server, { os, webDemo: os === 'web', url: '/settings' });
+    await act(() => stream.send(stateOf([{ ...demo, disconnected: false, parents: [] }])));
+    await fireEvent.press(await screen.findByTestId('server-row'));
+    const sheet = await screen.findByTestId('server-sheet');
+    const style = StyleSheet.flatten(sheet.props.style);
+    if (maxWidth === undefined) expect(style).not.toHaveProperty('maxWidth');
+    else expect(style).toMatchObject({ maxWidth, alignSelf: 'center' });
+  });
+
+  test('on the Web the whole app is in a frame at most 430px wide, centred', async () => {
+    const server = new FakeServer();
+    server.respond(demoRoute, 200, demo);
+    await startApp(server);
+    const frame = screen.getByTestId('phone-frame');
+    expect(StyleSheet.flatten(frame.props.style)).toMatchObject({ maxWidth: 430, width: '100%' });
+    expect(StyleSheet.flatten(screen.getByTestId('phone-frame-outer').props.style)).toMatchObject({ alignItems: 'center' });
+    expect(screen.getByTestId('battle-screen')).toBeOnTheScreen();
+  });
+
+  test('on iOS and Android there is no frame', async () => {
+    await startApp(new FakeServer(), { os: 'ios', webDemo: false });
+    expect(screen.queryByTestId('phone-frame')).toBeNull();
+    expect(screen.getByTestId('battle-screen')).toBeOnTheScreen();
   });
 });
