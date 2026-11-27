@@ -65,6 +65,7 @@
 6. WHILE Web である THE Add server sheet SHALL QR の読み取りのボタンを出さず、カメラの許可を求めない
 7. THE iOS・Android の起動と画面 SHALL 変わらず、`expo-secure-store`・`expo-notifications`・`expo-camera` を今までどおり使う
 8. THE Web のビルド SHALL `expo-secure-store` を使う保存先と `expo-notifications` を使う実装を含まない（`.web.ts` で置き換える）
+9. WHILE Web である THE kill ボタン SHALL 長押しで文字を選択させず（`user-select: none`）、長押しのメニュー（`contextmenu`）を出さない。iOS・Android には付けない
 
 ### Requirement 4: Web 版はデモ専用で、開くとデモの battle 画面を出す
 

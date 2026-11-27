@@ -24,16 +24,16 @@
   - [ ] 2.7 手元の PostgreSQL（`make db-up`）に向けて `KILLY_CORS_ORIGINS` つきで `killy server` を動かし、`curl` で preflight と SSE の応答のヘッダを確かめ、PR 本文に書く。staging の image を審査の前に更新する期限を PR 本文に書く
     - _Requirements: 2.4, 2.5, 2.12_
 
-- [ ] 3. app：Web では device token と設定を localStorage に保存し、通知とカメラを出さない（#131。前提：#128、#129）
-  - [ ] 3.1 `tokenKey` を `token-key.ts` に移し（`deps.ts` からも同じ名前で読める）、native のテストが変わらず緑であることを確かめる
+- [x] 3. app：Web では device token と設定を localStorage に保存し、通知とカメラを出さない（#131。前提：#128、#129）
+  - [x] 3.1 `tokenKey` を `token-key.ts` に移し（`deps.ts` からも同じ名前で読める）、native のテストが変わらず緑であることを確かめる
     - _Requirements: 3.7_
-  - [ ] 3.2 `deps.web.ts`・`prefs.web.ts`・`notifications.web.ts` のテスト（`localStorage` の偽物での保存と読み出し・値が正しくないときの扱い・`localStorage` が無い、読み書きで例外になるときの扱い・通知の許可が `denied` で push token が取れないこと・native の依存を import していないこと）を書き、最小のスタブで赤を確かめる
+  - [x] 3.2 `deps.web.ts`・`prefs.web.ts`・`notifications.web.ts` のテスト（`localStorage` の偽物での保存と読み出し・値が正しくないときの扱い・`localStorage` が無い、読み書きで例外になるときの扱い・通知の許可が `denied` で push token が取れないこと・native の依存を import していないこと）を書き、最小のスタブで赤を確かめる
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.8_
-  - [ ] 3.3 3 つの Web 用の実装を書き、テストを緑にする
+  - [x] 3.3 3 つの Web 用の実装を書き、テストを緑にする
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.8_
-  - [ ] 3.4 Settings の通知の行と `AddServerSheet` の QR のボタンが Web で出ないことの画面のテスト（`Platform.OS` を `web` にして）を書き、赤を確かめてから実装する。native（`ios`）では今までどおり出ることも確かめる
-    - _Requirements: 3.5, 3.6, 3.7_
-  - [ ] 3.5 `npm run typecheck && npm run lint && npm test` と `npx expo export --platform web` を通し、#129 で出た直しを入れる
+  - [x] 3.4 Settings の通知の行と `AddServerSheet` の QR のボタンが Web で出ないことと、kill ボタンの `user-select` と `contextmenu` の画面のテスト（`Platform.OS` を `web` にして）を書き、赤を確かめてから実装する。native（`ios`）では今までどおり出ることも確かめる
+    - _Requirements: 3.5, 3.6, 3.7, 3.9_
+  - [x] 3.5 `npm run typecheck && npm run lint && npm test` と `npx expo export --platform web` を通し、#129 で出た直しを入れる
     - _Requirements: 3.7, 3.8_
 
 - [ ] 4. app：Web 版をデモ専用にし、開くとデモサーバーの battle 画面を出す（#132。前提：#131）
