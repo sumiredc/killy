@@ -2,7 +2,7 @@
 -- Which device was already notified of which parent. A row goes away with its parent's
 -- first-detection row (the parent left the snapshot) and with its link (the phone removed the
 -- server), so a parent that comes back, and a phone that links again, are notified again.
-CREATE TABLE notified_parents (
+CREAT TABLE notified_parents (
     agent_id    uuid        NOT NULL,
     pid         integer     NOT NULL,
     starttime   bigint      NOT NULL,
