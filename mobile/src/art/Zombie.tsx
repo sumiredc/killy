@@ -1,7 +1,8 @@
+import { Platform } from 'react-native';
 import Animated, { type SharedValue, useAnimatedProps } from 'react-native-reanimated';
 import Svg, { Circle, G, type GProps, Path, Rect } from 'react-native-svg';
 
-import { rotateAbout } from '@/killy/pose';
+import { groupTransform, rotateAbout } from '@/killy/pose';
 import type { ZombiePose } from '@/killy/strike';
 
 import { hand, head } from './points';
@@ -43,9 +44,10 @@ function FaceNormal() {
  * move them on the UI thread.
  */
 export function Zombie({ width, dead = false, pose }: { width: number; dead?: boolean; pose?: SharedValue<ZombiePose> }) {
-  // `matrix` as in Killy: the transform react-native-svg's native group takes.
-  const armBack = useAnimatedProps(() => ({ matrix: rotateAbout(pose ? pose.value.arm : 0, armOrigins.back) }) as unknown as GProps);
-  const armFront = useAnimatedProps(() => ({ matrix: rotateAbout(pose ? pose.value.arm : 0, armOrigins.front) }) as unknown as GProps);
+  // `matrix` as in Killy: the transform react-native-svg's native group takes, `transform` on the Web.
+  const web = Platform.OS === 'web';
+  const armBack = useAnimatedProps(() => groupTransform(rotateAbout(pose ? pose.value.arm : 0, armOrigins.back), web) as unknown as GProps);
+  const armFront = useAnimatedProps(() => groupTransform(rotateAbout(pose ? pose.value.arm : 0, armOrigins.front), web) as unknown as GProps);
   const normal = useAnimatedProps(() => ({ opacity: pose && !pose.value.alive ? 0 : 1 }));
   const deadFace = useAnimatedProps(() => ({ opacity: pose && !pose.value.alive ? 1 : 0 }));
   return (

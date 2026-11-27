@@ -45,3 +45,13 @@ export function apply(m: number[], p: { x: number; y: number }): { x: number; y:
   'worklet';
   return { x: m[0] * p.x + m[2] * p.y + m[4], y: m[1] * p.x + m[3] * p.y + m[5] };
 }
+
+/**
+ * The props that give one of Killy's SVG groups the matrix `m`. react-native-svg's native group takes
+ * a `matrix`; on the Web it is an SVG <g>, which knows only the `transform` attribute and ignores
+ * `matrix`, so there the scythe and the ghost stood still.
+ */
+export function groupTransform(m: number[], web: boolean): Record<string, unknown> {
+  'worklet';
+  return web ? { transform: `matrix(${m.join(' ')})` } : { matrix: m };
+}
