@@ -63,19 +63,6 @@ jobs:
           if command -v rsync >/dev/null && command -v ssh >/dev/null; then exit 0; fi
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends rsync openssh-client
-      - name: Install the deploy key
-        env:
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
-        run: |
-          if [ -z "$DEPLOY_SSH_KEY" ] || [ -z "$DEPLOY_KNOWN_HOSTS" ]; then
-            echo "::error::Secret DEPLOY_SSH_KEY and Variable DEPLOY_KNOWN_HOSTS are required"; exit 1
-          fi
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          # The host key is checked against the Variable; StrictHostKeyChecking stays on.
-          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
       # Nothing is built or uploaded before every check here has passed, so a failure leaves the
       # live site as it was.
       - name: Build the upload directory
@@ -138,6 +125,21 @@ jobs:
           done
           test -f settings/index.html
           du -sh .
+      # The key is installed only now: the build above runs the code of mobile/'s dependencies, which must not
+      # find it on the disk.
+      - name: Install the deploy key
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$DEPLOY_SSH_KEY" ] || [ -z "$DEPLOY_KNOWN_HOSTS" ]; then
+            echo "::error::Secret DEPLOY_SSH_KEY and Variable DEPLOY_KNOWN_HOSTS are required"; exit 1
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # The host key is checked against the Variable; StrictHostKeyChecking stays on.
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
       # No --delete: the destination holds the .htaccess that sumire-sakamoto puts there.
       - name: Upload
         run: >
