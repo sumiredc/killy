@@ -3,12 +3,17 @@
 PG_CONTAINER ?= killy-pg
 PG_PORT      ?= 55432
 
-.PHONY: test db-up db-down
+.PHONY: test dbcheck db-up db-down
 
 # Unit tests only; none of them needs PostgreSQL.
 test:
 	go vet ./...
 	go test -race -count=1 ./...
+
+# Runs killy server against the PostgreSQL that `make db-up` started: applies the migrations, pairs, restarts.
+# It writes an agent and a device to that database, so use a throwaway one.
+dbcheck:
+	KILLY_DATABASE_URL='postgres://postgres:killy@127.0.0.1:$(PG_PORT)/killy?sslmode=disable' tools/dbcheck/run.sh
 
 # Starts a throwaway PostgreSQL 18.7 in Docker for running killy server by hand, with
 # KILLY_DATABASE_URL=postgres://postgres:killy@127.0.0.1:55432/killy?sslmode=disable
