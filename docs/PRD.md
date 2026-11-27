@@ -79,7 +79,7 @@ Killy is our entry to the **Kiroween 2026** hackathon in the **Frankenstein** ca
 | Hackathon | Submission deadline **2026-12-04 14:00 PT**. Category: Frankenstein. Public repository under the MIT License, with `.kiro/` at the root and not git-ignored. Demo video under 3 minutes. |
 | Repository | `github.com/sumiredc/killy`: private during development, made public before submission. |
 | Agent platform | Linux 5.3 or later (the agent signals through a pidfd); zombies are read from `/proc`. Real machine or VM. |
-| Languages | Backend (agent, server, summon) in Go 1.27 (toolchain go1.27.3). Mobile app in React Native with Expo. |
+| Languages | Backend (agent, server, summon) in Go 1.27 (toolchain go1.27.4). Mobile app in React Native with Expo. |
 | Hosting | Killy server on the team's home Kubernetes cluster at `killy.sumire.pink`, exposed through the existing Cloudflare Tunnel, one replica. The home cluster gives no uptime guarantee. |
 | Notifications | Expo Push Service (APNs and FCM credentials managed by EAS). |
 | Distribution | iOS through a TestFlight public link. Android through a Google Play open testing link, with the APK on the repository's GitHub Releases as well. For judges who install nothing, a Web demo at `https://killy.sumire-sakamoto.co.jp/demo/` on the introduction site. The agent binaries and the systemd unit are downloaded from the introduction site, not from GitHub, so they stay available when the repository is private. |
