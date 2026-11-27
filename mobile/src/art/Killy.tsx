@@ -1,9 +1,9 @@
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import Animated, { type SharedValue, useAnimatedProps } from 'react-native-reanimated';
 import Svg, { Circle, Defs, Ellipse, G, type GProps, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
 import { killyBlink } from '@/killy/idle';
-import { ghostMatrix, scytheMatrix } from '@/killy/pose';
+import { ghostMatrix, groupTransform, scytheMatrix } from '@/killy/pose';
 import { scytheSwing } from '@/killy/strike';
 
 /** Where Killy is drawn, in the art's units: the 200 × 150 box and room for the scythe's whole swing. */
@@ -39,10 +39,14 @@ export function Killy({
 }) {
   // `matrix` is the transform react-native-svg's native group takes; its public props do not list
   // it, because transforms usually go through `transform` and are turned into a matrix in JS,
-  // which animated props skip.
+  // which animated props skip. On the Web the group is an SVG <g>, which takes `transform` and
+  // not `matrix` (groupTransform).
+  const web = Platform.OS === 'web';
   const k = width / 200;
-  const ghost = useAnimatedProps(() => ({ matrix: ghostMatrix(lean ? lean.value : 0, bow ? bow.value : 0) }) as unknown as GProps);
-  const scythe = useAnimatedProps(() => ({ matrix: scytheMatrix(charge ? charge.value : 0, strike ? scytheSwing(strike.value) : null) }) as unknown as GProps);
+  const ghost = useAnimatedProps(() => groupTransform(ghostMatrix(lean ? lean.value : 0, bow ? bow.value : 0), web) as unknown as GProps);
+  const scythe = useAnimatedProps(
+    () => groupTransform(scytheMatrix(charge ? charge.value : 0, strike ? scytheSwing(strike.value) : null), web) as unknown as GProps,
+  );
   const near = useAnimatedProps(() => ({ ry: 7.2 * (clock ? killyBlink(clock.value) : 1) }));
   const far = useAnimatedProps(() => ({ ry: 6.6 * (clock ? killyBlink(clock.value) : 1) }));
   return (
