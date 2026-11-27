@@ -2,7 +2,7 @@
 
 各トップレベルのタスクが 1 つの issue と 1 つの PR に当たる。テストは実装より先に書き、期待した理由で赤になることを確かめる。完了条件の正は各 issue。テストは PostgreSQL を使わない。各 PR で、Go を変えるなら `go vet ./...` と `go test -race ./...`、app を変えるなら `cd mobile && npm run typecheck && npm run lint && npm test` も通す。
 
-- [ ] 1. Expo の Web 版が動くかを確かめる（#129。前提：#128）
+- [x] 1. Expo の Web 版が動くかを確かめる（#129。前提：#128）
   - [x] 1.1 `mobile/` に Web のビルドの依存を足し、`npx expo export --platform web` を通す。native のテスト（`npm test`）を変更前に実行して結果を取り、変更後も同じであることを確かめる
     - _Requirements: 1.1, 1.4_
   - [x] 1.2 手元の Killy server（CORS を許可）と擬似 agent で、Web のビルドをブラウザで開き、絵と動き・SSE・1 秒の長押し（マウスとタッチ）・足りない依存と警告を確かめ、結果と直し方を #129 に書く
