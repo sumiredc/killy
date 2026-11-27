@@ -206,9 +206,12 @@ export function AddServerSheet({ onClose, link }: { onClose: () => void; link?: 
                 placeholder="K7Q4XP"
                 placeholderTextColor={colors.elev3}
               />
-              <Pressable accessibilityRole="button" accessibilityLabel={t('scanQr')} onPress={() => void startScan()} style={styles.ghost}>
-                <KText style={styles.ghostLabel}>{t('scanQr')}</KText>
-              </Pressable>
+              {/* The Web version reads no QR code: the browser's camera is not what the code is for. */}
+              {Platform.OS !== 'web' && (
+                <Pressable accessibilityRole="button" accessibilityLabel={t('scanQr')} onPress={() => void startScan()} style={styles.ghost}>
+                  <KText style={styles.ghostLabel}>{t('scanQr')}</KText>
+                </Pressable>
+              )}
 
               <KText style={styles.label}>{t('nameLabel')}</KText>
               <TextInput

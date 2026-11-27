@@ -3,6 +3,9 @@ import * as SecureStore from 'expo-secure-store';
 
 import type { FetchLike } from './client';
 import { makeNotifications, type NotificationsDeps } from './notifications';
+import { tokenKey } from './token-key';
+
+export { tokenKey };
 
 /** Where the device token for this build's Killy server is kept between starts. */
 export type TokenStore = {
@@ -19,16 +22,6 @@ export type Deps = {
   randomBytes: (n: number) => Uint8Array;
   notifications: NotificationsDeps;
 };
-
-/**
- * The key of the device token for one Killy server. A server registers its own devices, so a token
- * is good only there; one key per server keeps a staging token from being sent to production when
- * both builds are on one phone (iOS keeps Keychain items when an app is replaced). SecureStore keys
- * allow only letters, digits, `.`, `-` and `_`; anything else in the URL becomes `_`.
- */
-export function tokenKey(baseURL: string): string {
-  return 'device_token.' + baseURL.trim().replace(/\/+$/, '').toLowerCase().replace(/[^a-z0-9._-]/g, '_');
-}
 
 /**
  * The real ones. Screen tests replace this function. Expo installs expo/fetch as the global fetch,

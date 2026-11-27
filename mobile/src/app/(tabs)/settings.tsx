@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AddServerSheet } from '@/components/AddServerSheet';
@@ -93,9 +93,12 @@ export default function SettingsScreen() {
         <KText style={styles.groupTitle}>{t('app')}</KText>
         <View style={styles.group}>
           <LanguageRow />
-          <View style={styles.rowDivider}>
-            <NotificationsRow />
-          </View>
+          {/* A browser gets no push from the Killy server and has no system settings to open. */}
+          {Platform.OS !== 'web' && (
+            <View style={styles.rowDivider}>
+              <NotificationsRow />
+            </View>
+          )}
         </View>
         <NotificationsError />
       </ScrollView>
