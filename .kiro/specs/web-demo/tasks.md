@@ -57,8 +57,10 @@
     - _Requirements: 5.3, 5.4, 5.5, 5.7_
   - [x] 5.3 `/demo/settings` を直接開いたときの扱いを確かめ、`.htaccess` を書き換えずに済む形にするか、その制限を PR 本文に書く
     - _Requirements: 5.6_
+  - [x] 5.5 `baseUrl` を `app.config.js` に移し（`EXPO_PUBLIC_KILLY_WEB_DEMO=1` のときだけ）、変数が無いとき・`1` 以外のときに付かないテストを書く。deploy key をビルドのあと、アップロードの前に置き、`ci.yml` の mobile の job に Web の export を足す
+    - _Requirements: 5.1, 5.7, 5.8_
   - [ ] 5.4 マージ後に `https://killy.sumire-sakamoto.co.jp/demo/` で #132 の動きになることを、人が確かめる手順を PR 本文に書く
-    - _Requirements: 5.8_
+    - _Requirements: 5.9_
 
 - [ ] 6. docs：Web 版のデモを README・PRIVACY・ARCHITECTURE・PRD に書く（#134。前提：#132、#133、#130）
   - [ ] 6.1 `README.md`・`docs/PRIVACY.md`・`docs/PRIVACY.ja.md`・`docs/ARCHITECTURE.md`・`docs/ARCHITECTURE.ja.md`・`docs/PRD.md` を直し、`go run ./tools/privacypage` で `site/privacy/` を作り直す
