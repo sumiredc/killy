@@ -18,6 +18,7 @@ import { BattleProvider } from '@/killy/battle-context';
 import { KillyProvider } from '@/killy/context';
 import { NotificationsProvider } from '@/killy/notifications-context';
 import { PairLinkProvider } from '@/killy/pair-link';
+import { WebDemoProvider } from '@/killy/web-demo';
 import { makePrefs } from '@/prefs';
 import { colors, fonts } from '@/theme/tokens';
 
@@ -64,13 +65,15 @@ export default function RootLayout() {
         <ServerURLProvider url={config.url}>
           <I18nProvider initial={lang} save={(l) => prefs.language.set(l)}>
             <KillyProvider>
-              <NotificationsProvider>
-                <BattleProvider>
-                  <PairLinkProvider>
-                    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
-                  </PairLinkProvider>
-                </BattleProvider>
-              </NotificationsProvider>
+              <WebDemoProvider>
+                <NotificationsProvider>
+                  <BattleProvider>
+                    <PairLinkProvider>
+                      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+                    </PairLinkProvider>
+                  </BattleProvider>
+                </NotificationsProvider>
+              </WebDemoProvider>
             </KillyProvider>
           </I18nProvider>
         </ServerURLProvider>

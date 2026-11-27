@@ -12,6 +12,7 @@ import { useBattle } from '@/killy/battle-context';
 import type { KillErrorKind } from '@/killy/client';
 import { useKilly } from '@/killy/context';
 import { useIdleClock, useReduceMotion } from '@/killy/motion';
+import { useWebDemo } from '@/killy/web-demo';
 import { useHoldToKill } from '@/killy/hold';
 import { useStrikeMotion } from '@/killy/strike-motion';
 import { KText } from '@/theme/KText';
@@ -51,6 +52,7 @@ export default function BattleScreen() {
   const { t } = useI18n();
   const { registration, state } = useKilly();
   const battle = useBattle();
+  const webDemo = useWebDemo();
   const current = battle.current;
   const servers = state?.servers ?? [];
 
@@ -97,6 +99,11 @@ export default function BattleScreen() {
       {registration === 'rate_limited' && (
         <View style={styles.notice}>
           <KText style={styles.noticeText}>{t('deviceRateLimited')}</KText>
+        </View>
+      )}
+      {webDemo.notice !== null && (
+        <View style={styles.notice} testID="web-demo-notice">
+          <KText style={styles.noticeText}>{t(webDemo.notice)}</KText>
         </View>
       )}
       <View style={styles.arena}>
@@ -149,10 +156,15 @@ export default function BattleScreen() {
           </View>
         ) : (
           <View style={styles.empty}>
-            <KText kind="monoSemiBold" style={styles.title}>
-              {t(servers.length === 0 ? 'emptyNoServerTitle' : 'emptyNoneTitle')}
-            </KText>
-            <KText style={styles.text}>{t(servers.length === 0 ? 'emptyNoServerText' : 'emptyNoneText')}</KText>
+            {/* The demo-only Web version has no Add server to point to: its demo server is on its way, or the notice says why not. */}
+            {!(webDemo.enabled && servers.length === 0) && (
+              <>
+                <KText kind="monoSemiBold" style={styles.title}>
+                  {t(servers.length === 0 ? 'emptyNoServerTitle' : 'emptyNoneTitle')}
+                </KText>
+                <KText style={styles.text}>{t(servers.length === 0 ? 'emptyNoServerText' : 'emptyNoneText')}</KText>
+              </>
+            )}
             {shown && <Result shown={shown} />}
           </View>
         )}
