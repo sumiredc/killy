@@ -62,8 +62,8 @@
   - [ ] 5.4 マージ後に `https://killy.sumire-sakamoto.co.jp/demo/` で #132 の動きになることを、人が確かめる手順を PR 本文に書く
     - _Requirements: 5.9_
 
-- [ ] 6. docs：Web 版のデモを README・PRIVACY・ARCHITECTURE・PRD に書く（#134。前提：#132、#133、#130）
-  - [ ] 6.1 `README.md`・`docs/PRIVACY.md`・`docs/PRIVACY.ja.md`・`docs/ARCHITECTURE.md`・`docs/ARCHITECTURE.ja.md`・`docs/PRD.md` を直し、`go run ./tools/privacypage` で `site/privacy/` を作り直す
+- [x] 6. docs：Web 版のデモを README・PRIVACY・ARCHITECTURE・PRD に書く（#134。前提：#132、#133、#130）
+  - [x] 6.1 `README.md`・`docs/PRIVACY.md`・`docs/PRIVACY.ja.md`・`docs/ARCHITECTURE.md`・`docs/ARCHITECTURE.ja.md`・`docs/PRD.md` を直し、`go run ./tools/privacypage` で `site/privacy/` を作り直す
     - _Requirements: 6.1, 6.2, 6.3, 6.4_
-  - [ ] 6.2 `go test ./...` を通し、「Try the demo server」「judges' builds」「TestFlight」を `grep` して食い違いが無いことを確かめる。紹介サイトに導線を足すかの提案を PR 本文に書く
+  - [x] 6.2 `go test ./...` を通し、「Try the demo server」「judges' builds」「TestFlight」を `grep` して食い違いが無いことを確かめる。紹介サイトに導線を足すかの提案を PR 本文に書く
     - _Requirements: 6.2, 6.5, 6.6_
