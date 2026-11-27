@@ -167,6 +167,15 @@ describe('the Web version in its demo-only form', () => {
     expect(screen.getByTestId('battle-server')).toHaveTextContent('demo-linux-01');
   });
 
+  test('once a server has been there, an old failure is not said again when it is removed', async () => {
+    const server = new FakeServer();
+    server.unreachable(demoRoute);
+    const stream = await startApp(server);
+    await act(() => stream.send(stateOf([{ ...demo, disconnected: false, parents: [] }])));
+    await act(() => stream.send(stateOf([])));
+    expect(screen.queryByTestId('web-demo-notice')).toBeNull();
+  });
+
   test('a killy://pair link opens no sheet to enter a code', async () => {
     const server = new FakeServer();
     server.respond(demoRoute, 200, demo);

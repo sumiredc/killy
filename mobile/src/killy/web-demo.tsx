@@ -44,6 +44,8 @@ export function WebDemoProvider({ children }: { children: ReactNode }) {
   // Nor once a server is there, whatever the failed call said: it may have been linked all the same
   // (the answer was lost, or another tab of this browser added it).
   const hasServer = (state?.servers.length ?? 0) > 0;
+  // A server that is there settles it: if it is removed later, the old failure is not said again.
+  if (hasServer && failure !== null) setFailure(null);
   const notice: Key | null = !enabled || hasServer ? null : registration === 'failed' ? 'deviceNotRegistered' : failure;
   const value = useMemo(() => (enabled ? { enabled, notice } : off), [enabled, notice]);
   return <WebDemoContext.Provider value={value}>{children}</WebDemoContext.Provider>;
