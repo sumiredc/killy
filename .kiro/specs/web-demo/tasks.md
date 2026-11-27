@@ -51,7 +51,7 @@
     - _Requirements: 4.3_
 
 - [ ] 5. site：Web 版をビルドして /demo/ に配置する（#133。前提：#132、#130）
-  - [x] 5.1 `app.json` に `baseUrl`・`web.output` を足し、`EXPO_PUBLIC_KILLY_SERVER_URL=https://stg-killy.sumire.pink EXPO_PUBLIC_KILLY_WEB_DEMO=1 npx expo export --platform web` の出力を、ローカルの静的な server の `/demo/` で開いて確かめる。開いたときの実行時の要求が、配布元と staging の Killy server だけであることをブラウザで確かめる
+  - [x] 5.1 `app.json` に `web.output`・`favicon` を足し（`baseUrl` は 5.5）、`EXPO_PUBLIC_KILLY_SERVER_URL=https://stg-killy.sumire.pink EXPO_PUBLIC_KILLY_WEB_DEMO=1 npx expo export --platform web` の出力を、ローカルの静的な server の `/demo/` で開いて確かめる。開いたときの実行時の要求が、配布元と staging の Killy server だけであることをブラウザで確かめる
     - _Requirements: 5.1, 5.2_
   - [x] 5.2 `deploy-site.yml` に Node のセットアップとビルドと `out/demo/` への配置、`paths` の `mobile/**`、確認の `/demo/` を足す。ビルドの失敗でアップロードされないことを、ビルドを壊して手元で確かめる
     - _Requirements: 5.3, 5.4, 5.5, 5.7_

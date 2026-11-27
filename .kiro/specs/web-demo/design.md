@@ -129,7 +129,7 @@ flowchart LR
   O --> U["rsync（--delete なし）"] --> V["確認: /demo/ が 200"]
 ```
 
-- `app.json` に `expo.experiments.baseUrl: "/demo"` と `expo.web.output: "static"`（`bundler: "metro"`）を足す。`web.output`・`favicon` は `app.json` に置く。`baseUrl` は Expo の native の release の bundle も読む（`export:embed`）ので、`app.json` には置かず、`mobile/app.config.js` が `EXPO_PUBLIC_KILLY_WEB_DEMO=1` のときだけ足す。EAS の build はこの変数を設定しないので、`baseUrl` を持たない。
+- `app.json` に `expo.web.output: "static"`（`bundler: "metro"`）と `favicon` を足す。`baseUrl` は Expo の native の release の bundle も読む（`export:embed`）ので、`app.json` には置かず、`mobile/app.config.js` が `EXPO_PUBLIC_KILLY_WEB_DEMO=1` のときだけ足す。EAS の build はこの変数を設定しないので、`baseUrl` を持たない。
 - 出力（`mobile/dist/`）は `out/demo/` に置く。既存の「確認が全部通るまで何もアップロードしない」の並びに入れる。
 - `mobile/**` の変更で走るので、`paths` に `mobile/**` を足す。`mobile/` の変更が `site/` に影響しなくても、`/demo/` を最新に保つほうを選ぶ。
 - Web のビルドが外のホストを読まないことは、ブラウザで開いて実行時の要求を数えて確かめる（許可するのは配布元と `stg-killy.sumire.pink` だけ）。出力の `https://` を `grep` する方法は使えない：`@expo-google-fonts` の JS に、使われない `fonts.gstatic.com` の文字列が入っている。

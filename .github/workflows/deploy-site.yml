@@ -113,7 +113,7 @@ jobs:
           npm ci
           npx expo export --platform web --output-dir "$GITHUB_WORKSPACE/out/demo"
           cd "$GITHUB_WORKSPACE/out/demo"
-          # The pages point at /demo/ for their scripts and assets (app.json: baseUrl).
+          # The pages point at /demo/ for their scripts and assets (app.config.js: baseUrl).
           grep -q '/demo/_expo/static/js/web/' index.html
           # The host's .htaccess is not ours, so it cannot be asked to find settings.html for
           # /demo/settings. A directory with an index.html is found by any web host, so a route that is
