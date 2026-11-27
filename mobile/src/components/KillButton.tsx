@@ -1,8 +1,19 @@
-import { Pressable, StyleSheet } from 'react-native';
+import { Platform, Pressable, StyleSheet } from 'react-native';
 import Animated, { type SharedValue, useAnimatedStyle } from 'react-native-reanimated';
 
 import { KText } from '@/theme/KText';
 import { colors, radii } from '@/theme/tokens';
+
+// A hold of a second in a browser would select the label or open the long-press menu of the phone.
+// The style names are the browser's; React Native Web passes them on.
+function webOnly() {
+  return Platform.OS === 'web'
+    ? {
+        style: { userSelect: 'none', WebkitTouchCallout: 'none' } as object,
+        props: { onContextMenu: (e: { preventDefault(): void }) => e.preventDefault() } as object,
+      }
+    : { style: null, props: {} };
+}
 
 /**
  * The hold-to-kill button (DESIGN: Battle tab, Hold to kill): it fills with red from the left as
@@ -23,6 +34,7 @@ export function KillButton({
   onPressIn: () => void;
   onPressOut: () => void;
 }) {
+  const web = webOnly();
   const fill = useAnimatedStyle(() => ({ transform: [{ scaleX: charge.value }] }));
   return (
     <Pressable
@@ -32,7 +44,8 @@ export function KillButton({
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       // The mock's `.kill:active`: pressed in a little while held.
-      style={({ pressed }) => [styles.kill, !enabled && styles.killDisabled, pressed && enabled && styles.pressed]}>
+      style={({ pressed }) => [styles.kill, !enabled && styles.killDisabled, pressed && enabled && styles.pressed, web.style]}
+      {...web.props}>
       <Animated.View style={[styles.fill, fill]} testID="kill-fill" pointerEvents="none" />
       <KText kind="monoSemiBold" style={styles.label}>
         {label}

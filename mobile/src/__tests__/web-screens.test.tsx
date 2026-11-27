@@ -1,6 +1,6 @@
 import { act, fireEvent, renderRouter, screen, within } from 'expo-router/testing-library';
 import * as Localization from 'expo-localization';
-import { Platform } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 
 import * as config from '../config';
 import RootLayout from '../app/_layout';
@@ -66,5 +66,23 @@ describe.each([
     const sheet = within(await screen.findByTestId('add-server-sheet'));
     expect(sheet.getByLabelText('Pairing code')).toBeOnTheScreen();
     expect(sheet.queryByRole('button', { name: 'Scan QR code' }) !== null).toBe(hasNative);
+  });
+});
+
+describe('the kill button, which is held for a second', () => {
+  test('on the Web, a long press selects no text and opens no menu', async () => {
+    await startApp('web');
+    const button = screen.getByRole('button', { name: 'Hold to kill' });
+    expect(StyleSheet.flatten(button.props.style)).toMatchObject({ userSelect: 'none', WebkitTouchCallout: 'none' });
+    const preventDefault = jest.fn();
+    button.props.onContextMenu({ preventDefault });
+    expect(preventDefault).toHaveBeenCalled();
+  });
+
+  test('on iOS it is as it was', async () => {
+    await startApp('ios');
+    const button = screen.getByRole('button', { name: 'Hold to kill' });
+    expect(StyleSheet.flatten(button.props.style)).not.toHaveProperty('userSelect');
+    expect(button.props.onContextMenu).toBeUndefined();
   });
 });
