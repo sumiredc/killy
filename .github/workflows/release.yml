@@ -17,9 +17,13 @@ jobs:
     # from a fork run code there.
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    # Only this job may write: it creates the Release and uploads to it with GITHUB_TOKEN.
+    # Only this job may write: it creates the Release and uploads to it with GITHUB_TOKEN, and signs
+    # the attestation of the binaries (id-token mints the short-lived signing certificate;
+    # attestations stores the result).
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -45,6 +49,15 @@ jobs:
           done
           (cd dist && sha256sum killy-linux-* > SHA256SUMS)
           cat dist/SHA256SUMS
+      # Binds each file to this repository, this workflow and the tag's commit, so a user can check
+      # that it was built here: gh attestation verify killy-linux-amd64 -R sumiredc/killy
+      - name: Attest the build
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            dist/killy-linux-amd64
+            dist/killy-linux-arm64
+            dist/SHA256SUMS
       - name: Create the Release and upload the binaries
         env:
           TAG: ${{ github.ref_name }}
