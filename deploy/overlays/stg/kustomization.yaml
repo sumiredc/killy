@@ -13,7 +13,7 @@ resources:
 
 images:
   - name: 10.1.1.10:5000/killy/server
-    digest: sha256:e09203e9bdf3bd9a705f26c70c806008f177da3482a7c2c9061ac18893209589
+    digest: sha256:31581d23bf7e819d0f955f143e86fda944a0565eae883bfcf3f58c370f4b223d
 
 patches:
   - target: { kind: Ingress, name: killy }
