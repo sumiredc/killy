@@ -1,0 +1,45 @@
+name: gitleaks
+
+# The whole history is scanned on every run (it takes about a second), so a secret that is committed
+# and removed in the same pull request is still found. Findings that are not secrets are listed in
+# .gitleaksignore, and the rules are in .gitleaks.toml. The same command runs by hand.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GITLEAKS_VERSION: 8.30.1
+  # SHA-256 of gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz, from the release's checksums file.
+  GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+
+jobs:
+  gitleaks:
+    # Every job uses a GitHub-hosted runner: a runner inside the home LAN would let a pull request
+    # from a fork run code there.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # A fixed release of the binary is fetched and checked here, not a third-party action, so the
+      # scanner cannot change without a pull request.
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/gitleaks.tar.gz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" version
+      - name: Scan the history
+        run: '"$RUNNER_TEMP/gitleaks" git --config .gitleaks.toml --redact --no-banner --verbose'
