@@ -114,3 +114,38 @@ jobs:
       - run: tools/dbcheck/run.sh
         env:
           KILLY_DATABASE_URL: postgres://postgres:killy@127.0.0.1:5432/killy?sslmode=disable
+
+  # The real server, agent and a real zombie parent on this runner: tools/e2e checks the kill
+  # guarantees through the phone's API (killed, the same ID once, already gone, and that PID 1, the
+  # agent and an ancestor of the agent are refused). The runner is not root, so the agent can signal
+  # only this user's processes, and it is asked to kill only processes the script started.
+  e2e:
+    # Every job uses a GitHub-hosted runner: a runner inside the home LAN would let a pull request
+    # from a fork run code there.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18.7@sha256:2ea8630df176ad090ec92136dee850397c5af8781e4bcf2e4162593691c61bbc
+        env:
+          # A password for this job's own database, which is gone when the job ends.
+          POSTGRES_PASSWORD: killy
+          POSTGRES_DB: killy
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres -d killy"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - run: uname -r
+      - run: tools/e2e/run.sh
+        env:
+          KILLY_DATABASE_URL: postgres://postgres:killy@127.0.0.1:5432/killy?sslmode=disable
