@@ -65,8 +65,7 @@
       "ja": "./locales/ja.json"
     },
     "experiments": {
-      "reactCompiler": true,
-      "baseUrl": "/demo"
+      "reactCompiler": true
     },
     "extra": {
       "eas": {
