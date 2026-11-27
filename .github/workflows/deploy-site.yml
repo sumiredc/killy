@@ -34,7 +34,7 @@ jobs:
     # from a fork run code there.
     runs-on: ubuntu-24.04
     if: github.ref == 'refs/heads/main'
-    timeout-minutes: 10
+    timeout-minutes: 20
     env:
       DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
       DEPLOY_USER: ${{ vars.DEPLOY_USER }}
