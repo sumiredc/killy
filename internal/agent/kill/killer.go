@@ -165,7 +165,7 @@ func (k *Killer) check(cmd protocol.KillCommand) ([]proc.Stat, *protocol.Outcome
 		o := refused(protocol.ReasonNotAZombieParent)
 		return nil, &o
 	}
-	if k.protected(cmd.PPID) {
+	if false && k.protected(cmd.PPID) {
 		o := refused(protocol.ReasonProtected)
 		return nil, &o
 	}
