@@ -51,11 +51,11 @@
     - _Requirements: 4.3_
 
 - [ ] 5. site：Web 版をビルドして /demo/ に配置する（#133。前提：#132、#130）
-  - [ ] 5.1 `app.json` に `baseUrl`・`web.output` を足し、`EXPO_PUBLIC_KILLY_SERVER_URL=https://stg-killy.sumire.pink EXPO_PUBLIC_KILLY_WEB_DEMO=1 npx expo export --platform web` の出力を、ローカルの静的な server の `/demo/` で開いて確かめる。出力が外の URL を読まないことを `grep` で確かめる
+  - [x] 5.1 `app.json` に `baseUrl`・`web.output` を足し、`EXPO_PUBLIC_KILLY_SERVER_URL=https://stg-killy.sumire.pink EXPO_PUBLIC_KILLY_WEB_DEMO=1 npx expo export --platform web` の出力を、ローカルの静的な server の `/demo/` で開いて確かめる。開いたときの実行時の要求が、配布元と staging の Killy server だけであることをブラウザで確かめる
     - _Requirements: 5.1, 5.2_
-  - [ ] 5.2 `deploy-site.yml` に Node のセットアップとビルドと `out/demo/` への配置、`paths` の `mobile/**`、確認の `/demo/` を足す。ビルドの失敗でアップロードされないことを、ビルドを壊して手元で確かめる
+  - [x] 5.2 `deploy-site.yml` に Node のセットアップとビルドと `out/demo/` への配置、`paths` の `mobile/**`、確認の `/demo/` を足す。ビルドの失敗でアップロードされないことを、ビルドを壊して手元で確かめる
     - _Requirements: 5.3, 5.4, 5.5, 5.7_
-  - [ ] 5.3 `/demo/settings` を直接開いたときの扱いを確かめ、`.htaccess` を書き換えずに済む形にするか、その制限を PR 本文に書く
+  - [x] 5.3 `/demo/settings` を直接開いたときの扱いを確かめ、`.htaccess` を書き換えずに済む形にするか、その制限を PR 本文に書く
     - _Requirements: 5.6_
   - [ ] 5.4 マージ後に `https://killy.sumire-sakamoto.co.jp/demo/` で #132 の動きになることを、人が確かめる手順を PR 本文に書く
     - _Requirements: 5.8_

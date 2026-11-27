@@ -132,7 +132,8 @@ flowchart LR
 - `app.json` に `expo.experiments.baseUrl: "/demo"` と `expo.web.output: "static"`（`bundler: "metro"`）を足す。`baseUrl` は Web のビルドにだけ効く（native の build は読まない）。
 - 出力（`mobile/dist/`）は `out/demo/` に置く。既存の「確認が全部通るまで何もアップロードしない」の並びに入れる。
 - `mobile/**` の変更で走るので、`paths` に `mobile/**` を足す。`mobile/` の変更が `site/` に影響しなくても、`/demo/` を最新に保つほうを選ぶ。
-- Web のビルドが外のホストを読まないことは、出力に `https://` で始まる URL を `grep` して確かめる（許可するのは `stg-killy.sumire.pink` だけ）。
+- Web のビルドが外のホストを読まないことは、ブラウザで開いて実行時の要求を数えて確かめる（許可するのは配布元と `stg-killy.sumire.pink` だけ）。出力の `https://` を `grep` する方法は使えない：`@expo-google-fonts` の JS に、使われない `fonts.gstatic.com` の文字列が入っている。
+- 配布元の `.htaccess` を書き換えずに、`/demo/settings` を直接開けるようにするため、ビルドのあと `settings.html` を `settings/index.html` にも写す（`index.html`・`+not-found.html`・`_sitemap.html` は除く）。
 
 ## Data Models
 

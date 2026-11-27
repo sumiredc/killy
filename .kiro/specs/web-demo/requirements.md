@@ -92,11 +92,11 @@
 #### Acceptance Criteria
 
 1. THE 配置の workflow SHALL `EXPO_PUBLIC_KILLY_SERVER_URL=https://stg-killy.sumire.pink` と `EXPO_PUBLIC_KILLY_WEB_DEMO=1` で `npx expo export --platform web` を実行し、`expo.experiments.baseUrl` を `/demo`、`web.output` を `static` にして、出力を `out/demo/` に置く
-2. THE ビルド SHALL `/demo/` の下の JS とアセットだけを読み、サイトの外の URL（Killy server の `https://stg-killy.sumire.pink` を除く）を読まない
+2. THE ページ SHALL 開いたとき、`/demo/` の下の JS とアセットだけを読み、サイトの外へは Killy server の `https://stg-killy.sumire.pink` にだけ要求する（`@expo-google-fonts` の JS には `fonts.gstatic.com` の文字列があるが、実行時には読まれない。出力の文字列ではなく実行時の要求で確かめる）
 3. WHEN `mobile/**` が `main` で変わる THEN `deploy-site.yml` SHALL 走る
 4. IF ビルドが失敗する THEN workflow SHALL 何もアップロードしない
 5. THE 最後の確認 SHALL `/demo/` が 200 を返すことを含み、既存の確認（`/`・`/privacy/`・`/support/`・`/download/*` ほか）は変わらず通る
-6. THE `/demo/` SHALL `.htaccess`（`sumiredc/sumire-sakamoto` が持つ）の書き換えを要らない形で配られる。`/demo/settings` を直接開いたときの扱いは、#133 で確かめて PR 本文に書く
+6. THE `/demo/` SHALL `.htaccess`（`sumiredc/sumire-sakamoto` が持つ）の書き換えを要らない形で配られる。route ごとの html（`settings.html`）は `settings/index.html` にも置き、`/demo/settings` と `/demo/settings/` を直接開いても（再読み込みでも）Settings が開く
 7. THE workflow SHALL GitHub-hosted runner（`ubuntu-24.04`）のままで、外部の action は既存と同じくコミット SHA で固定し、秘密情報を足さない
 8. WHEN `main` にマージされる THEN `https://killy.sumire-sakamoto.co.jp/demo/` SHALL Requirement 4 の動きになる
 
