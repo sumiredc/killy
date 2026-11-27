@@ -19,7 +19,13 @@ jobs:
   go:
     # Every job uses a GitHub-hosted runner: a runner inside the home LAN would let a pull request
     # from a fork run code there.
-    runs-on: ubuntu-24.04
+    # The agent is released for amd64 and arm64 (release.yml), and its tests check the machine they
+    # run on (pidfd, reaping), so both architectures run them.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -32,7 +38,18 @@ jobs:
       - run: go vet ./...
       # -count=1: the Linux tests check the runner itself (pidfd, reaping), so a cached pass proves nothing.
       # -v: the log lists every test, so a skipped one (--- SKIP) can be seen.
-      - run: go test -race -count=1 -v ./...
+      - name: go test
+        run: |
+          set -o pipefail
+          go test -race -count=1 -v ./... 2>&1 | tee "$RUNNER_TEMP/go-test.log"
+      # A skipped test checks nothing on this machine, so say so in the run's summary.
+      - name: Skipped tests
+        if: always()
+        run: |
+          n=$(grep -c -- '--- SKIP' "$RUNNER_TEMP/go-test.log" 2>/dev/null || true)
+          n=${n:-0}
+          echo "${{ matrix.os }}: ${n} skipped tests" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$n" -gt 0 ]; then echo "::warning::${n} tests were skipped on ${{ matrix.os }}"; fi
 
   app:
     # Every job uses a GitHub-hosted runner: a runner inside the home LAN would let a pull request
