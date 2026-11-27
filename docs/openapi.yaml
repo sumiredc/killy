@@ -13,6 +13,12 @@ info:
 
     Every error response has the body `{"error": "<code>"}`. Kill outcomes,
     including `unknown`, are not errors and are returned with `200`.
+
+    Under `/app/v1/`, a server started with `KILLY_CORS_ORIGINS` answers a
+    preflight (`OPTIONS` with `Origin` and `Access-Control-Request-Method`)
+    from a listed origin with `204` and no body, and puts
+    `Access-Control-Allow-Origin` on every response to that origin. Without
+    the setting it sends no CORS header. See ARCHITECTURE.md, CORS.
 servers:
   - url: https://killy.sumire.pink
     description: production

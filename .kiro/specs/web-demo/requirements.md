@@ -40,7 +40,7 @@
 
 1. THE Killy server SHALL 許可するオリジンを、起動時に環境変数 `KILLY_CORS_ORIGINS`（カンマ区切り）から読む
 2. WHERE `KILLY_CORS_ORIGINS` が未設定または空である THE Killy server SHALL どの応答にも CORS のヘッダ（`Access-Control-*` と、その理由の `Vary: Origin`）を付けない
-3. IF `KILLY_CORS_ORIGINS` の項目が、スキーム・ホスト・（あれば）ポートだけの origin でない（`*` である、パスや空のホストを持つなど） THEN Killy server SHALL 起動に失敗する。項目の前後の空白と末尾の `/` は取り除いて読む
+3. IF `KILLY_CORS_ORIGINS` の項目が、スキーム・ホスト・（あれば）ポートだけの origin でない（`*` である、パスや空のホストを持つなど） THEN Killy server SHALL 起動に失敗する。項目の前後の空白と末尾の `/` は取り除き、スキームとホストは小文字にそろえ、既定の port（`https` の 443、`http` の 80）は省いて読む。ブラウザが送る `Origin` と同じ形にして、一致しないまま黙って無効になることを避けるため
 4. WHEN `Origin` が許可したオリジンの 1 つと完全に一致する要求が `/app/v1/` の下に届く THEN Killy server SHALL 応答に `Access-Control-Allow-Origin` としてそのオリジンと、`Vary: Origin` を付ける。成功の応答、`401`・`429` などのエラーの応答、SSE の `GET /app/v1/events` の応答のどれにも付ける
 5. WHEN 許可したオリジンから、preflight（`Origin` と `Access-Control-Request-Method` を持つ `OPTIONS`）が `/app/v1/` の下に届く THEN Killy server SHALL `204` で、`Access-Control-Allow-Origin`（そのオリジン）・`Access-Control-Allow-Methods: GET, POST, PATCH, DELETE`・`Access-Control-Allow-Headers: Authorization, Content-Type`・`Access-Control-Max-Age` を返し、認証にも回数制限にも handler にも進まない
 6. IF 要求の `Origin` が許可したオリジンのどれとも一致しない、または `Origin` が無い THEN Killy server SHALL `Access-Control-Allow-*` を付けない。`Access-Control-Allow-Origin` に `*` を返すことはない。許可していないオリジンの preflight には `204` も返さない（今の応答のまま）

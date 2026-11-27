@@ -154,3 +154,19 @@ func TestADemoAgentIDThatIsNotAUUIDIsLogged(t *testing.T) {
 		t.Errorf("log %q for an unset value, want nothing", buf.String())
 	}
 }
+
+func TestTheServerDoesNotStartWithACORSOriginThatIsNotAnOrigin(t *testing.T) {
+	// The database is never reached: the setting is checked first, so a mistake cannot become
+	// "every origin" or a setting that silently matches nothing.
+	t.Setenv("KILLY_DATABASE_URL", "postgres://killy@127.0.0.1:1/killy")
+	for _, value := range []string{"*", "https://killy.sumire-sakamoto.co.jp/demo", "https://a.example,"} {
+		t.Setenv("KILLY_CORS_ORIGINS", value)
+		var stderr bytes.Buffer
+		if code := runServer([]string{"-listen", "127.0.0.1:0"}, &stderr); code != 1 {
+			t.Errorf("KILLY_CORS_ORIGINS=%q: exit code %d, want 1", value, code)
+		}
+		if !strings.Contains(stderr.String(), "KILLY_CORS_ORIGINS") {
+			t.Errorf("KILLY_CORS_ORIGINS=%q: output %q, want a line naming the variable", value, stderr.String())
+		}
+	}
+}

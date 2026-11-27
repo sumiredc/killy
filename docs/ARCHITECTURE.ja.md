@@ -185,6 +185,17 @@ sequenceDiagram
 - Go の handler は、SSE の route では `http.ResponseController` で書き込みの期限を外し、イベントごとに flush する。
 - client は、指数的に延ばす待ち時間（1 秒 → 30 秒）にランダムな揺らぎを足して再接続する。Killy server の再起動で再接続が一斉に起きないようにするため。
 
+### CORS
+
+別のオリジンのブラウザのページは、Killy server が許可したときだけ App API を呼べます。デモの Web 版（「デモ環境」を参照）がそのページです。`https://killy.sumire-sakamoto.co.jp` から配られ、`https://stg-killy.sumire.pink` を呼びます。ネイティブの app はブラウザのページではなく、この設定は要りません。
+
+- `KILLY_CORS_ORIGINS` は、オリジン（scheme、host、あれば port。path と `*` は不可）をカンマで区切った一覧。項目がオリジンでなければ、server は起動しない。項目は、ブラウザが送る形（scheme と host は小文字、既定の port は省く）で読む。未設定か空なら、今までどおり、どの応答にも CORS のヘッダ（`Vary: Origin` を含む）を付けない。
+- `/app/v1/` の下で `Origin` が一覧のどれかと一致する要求には、すべての応答に、そのオリジンを入れた `Access-Control-Allow-Origin` を付ける。成功、エラー（`401`・`429`。無いとページが status を読めない）、イベントの stream のどれにも付ける。一覧を設定している間は、`/app/v1/` の下のすべての応答に、オリジンによらず `Vary: Origin` も付く。`*` は返さず、`Access-Control-Allow-Credentials` も返さない。app は cookie を使わず、Bearer token だけを送るため。
+- 一覧のオリジンからの preflight（`Origin` と `Access-Control-Request-Method` を持つ `OPTIONS`）には、認証と回数制限より前に、`204` と `Access-Control-Allow-Methods: GET, POST, PATCH, DELETE`・`Access-Control-Allow-Headers: Authorization, Content-Type`・`Access-Control-Max-Age: 600` を返す。そのため preflight は回数制限を使わない。それ以外のオリジンには、`Access-Control-*` のヘッダを付けず、今までの応答（`405`）を返す。
+- `/agent/v1/` には何も付けない。agent はブラウザではないため。
+- CORS は認証ではない。一覧のオリジンからでも、有効な token の無い要求は、ほかと同じく `401`。回数制限も変わらない。
+- 設定するのは `deploy/overlays/stg/` だけで、値は `https://killy.sumire-sakamoto.co.jp`。production には設定しない。
+
 ## 時間
 
 | 値 | 設定 |
@@ -236,7 +247,7 @@ DNS のレコード、tunnel の route、証明書は追加しません。tunnel
 | Image | `10.1.1.10:5000/killy/server:<変えない tag>`。kustomize の `images[]` で digest で固定する。base image は `10.1.1.10:5001` の mirror から取る |
 | Image の build | このリポジトリには image の workflow が無く、self-hosted runner を使う workflow も無い。workflow（CI・release・サイト）は GitHub-hosted runner（`ubuntu-24.04`）で動く。public にした後は、self-hosted runner だと fork からの pull request が LAN の中でコードを実行できてしまうため。GitHub-hosted runner は LAN の registry に届かない。このリポジトリで build した最後の image（外す前の cluster の self-hosted runner で build した）が、`deploy/overlays/stg/` と `deploy/overlays/prd/` に固定してあるもの。public にした後の production の image は、aidd-infra リポジトリの `workflow_dispatch` の workflow で build する。この workflow は Killy の commit SHA を受け取り、共有の BuildKit で build して `10.1.1.10:5000/killy/server:<commit SHA>` に push し、digest を報告する。Killy はその digest を pull request で `deploy/overlays/` に固定する。infra の担当者に依頼済みで、workflow はまだ無い。registry は tag の上書きを許すので、デプロイは digest だけで行う |
 | Secrets | `EXPO_ACCESS_TOKEN`、PostgreSQL のパスワードなどは `SealedSecret`（`kubeseal --controller-namespace kube-system --controller-name sealed-secrets-controller --scope strict`）でだけ持ち、overlay ごとに置く。strict の scope は暗号文を Secret の名前と namespace に結びつけるので、staging と production で 1 つを共有できず、値も環境ごとに違う。平文の秘密情報をリポジトリにもチャットにも置かない |
-| 設定 | `KILLY_DATABASE_URL`（PostgreSQL のパスワードを含むので `SealedSecret` から渡す）、`KILLY_DEMO_AGENT_ID`（「デモ環境」を参照）。`EXPO_ACCESS_TOKEN` は Expo の push security を有効にしたときだけ要る（有効にしていない） |
+| 設定 | `KILLY_DATABASE_URL`（PostgreSQL のパスワードを含むので `SealedSecret` から渡す）、`KILLY_DEMO_AGENT_ID`（「デモ環境」を参照）、`KILLY_CORS_ORIGINS`（「CORS」を参照。staging だけ）。`EXPO_ACCESS_TOKEN` は Expo の push security を有効にしたときだけ要る（有効にしていない） |
 | 接続元のアドレス | `CF-Connecting-IP` を読む。TCP の相手のアドレスは cluster のもので、client のものではない。ペアリングの回数制限に使う |
 | アクセスの制御 | 認可はすべて app 側（token）で行う。cluster は NetworkPolicy を使っていない。ペアリングの回数制限は Killy server にあり、それ以上の rate limiting が要るなら Cloudflare のダッシュボードで設定する |
 | CPU | AVX の無い x86_64。static な Go のバイナリには特別なものは要らない |
