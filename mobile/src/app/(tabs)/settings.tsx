@@ -9,6 +9,7 @@ import { useI18n } from '@/i18n/context';
 import { useKilly } from '@/killy/context';
 import { useNotifications } from '@/killy/notifications-context';
 import { usePairLinks } from '@/killy/pair-link';
+import { useWebDemo } from '@/killy/web-demo';
 import { serverRow } from '@/killy/server-row';
 import { KText } from '@/theme/KText';
 import { colors, gutter, radii } from '@/theme/tokens';
@@ -16,6 +17,8 @@ import { colors, gutter, radii } from '@/theme/tokens';
 export default function SettingsScreen() {
   const { t } = useI18n();
   const { state } = useKilly();
+  // The demo-only Web version has the demo server and no code to add another with.
+  const webDemo = useWebDemo();
   const [adding, setAdding] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   // A killy://pair link, already checked by its route, opens the Add server sheet. Settings has no
@@ -86,10 +89,12 @@ export default function SettingsScreen() {
             })}
           </View>
         )}
-        <Pressable accessibilityRole="button" style={styles.addButton} onPress={() => setAdding(true)}>
-          <KText style={styles.addButtonText}>＋</KText>
-          <KText style={styles.addButtonText}>{t('addServer')}</KText>
-        </Pressable>
+        {!webDemo.enabled && (
+          <Pressable accessibilityRole="button" style={styles.addButton} onPress={() => setAdding(true)}>
+            <KText style={styles.addButtonText}>＋</KText>
+            <KText style={styles.addButtonText}>{t('addServer')}</KText>
+          </Pressable>
+        )}
         <KText style={styles.groupTitle}>{t('app')}</KText>
         <View style={styles.group}>
           <LanguageRow />
@@ -103,7 +108,8 @@ export default function SettingsScreen() {
         <NotificationsError />
       </ScrollView>
       {/* Not over the Server sheet: iOS presents one sheet at a time, so a link waits until it closes. */}
-      {(adding || link !== null) && open === undefined && <AddServerSheet onClose={closeAdd} link={link} />}
+      {/* Nor from a pair link in the demo-only Web version: it has no code to enter. */}
+      {!webDemo.enabled && (adding || link !== null) && open === undefined && <AddServerSheet onClose={closeAdd} link={link} />}
       {open !== undefined && <ServerSheet server={open} onClose={() => setOpenId(null)} />}
     </SafeAreaView>
   );

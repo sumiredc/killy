@@ -76,12 +76,12 @@
 1. THE `config.ts` SHALL `EXPO_PUBLIC_KILLY_WEB_DEMO` が `1` のときだけ Web のデモ専用を有効とする（`demoEnabled` と同じ形。ほかの値や未設定は無効）
 2. WHILE Web のデモ専用が有効である WHEN 端末の登録が済んだ THEN app SHALL `POST /app/v1/demo` を 1 回呼び、battle 画面を出す。起動のたびに 1 回呼ぶ（Killy server は同じ端末の 2 回目以降を、紐付けも表示名も変えずに受ける）
 3. WHILE Web のデモ専用が有効である THE app SHALL `Platform.OS` が Web でないとき、この動きをしない（native の build は、この変数が設定されていても変わらない）
-4. WHILE Web のデモ専用が有効である THE Settings SHALL Add server（コードの入力）を出さない
+4. WHILE Web のデモ専用が有効である THE Settings SHALL Add server（コードの入力）を出さない。サーバーが 1 つも無い間、battle 画面は「設定からサーバーを追加する」案内（Add server が無いので指せない）を出さない。ペアリングの link（`/pair`）でも、コードの入力の sheet を開かない
 5. IF 端末の登録が失敗した（`429`、届かない、そのほか） THEN app SHALL battle 画面に、理由を system text で出し、`POST /app/v1/demo` を呼ばない。文言は既存の `deviceRateLimited`・`deviceNotRegistered` を使う
-6. IF `POST /app/v1/demo` が失敗した THEN app SHALL battle 画面に、理由を system text で出す。文言は Add server の「デモサーバーを試す」と同じ表（`ClaimError` の種類ごと：`demo_not_configured` は `demoNotConfigured`、届かないは `pairUnreachable`、そのほかは `pairFailed`）を使い、新しい文言を足さない。再読み込みでやり直せる
+6. IF `POST /app/v1/demo` が失敗した THEN app SHALL battle 画面に、理由を system text で出す。文言は Add server の「デモサーバーを試す」と同じ表（`ClaimError` の種類ごと：`demo_not_configured` は `demoNotConfigured`、届かないは `pairUnreachable`、そのほかは `pairFailed`）を使い、新しい文言を足さない。再読み込みでやり直せる。サーバーが 1 つでもあれば、この理由は出さない（返事が届かなかっただけで、追加されていることがある）
 7. WHILE Web のデモ専用が有効で追加が済んだ THE app SHALL 公開デモの親を battle の列に出し、kill ボタンの 1 秒の長押しで kill できる。1 秒より前に離すと何も送らない
 8. WHEN 他の人が同じデモの親を先に kill した THEN app SHALL その親を画面から消す。これは今のデモ（PRD UC6）と同じ動きである
-9. WHILE Web である WHEN 画面の幅が 430px より広い THEN app SHALL 幅 430px の枠を中央に置き、その中に画面を出す。430px 以下のときは、画面いっぱいに出す
+9. WHILE Web である WHEN 画面の幅が 430px より広い THEN app SHALL 幅 430px の枠を中央に置き、その中に画面を出す。430px 以下のときは、画面いっぱいに出す。Modal の sheet も、枠と同じ幅にとどめる
 10. THE Web のデモ専用 SHALL Killy の文言を system text にとどめ、新しい台詞を足さない（[killy-character](../../steering/killy-character.md)）
 11. THE kill の安全確認（agent の `not_demo`）と回数制限 SHALL 今のまま使い、server と agent にデモ用の特別扱いを足さない
 

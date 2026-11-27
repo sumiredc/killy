@@ -38,18 +38,18 @@
   - [x] 3.5 `npm run typecheck && npm run lint && npm test` と `npx expo export --platform web` を通し、#129 で出た直しを入れる
     - _Requirements: 3.7, 3.8_
 
-- [ ] 4. app：Web 版をデモ専用にし、開くとデモサーバーの battle 画面を出す（#132。前提：#131）
-  - [ ] 4.1 `webDemoEnabled` のテスト（`1`・`0`・空・未設定・空白つきの `1`）と `claimMessages` を `claim-messages.ts` に移すこと（native のテストは緑のまま）
+- [x] 4. app：Web 版をデモ専用にし、開くとデモサーバーの battle 画面を出す（#132。前提：#131）
+  - [x] 4.1 `webDemoEnabled` のテスト（`1`・`0`・空・未設定・空白つきの `1`）と `claimMessages` を `claim-messages.ts` に移すこと（native のテストは緑のまま）
     - _Requirements: 4.1_
-  - [ ] 4.2 `WebDemoProvider` の画面のテスト（登録が済むと `POST /app/v1/demo` が 1 回・battle にデモの親が出る・登録が `429`・届かないときに呼ばず理由が出る・デモの追加の失敗 3 種の文言・無効なときと `Platform.OS` が `ios` のときは呼ばない・Settings に Add server が出ない・保存された token があれば登録しない）を書き、最小のスタブで赤を確かめる
+  - [x] 4.2 `WebDemoProvider` の画面のテスト（登録が済むと `POST /app/v1/demo` が 1 回・battle にデモの親が出る・登録が `429`・届かないときに呼ばず理由が出る・デモの追加の失敗 3 種の文言・無効なときと `Platform.OS` が `ios` のときは呼ばない・Settings に Add server が出ない・保存された token があれば登録しない）を書き、最小のスタブで赤を確かめる
     - _Requirements: 4.2, 4.3, 4.4, 4.5, 4.6_
-  - [ ] 4.3 `WebDemoProvider`・battle 画面の理由の表示・Settings の出し分けを実装し、テストを緑にする
+  - [x] 4.3 `WebDemoProvider`・battle 画面の理由の表示・Settings の出し分けを実装し、テストを緑にする
     - _Requirements: 4.2, 4.3, 4.4, 4.5, 4.6, 4.7_
-  - [ ] 4.4 PC の幅の枠のテスト（Web で `maxWidth` が 430、native では枠が無い）を書き、赤を確かめてから実装する
+  - [x] 4.4 PC の幅の枠のテスト（Web で `maxWidth` が 430、native では枠が無い）を書き、赤を確かめてから実装する
     - _Requirements: 4.9_
-  - [ ] 4.5 手元の Killy server と擬似 agent で、新しいブラウザ（`localStorage` が空）で開いてデモのゾンビが出ること、1 秒の長押しで kill が送られること、1 秒より前に離すと送られないこと、再読み込みで登録し直さないこと、PC の幅の枠を確かめ、PR 本文に書く
+  - [x] 4.5 手元の Killy server と擬似 agent で、新しいブラウザ（`localStorage` が空）で開いてデモのゾンビが出ること、1 秒の長押しで kill が送られること、1 秒より前に離すと送られないこと、再読み込みで登録し直さないこと、PC の幅の枠を確かめ、PR 本文に書く
     - _Requirements: 4.7, 4.8, 4.9_
-  - [ ] 4.6 `npm run typecheck && npm run lint && npm test` を通す
+  - [x] 4.6 `npm run typecheck && npm run lint && npm test` を通す
     - _Requirements: 4.3_
 
 - [ ] 5. site：Web 版をビルドして /demo/ に配置する（#133。前提：#132、#130）
