@@ -34,3 +34,18 @@ export function demoEnabled(value: string | undefined): boolean {
 export function buildDemoEnabled(): boolean {
   return demoEnabled(process.env.EXPO_PUBLIC_KILLY_DEMO);
 }
+
+/**
+ * Whether this build is the Web version in its demo-only form: it opens straight onto the public
+ * demo server, with no pairing code, no QR code and no notifications. Only the build that is put on
+ * the introduction site's /demo/ sets EXPO_PUBLIC_KILLY_WEB_DEMO=1; any other value, or none,
+ * leaves the app as it is. It has an effect on the Web only (see WebDemoProvider).
+ */
+export function webDemoEnabled(value: string | undefined): boolean {
+  return value?.trim() === '1';
+}
+
+/** Read where Expo inlines EXPO_PUBLIC_ variables: the name must be written out in full. */
+export function buildWebDemoEnabled(): boolean {
+  return webDemoEnabled(process.env.EXPO_PUBLIC_KILLY_WEB_DEMO);
+}

@@ -1,4 +1,4 @@
-import { buildDemoEnabled, buildServerURL, ConfigError, demoEnabled, serverURL } from '../config';
+import { buildDemoEnabled, buildServerURL, buildWebDemoEnabled, ConfigError, demoEnabled, serverURL, webDemoEnabled } from '../config';
 
 describe('serverURL', () => {
   test('reads the URL set for the build', () => {
@@ -58,5 +58,36 @@ describe('buildDemoEnabled', () => {
     expect(buildDemoEnabled()).toBe(true);
     delete process.env.EXPO_PUBLIC_KILLY_DEMO;
     expect(buildDemoEnabled()).toBe(false);
+  });
+});
+
+describe('webDemoEnabled', () => {
+  test('only 1 makes the Web version demo-only', () => {
+    expect(webDemoEnabled('1')).toBe(true);
+    expect(webDemoEnabled(' 1 ')).toBe(true);
+    for (const v of [undefined, '', '0', 'true', 'yes', '11']) {
+      expect(webDemoEnabled(v)).toBe(false);
+    }
+  });
+});
+
+describe('buildWebDemoEnabled', () => {
+  const original = process.env.EXPO_PUBLIC_KILLY_WEB_DEMO;
+  afterEach(() => {
+    if (original === undefined) delete process.env.EXPO_PUBLIC_KILLY_WEB_DEMO;
+    else process.env.EXPO_PUBLIC_KILLY_WEB_DEMO = original;
+  });
+
+  test('reads EXPO_PUBLIC_KILLY_WEB_DEMO, not EXPO_PUBLIC_KILLY_DEMO', () => {
+    process.env.EXPO_PUBLIC_KILLY_WEB_DEMO = '1';
+    expect(buildWebDemoEnabled()).toBe(true);
+    delete process.env.EXPO_PUBLIC_KILLY_WEB_DEMO;
+    expect(buildWebDemoEnabled()).toBe(false);
+    process.env.EXPO_PUBLIC_KILLY_DEMO = '1';
+    try {
+      expect(buildWebDemoEnabled()).toBe(false);
+    } finally {
+      delete process.env.EXPO_PUBLIC_KILLY_DEMO;
+    }
   });
 });
