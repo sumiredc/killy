@@ -100,7 +100,7 @@ export default function SettingsScreen() {
             </View>
           )}
         </View>
-        {Platform.OS !== 'web' && <NotificationsError />}
+        <NotificationsError />
       </ScrollView>
       {/* Not over the Server sheet: iOS presents one sheet at a time, so a link waits until it closes. */}
       {(adding || link !== null) && open === undefined && <AddServerSheet onClose={closeAdd} link={link} />}
