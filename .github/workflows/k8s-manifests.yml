@@ -1,0 +1,61 @@
+name: k8s-manifests
+
+# deploy/overlays/stg and prd are what Argo CD reads. A manifest that is wrong (a mistyped field, an
+# image without a digest) would be found only when Argo CD fails to sync. tools/k8scheck builds each
+# overlay with kustomize and validates it with kubeconform, without a cluster. It runs only when
+# something it reads changes: a check that is skipped on other pull requests cannot be a required check.
+on:
+  pull_request:
+    paths:
+      - 'deploy/**'
+      - 'tools/k8scheck/**'
+      - '.github/workflows/k8s-manifests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'deploy/**'
+      - 'tools/k8scheck/**'
+      - '.github/workflows/k8s-manifests.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  KUSTOMIZE_VERSION: 5.8.3
+  # SHA-256 of kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz, from the release's checksums.txt.
+  KUSTOMIZE_SHA256: cb9e31198d3f63b44848bd0afc4c8efc56e6cfef9c93a4a39a211940e6decd61
+  KUBECONFORM_VERSION: 0.8.0
+  # SHA-256 of kubeconform-linux-amd64.tar.gz, from the release's CHECKSUMS.
+  KUBECONFORM_SHA256: 9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883
+
+jobs:
+  validate:
+    # Every job uses a GitHub-hosted runner: a runner inside the home LAN would let a pull request
+    # from a fork run code there.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Fixed releases of the binaries are fetched and checked here, not third-party actions.
+      - name: Install kustomize and kubeconform
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSL -o "$RUNNER_TEMP/kustomize.tar.gz" \
+            "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
+          echo "${KUSTOMIZE_SHA256}  $RUNNER_TEMP/kustomize.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/kustomize.tar.gz" -C "$RUNNER_TEMP/bin" kustomize
+          curl -fsSL -o "$RUNNER_TEMP/kubeconform.tar.gz" \
+            "https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
+          echo "${KUBECONFORM_SHA256}  $RUNNER_TEMP/kubeconform.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/kubeconform.tar.gz" -C "$RUNNER_TEMP/bin" kubeconform
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - run: kustomize version
+      - run: kubeconform -v
+      - run: tools/k8scheck/run.sh
