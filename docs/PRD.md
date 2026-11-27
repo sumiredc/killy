@@ -23,7 +23,7 @@ Killy is our entry to the **Kiroween 2026** hackathon in the **Frankenstein** ca
 | User | What they want |
 |---|---|
 | Operator | Runs one or more Linux servers. Installs the agent, pairs the phone, gets notified and kills zombie parents. |
-| Judge / visitor | Has no server of their own. Installs the app (TestFlight, Google Play open testing, or APK) and tries Killy against the public demo environment. |
+| Judge / visitor | Has no server of their own. Installs the app (TestFlight, Google Play open testing, or APK), or opens the Web demo in a browser, and tries Killy against the public demo environment. |
 
 ## Guarantees
 
@@ -83,7 +83,7 @@ Killy is our entry to the **Kiroween 2026** hackathon in the **Frankenstein** ca
 | Hosting | Killy server on the team's home Kubernetes cluster at `killy.sumire.pink`, exposed through the existing Cloudflare Tunnel, one replica. The home cluster gives no uptime guarantee. |
 | Notifications | Expo Push Service (APNs and FCM credentials managed by EAS). |
 | Distribution | iOS through a TestFlight public link. Android through a Google Play open testing link, with the APK on the repository's GitHub Releases as well. For judges who install nothing, a Web demo at `https://killy.sumire-sakamoto.co.jp/demo/` on the introduction site. The agent binaries and the systemd unit are downloaded from the introduction site, not from GitHub, so they stay available when the repository is private. |
-| Introduction site | Static pages in this repository's `site/`, published at `https://killy.sumire-sakamoto.co.jp` on the team's web host, not by the Killy server. They say what Killy is and where to get it (the App Store and Google Play badges, and the agent download), in English and Japanese. A support page on it, for people who use the store release, says how to install the agent for the production Killy server, what Killy promises about the processes it kills, and links to the contact form. The privacy policy registered with Google Play is its `/privacy/` page, whose text is [PRIVACY.md](PRIVACY.md). |
+| Introduction site | Static pages in this repository's `site/` (and the Web demo built from `mobile/` under `/demo/`), published at `https://killy.sumire-sakamoto.co.jp` on the team's web host, not by the Killy server. They say what Killy is and where to get it (the App Store and Google Play badges, and the agent download), in English and Japanese. A support page on it, for people who use the store release, says how to install the agent for the production Killy server, what Killy promises about the processes it kills, and links to the contact form. The privacy policy registered with Google Play is its `/privacy/` page, whose text is [PRIVACY.md](PRIVACY.md). |
 | Character | Killy never speaks. See the character rules. |
 
 ## Use cases
@@ -152,7 +152,7 @@ The operator wants to know whether Killy can reach a server right now.
 
 A judge wants to try Killy without a server.
 
-The public demo exists for the hackathon's judging only. It runs on the staging Killy server, and only the builds made for the judges (the TestFlight public link, the Google Play open test and the APK) connect there and show "Try the demo server". For a judge who installs nothing there is also the Web demo, in a browser at `https://killy.sumire-sakamoto.co.jp/demo/`, which connects to the same staging server. The production Killy server has no demo, and builds that connect to it do not show the button.
+The public demo exists for the hackathon's judging only. It runs on the staging Killy server, and only the builds made for the judges (the TestFlight public link, the Google Play open test and the APK) connect there and show "Try the demo server". For a judge who installs nothing there is also the Web demo, in a browser at `https://killy.sumire-sakamoto.co.jp/demo/`, which connects to the same staging server and needs no button. The production Killy server has no demo, and builds that connect to it do not show the button.
 
 - Main flow: in Add server, the judge taps "Try the demo server"; the public demo server is added without a pairing code. Demo zombies appear and can be killed.
 - Alternative: the judge opens the Web demo in a browser; it adds the demo server by itself, with no button and no pairing code, and shows the battle screen. It has no QR code and no notifications (Settings has no Add server and no Notifications row), and it keeps its device token in the browser's local storage, so a reload is the same device. Holding the kill button for 1 second kills, as in the app.

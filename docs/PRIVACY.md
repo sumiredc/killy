@@ -56,7 +56,7 @@ We use these answers only to reply to you and to carry out requests to delete da
 
 ## The public demo
 
-This section applies only to the builds made for the Kiroween 2026 hackathon judges. They connect to the team's staging Killy server and offer a public demo server. The store release of the app (App Store and Google Play) connects to the production Killy server and has no demo. Processes shown in the demo are created on a demo machine only for that purpose. Kills sent to the demo are visible to everyone using it: a parent killed by one person disappears for everyone.
+This section applies only to the builds made for the Kiroween 2026 hackathon judges and to the Web demo (below). They connect to the team's staging Killy server and offer a public demo server. The store release of the app (App Store and Google Play) connects to the production Killy server and has no demo. Processes shown in the demo are created on a demo machine only for that purpose. Kills sent to the demo are visible to everyone using it: a parent killed by one person disappears for everyone.
 
 The Web demo, at <https://killy.sumire-sakamoto.co.jp/demo/>, is the same app in a browser, for the demo only. It connects to the staging Killy server and adds the demo server by itself when it opens, with no pairing code. It keeps the device token and the language setting in the browser's local storage (`localStorage`) for the site killy.sumire-sakamoto.co.jp, where the phone app uses its secure storage. It sends no push token and uses no camera. The page and its scripts, images and fonts come from the introduction site only, and the page loads nothing from a third party; the introduction site's web server may record the address and time of requests in its logs.
 
