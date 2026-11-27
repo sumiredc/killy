@@ -27,6 +27,8 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+          # The binaries are published, so the build must not read a cache another run could have written.
+          cache: false
       - name: Build
         env:
           TAG: ${{ github.ref_name }}
