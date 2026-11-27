@@ -1,0 +1,59 @@
+name: workflows-lint
+
+# actionlint finds mistakes in the workflows (syntax, expressions, shell). zizmor finds security
+# problems in them (script injection, excess permissions, unpinned actions, cache poisoning). Both
+# run on every pull request, whichever files it changes, because a check that is skipped on some pull
+# requests cannot be made required.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  ACTIONLINT_VERSION: 1.7.12
+  # SHA-256 of actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz, from the release's checksums file.
+  ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+  ZIZMOR_VERSION: 1.33.1
+  # SHA-256 of zizmor-x86_64-unknown-linux-gnu.tar.gz, as GitHub shows it for the release asset.
+  ZIZMOR_SHA256: 3e6a301c7a820a2501915f5a9de8c0486da82bdec7965f068477538a98743d43
+
+jobs:
+  lint:
+    # Every job uses a GitHub-hosted runner: a runner inside the home LAN would let a pull request
+    # from a fork run code there.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Fixed releases of the binaries are fetched and checked here, not third-party actions, so a
+      # scanner cannot change without a pull request.
+      - name: Install actionlint and zizmor
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/actionlint.tar.gz" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          curl -fsSL -o "$RUNNER_TEMP/zizmor.tar.gz" \
+            "https://github.com/zizmorcore/zizmor/releases/download/v${ZIZMOR_VERSION}/zizmor-x86_64-unknown-linux-gnu.tar.gz"
+          echo "${ZIZMOR_SHA256}  $RUNNER_TEMP/zizmor.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/zizmor.tar.gz" -C "$RUNNER_TEMP" zizmor
+          "$RUNNER_TEMP/actionlint" -version
+          "$RUNNER_TEMP/zizmor" --version
+      - name: actionlint
+        run: '"$RUNNER_TEMP/actionlint" -color'
+      # The token lets zizmor audit online (a pinned SHA that is not on the repository's branches or tags,
+      # a SHA that does not belong to the tag in its comment, an action with a known vulnerability).
+      - name: zizmor
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: '"$RUNNER_TEMP/zizmor" --format plain .github/workflows'
