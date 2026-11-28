@@ -25,6 +25,7 @@ export function Killy({
   lean,
   strike,
   bow,
+  scythe: withScythe = true,
 }: {
   width: number;
   clock?: SharedValue<number>;
@@ -36,6 +37,8 @@ export function Killy({
   strike?: SharedValue<number>;
   /** How far Killy has bowed, 0–1. */
   bow?: SharedValue<number>;
+  /** Whether Killy carries the scythe; the All clear card shows Killy without it (the mock's `.clear-killy .scythe`). */
+  scythe?: boolean;
 }) {
   // `matrix` is the transform react-native-svg's native group takes; its public props do not list
   // it, because transforms usually go through `transform` and are turned into a matrix in JS,
@@ -80,6 +83,7 @@ export function Killy({
           <AnimatedEllipse testID="killy-eye" cx="105" cy="55" rx="3.8" ry="6.6" fill="#000" animatedProps={far} />
         </AnimatedG>
 
+        {withScythe && (
         <AnimatedG testID="killy-scythe" animatedProps={scythe}>
           <Path d="M100 146 Q119 82 127 16" fill="none" stroke="#2f2740" strokeWidth="7" strokeLinecap="round" />
           <Path d="M98.6 143 Q117 82 125 18" fill="none" stroke="#5c4f78" strokeWidth="2" strokeLinecap="round" />
@@ -104,8 +108,10 @@ export function Killy({
             />
           </G>
         </AnimatedG>
+        )}
 
-        <Circle testID="killy-arm" cx="115" cy="82" r="7.5" fill="#ffffff" />
+        {/* Without the scythe the arm hangs a little lower and nearer the body, as the mock's `.clear-killy .arm`. */}
+        <Circle testID="killy-arm" cx={withScythe ? 115 : 109} cy={withScythe ? 82 : 88} r="7.5" fill="#ffffff" />
       </Svg>
     </View>
   );

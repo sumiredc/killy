@@ -13,6 +13,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { buildServerURL, ConfigError } from '@/config';
 import { ServerURLProvider } from '@/config-context';
 import { initialLanguage, type Lang } from '@/i18n';
+import { AllClearOverlay } from '@/components/AllClearOverlay';
 import { PhoneFrame } from '@/components/PhoneFrame';
 import { I18nProvider } from '@/i18n/context';
 import { BattleProvider } from '@/killy/battle-context';
@@ -72,6 +73,8 @@ export default function RootLayout() {
                     <PairLinkProvider>
                       <PhoneFrame>
                         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+                        {/* Over the tabs, the tab bar included (DESIGN: All clear overlay). */}
+                        <AllClearOverlay />
                       </PhoneFrame>
                     </PairLinkProvider>
                   </BattleProvider>
