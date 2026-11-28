@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
+  makeMutable,
   ReduceMotion,
   type SharedValue,
   useAnimatedProps,
@@ -40,6 +41,9 @@ import {
   bubblePop,
   DEFEAT_FROM,
   defeatRows,
+  DROP_MS,
+  dropOffset,
+  dropOpacity,
   ENTER_FROM,
   flashOpacity,
   killyDash,
@@ -224,6 +228,7 @@ function ZombieOnGround({
   clock,
   motion,
   on,
+  drop,
 }: {
   pid: number;
   index: number;
@@ -231,6 +236,8 @@ function ZombieOnGround({
   clock: SharedValue<number>;
   motion: StrikeMotion;
   on: boolean;
+  /** How far a zombie that is coming in has dropped, eased, 0 to about 1; none for one that was there. */
+  drop?: SharedValue<number>;
 }) {
   const box = zombieBox(index, size);
   const pose = useDerivedValue(() => {
@@ -240,7 +247,9 @@ function ZombieOnGround({
   const jerk = useAnimatedStyle(() => {
     // A knocked-out zombie stops jerking (the mock's `.zombie.dead { animation: none }`).
     const p = pose.value.alive ? puppet(clock.value, index) : { y: 0, rotate: 0 };
-    return { transform: [{ scale: box.scale }, { translateY: p.y }, { rotate: `${p.rotate}deg` }] };
+    // A new zombie drops in from 60px above on its strings, fading in (the mock's `drop-in`).
+    const e = drop ? drop.value : 1;
+    return { opacity: dropOpacity(e), transform: [{ scale: box.scale }, { translateY: p.y + dropOffset(e) }, { rotate: `${p.rotate}deg` }] };
   });
   const body = useAnimatedStyle(() => {
     const b = pose.value.body;
@@ -269,6 +278,36 @@ function ZombieOnGround({
 }
 
 /**
+ * The drop of each zombie that comes after the ones the parent was first drawn with: a value that
+ * goes from 0 to 1 over 600 ms (eased, so it passes 1 a little), by PID. It is made while rendering
+ * the zombie's first frame, at 0, so the zombie never shows in its place before it drops. Without
+ * `on` (reduce motion) a new zombie has none and is simply there.
+ */
+function useDrops(zombies: number[], on: boolean): Map<number, SharedValue<number>> {
+  const [known, setKnown] = useState(zombies);
+  const [drops, setDrops] = useState(() => new Map<number, SharedValue<number>>());
+  const fresh = zombies.filter((pid) => !known.includes(pid));
+  if (fresh.length > 0) {
+    const next = new Map(drops);
+    if (on) {
+      for (const pid of fresh) {
+        next.set(pid, makeMutable(0));
+      }
+    }
+    setKnown([...known, ...fresh]);
+    setDrops(next);
+  }
+  useEffect(() => {
+    for (const d of drops.values()) {
+      if (d.value === 0) {
+        d.set(withTiming(1, { duration: DROP_MS, easing: Easing.bezier(0.3, 1.4, 0.5, 1), reduceMotion: ReduceMotion.Never }));
+      }
+    }
+  }, [drops]);
+  return drops;
+}
+
+/**
  * The necromancer, its zombies on the ground and the strings between them, all moving with the
  * idle clock and, while a kill is on (`striking`), with the kill sequence. A parent drawn with
  * `entering` comes in from above, as the next one does after a defeat.
@@ -280,6 +319,7 @@ export function Enemies({
   motion,
   striking = false,
   entering = false,
+  dropIn = false,
 }: {
   size: Size;
   zombies: number[];
@@ -287,8 +327,12 @@ export function Enemies({
   motion: StrikeMotion;
   striking?: boolean;
   entering?: boolean;
+  /** A zombie that comes after the first ones drops in on its strings (DESIGN: Other motion); without it, it is just there. */
+  dropIn?: boolean;
 }) {
   const ground = onGround(zombies);
+  const drops = useDrops(zombies, dropIn);
+  const slotDrops = ground.shown.map((pid) => drops.get(pid));
   const necro = necromancerAt(size);
   const last = zombieBox(slots.length - 1, size);
   const count = ground.shown.length;
@@ -299,7 +343,15 @@ export function Enemies({
       enter.set(withTiming(1, { duration: NEXT_IN_MS, easing: cssEaseOut, reduceMotion: ReduceMotion.Never }));
     }
   }, [entering, enter]);
-  const lines = useDerivedValue(() => stringsAt(clock.value, count, size, ENTER_FROM * (1 - enter.value)));
+  const lines = useDerivedValue(() => {
+    // A loop, not `map`: a callback made here would not be a worklet, and the UI thread cannot call it.
+    const lifted: number[] = [];
+    for (let i = 0; i < slotDrops.length; i++) {
+      const d = slotDrops[i];
+      lifted.push(d ? dropOffset(d.value) : 0);
+    }
+    return stringsAt(clock.value, count, size, ENTER_FROM * (1 - enter.value), lifted);
+  });
   const pose = useDerivedValue(() => {
     const k = seen(motion, striking);
     return necromancerPose(k.t, k.outcome, k.at, k.n);
@@ -344,7 +396,7 @@ export function Enemies({
         </Animated.View>
       </Animated.View>
       {ground.shown.map((pid, i) => (
-        <ZombieOnGround key={pid} pid={pid} index={i} size={size} clock={clock} motion={motion} on={striking} />
+        <ZombieOnGround key={pid} pid={pid} index={i} size={size} clock={clock} motion={motion} on={striking} drop={drops.get(pid)} />
       ))}
       {ground.more > 0 && (
         <Animated.View style={[styles.more, { left: last.left, bottom: size.height - last.top + 4 }, more]} testID="zombies-more">

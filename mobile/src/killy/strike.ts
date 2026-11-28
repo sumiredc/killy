@@ -428,3 +428,49 @@ export function zombie(t: number, i: number, n: number, outcome: Outcome | null,
   }
   return { alive: false, arm, body: { x, rotate, scaleY, opacity }, soul, pidOpacity: 1 - ease(progress(t, releaseAt, PID_MS)) };
 }
+
+// ---------- New zombies and the server chip ----------
+
+/** How long a new zombie takes to drop in on its strings (the mock's `drop-in`, .6s cubic-bezier(.3, 1.4, .5, 1)). */
+export const DROP_MS = 600;
+const DROP_FROM = -60;
+
+/** The drop's easing: it overshoots, so the zombie settles a little below its place and back. */
+export const dropEase = (x: number) => {
+  'worklet';
+  return cubicBezier(0.3, 1.4, 0.5, 1, x);
+};
+
+/** How far above its place a zombie is at drop progress `e` (the eased 0–1, which may pass 1), before the arena's scale. */
+export function dropOffset(e: number): number {
+  'worklet';
+  return DROP_FROM * (1 - e);
+}
+
+/** A dropping zombie's opacity at progress `e`: it fades in as it comes down. */
+export function dropOpacity(e: number): number {
+  'worklet';
+  return clamp(e);
+}
+
+/** How long the server chip's pop lasts (the mock's `srv-pop`, .5s ease-out). */
+export const CHIP_POP_MS = 500;
+
+const CHIP_REST = 0.14;
+const CHIP_BRIGHT = 0.4;
+
+/** The server chip t ms into its pop: it grows to 1.08 and its purple brightens at 40%, then settles. */
+export function chipPop(t: number): { scale: number; tint: number } {
+  'worklet';
+  if (t < 0 || t >= CHIP_POP_MS) {
+    return { scale: 1, tint: CHIP_REST };
+  }
+  const p = t / CHIP_POP_MS;
+  const stops = (a: number, b: number) =>
+    [
+      [0, a],
+      [0.4, b],
+      [1, a],
+    ] as const;
+  return { scale: keyframes(stops(1, 1.08), easeOut, p), tint: keyframes(stops(CHIP_REST, CHIP_BRIGHT), easeOut, p) };
+}

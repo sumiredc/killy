@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Backdrop, Enemies, Ground, KillyOnStage, ParentCounter, StrikeEffects } from '@/components/Arena';
 import { KillButton } from '@/components/KillButton';
+import { ServerChip } from '@/components/ServerChip';
 import type { Key } from '@/i18n';
 import { useI18n } from '@/i18n/context';
 import { counter, type Size } from '@/killy/arena';
@@ -130,11 +131,7 @@ export default function BattleScreen() {
           // A reason in red reaches down over the necromancer: while one is shown, the info block
           // comes in front of the enemies so it can be read (not in the mock, where it is behind).
           <View style={[styles.info, shown && !shown.ok && styles.infoFront]} testID="battle-info">
-            <View style={styles.chip}>
-              <KText kind="mono" style={styles.chipText} testID="battle-server">
-                {current.server.name}
-              </KText>
-            </View>
+            <ServerChip serverId={current.server.id} name={current.server.name} instant={instant} />
             <View style={styles.countRow}>
               <KText kind="monoSemiBold" style={styles.count} testID="battle-zombies">
                 {/* Once the parent is put away its zombies are released, as the mock's count goes to 0. */}
@@ -200,6 +197,7 @@ export default function BattleScreen() {
             motion={motion}
             striking={battle.strike !== null}
             entering={battle.afterDefeat && !instant}
+            dropIn={!instant}
           />
         )}
         <KillyOnStage clock={clock} charge={press.windUp} lean={press.lean} motion={motion} bubble={battle.bubble} fidget={fidget} instant={instant} />
@@ -236,17 +234,6 @@ const styles = StyleSheet.create({
   info: { position: 'absolute', top: 20, left: 20, right: 70, zIndex: 1 },
   // Above the enemies (2), below Killy (11).
   infoFront: { zIndex: 3 },
-  chip: {
-    alignSelf: 'flex-start',
-    marginBottom: 10,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: 'rgba(191,158,255,0.35)',
-    backgroundColor: 'rgba(144,70,255,0.14)',
-  },
-  chipText: { color: colors.purple100, fontSize: 12.5 },
   countRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
   count: { color: colors.text, fontSize: 56, lineHeight: 56, letterSpacing: -2 },
   countLabel: { color: colors.muted, fontSize: 15 },

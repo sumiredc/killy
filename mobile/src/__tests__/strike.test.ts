@@ -3,7 +3,11 @@ import { apply, BOW, ghostMatrix, ghostOrigin, rotateAbout, scytheMatrix, WIND_U
 import {
   BUBBLE_MS,
   bubblePop,
+  chipPop,
   defeatRows,
+  DROP_MS,
+  dropOffset,
+  dropOpacity,
   FIDGET_TOTAL,
   flashOpacity,
   killyDash,
@@ -267,5 +271,31 @@ describe("Killy's fidget and the bubble's pop", () => {
 
   test('a notice stays 1.4 s, as the recoil does', () => {
     expect(BUBBLE_MS.notice).toBe(1400);
+  });
+});
+
+// DESIGN: Other motion. A new zombie drops in from 60px above over 600 ms; the server chip pops
+// (scale 1.08, brighter) for 500 ms when the parent is from another server.
+describe('a new zombie dropping in and the server chip popping', () => {
+  test('the zombie starts 60px above its place, invisible, and ends in it, visible, after 600 ms', () => {
+    expect(DROP_MS).toBe(600);
+    expect(dropOffset(0)).toBe(-60);
+    expect(dropOpacity(0)).toBe(0);
+    expect(dropOffset(1)).toBeCloseTo(0);
+    expect(dropOpacity(1)).toBe(1);
+    // The easing overshoots a little: past its place, not above it, and never brighter than 1.
+    expect(dropOffset(1.05)).toBeGreaterThan(0);
+    expect(dropOpacity(1.05)).toBe(1);
+  });
+
+  test('the chip grows to 1.08 and brightens at 40% of its 500 ms, and is as it was before and after', () => {
+    const rest = chipPop(-1);
+    expect(rest).toEqual({ scale: 1, tint: 0.14 });
+    expect(chipPop(0)).toEqual(rest);
+    expect(chipPop(200).scale).toBeCloseTo(1.08);
+    expect(chipPop(200).tint).toBeCloseTo(0.4);
+    expect(chipPop(350).scale).toBeLessThan(1.08);
+    expect(chipPop(350).scale).toBeGreaterThan(1);
+    expect(chipPop(500)).toEqual(rest);
   });
 });
