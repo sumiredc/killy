@@ -5,6 +5,7 @@ import { AccessibilityInfo } from 'react-native';
 import { getAnimatedStyle } from 'react-native-reanimated';
 
 import { Enemies, KillyOnStage, StrikeEffects } from '../components/Arena';
+import { ServerChip } from '../components/ServerChip';
 import { useFidget } from '../killy/fidget';
 import type { Strike } from '../killy/battle-context';
 import { killyBob, necroFloat, necroWork, puppet } from '../killy/idle';
@@ -343,5 +344,74 @@ describe("Killy's fidget and bubble", () => {
     expect(dashX()).toBe(0);
     await screen.rerender(<Reacting id={1} bubble={null} reduce />);
     expect(screen.queryByTestId('killy-bubble', { includeHiddenElements: true })).toBeNull();
+  });
+});
+
+// DESIGN: Other motion. With reduce motion these are instant switches.
+describe('a new zombie and the server chip', () => {
+  function Party({ zombies, dropIn }: { zombies: number[]; dropIn: boolean }) {
+    const clock = useIdleClock(false);
+    const motion = useStrikeMotion(null, false, false);
+    return <Enemies size={arena} zombies={zombies} clock={clock} motion={motion} dropIn={dropIn} />;
+  }
+  const zombieY = (i: number) => Number(transform('zombie', i).find((x) => 'translateY' in x)?.translateY ?? 0);
+  const zombieOpacity = (i: number) => (animatedStyle(screen.getAllByTestId('zombie')[i]) as { opacity?: number }).opacity;
+
+  test('a zombie that comes after the first ones drops in from 60px above in 600 ms, the others staying put', async () => {
+    await render(<Party zombies={[3802, 3803]} dropIn />);
+    await ms(16);
+    expect([zombieY(0), zombieOpacity(0)]).toEqual([0, 1]);
+    await screen.rerender(<Party zombies={[3802, 3803, 3804]} dropIn />);
+    await ms(16);
+    // Scaled with the zombie: 60px above, less the first frames.
+    expect(zombieY(2)).toBeLessThan(-30);
+    expect(zombieOpacity(2) ?? 0).toBeLessThan(0.5);
+    expect([zombieY(0), zombieOpacity(0)]).toEqual([0, 1]);
+    await ms(700);
+    expect(zombieY(2)).toBeCloseTo(0, 0);
+    expect(zombieOpacity(2)).toBe(1);
+  });
+
+  test('the zombies a parent starts with are there at once', async () => {
+    await render(<Party zombies={[3802, 3803, 3804]} dropIn />);
+    await ms(16);
+    for (const i of [0, 1, 2]) {
+      expect([zombieY(i), zombieOpacity(i)]).toEqual([0, 1]);
+    }
+  });
+
+  test('with reduce motion a new zombie is simply there', async () => {
+    await render(<Party zombies={[3802]} dropIn={false} />);
+    await screen.rerender(<Party zombies={[3802, 3803]} dropIn={false} />);
+    await ms(16);
+    expect([zombieY(1), zombieOpacity(1)]).toEqual([0, 1]);
+  });
+
+  const scale = () => Number(transform('server-chip').find((x) => 'scale' in x)?.scale ?? 1);
+
+  test('the chip pops to 1.08 for 500 ms when the parent is from another server', async () => {
+    await render(<ServerChip serverId="a" name="web-01" instant={false} />);
+    await ms(16);
+    expect(scale()).toBe(1);
+    await screen.rerender(<ServerChip serverId="b" name="db-01" instant={false} />);
+    await ms(200);
+    expect(scale()).toBeCloseTo(1.08, 1);
+    await ms(400);
+    expect(scale()).toBe(1);
+  });
+
+  test('the chip does not pop for the same server, even renamed', async () => {
+    await render(<ServerChip serverId="a" name="web-01" instant={false} />);
+    await screen.rerender(<ServerChip serverId="a" name="web-02" instant={false} />);
+    await ms(200);
+    expect(scale()).toBe(1);
+  });
+
+  test('with reduce motion the chip changes at once and does not pop', async () => {
+    await render(<ServerChip serverId="a" name="web-01" instant />);
+    await screen.rerender(<ServerChip serverId="b" name="db-01" instant />);
+    await ms(200);
+    expect(scale()).toBe(1);
+    expect(screen.getByTestId('battle-server')).toHaveTextContent('db-01');
   });
 });

@@ -214,12 +214,14 @@ export function anchorsAt(t: number, arena: Size, dy = 0): Point[] {
  * its depth, lifted and tilted by its puppet jerk, all around its bottom centre, as the mock's
  * `transform: scale(s) translateY(y) rotate(r)` with transform-origin 50% 100%.
  */
-export function zombiePointAt(t: number, i: number, arena: Size, p: Point): Point {
+export function zombiePointAt(t: number, i: number, arena: Size, p: Point, drop = 0): Point {
   'worklet';
   const box = zombieBox(i, arena);
   const k = ZOMBIE_WIDTH / 56;
   const origin = { x: box.left + ZOMBIE_WIDTH / 2, y: box.top + ZOMBIE_HEIGHT };
+  // `drop` lifts a zombie that is coming in, in the same units as the jerk.
   const jerk = puppet(t, i);
+  jerk.y += drop;
   const turned = rotateAround({ x: box.left + p.x * k, y: box.top + p.y * k }, origin, jerk.rotate);
   return { x: origin.x + (turned.x - origin.x) * box.scale, y: origin.y + (turned.y - origin.y + jerk.y) * box.scale };
 }
@@ -227,9 +229,9 @@ export function zombiePointAt(t: number, i: number, arena: Size, p: Point): Poin
 /**
  * The marionette strings at time t for `count` zombies on the ground: from the anchor nearest
  * each zombie's head to the head, and from the nearest other anchor to its front hand, as the
- * mock's drawThreads does every frame. `dy` is how far the necromancer is moved down from its place (while it comes in).
+ * mock's drawThreads does every frame. `dy` is how far the necromancer is moved down from its place (while it comes in); `drops` is how far each zombie that is coming in is above its place.
  */
-export function stringsAt(t: number, count: number, arena: Size, dy = 0): Line[] {
+export function stringsAt(t: number, count: number, arena: Size, dy = 0, drops?: readonly number[]): Line[] {
   'worklet';
   const from = anchorsAt(t, arena, dy);
   const nearest = (p: Point, skip: number) => {
@@ -243,8 +245,8 @@ export function stringsAt(t: number, count: number, arena: Size, dy = 0): Line[]
   };
   const lines: Line[] = [];
   for (let i = 0; i < Math.min(count, slots.length); i++) {
-    const h = zombiePointAt(t, i, arena, head);
-    const f = zombiePointAt(t, i, arena, hand);
+    const h = zombiePointAt(t, i, arena, head, drops?.[i] ?? 0);
+    const f = zombiePointAt(t, i, arena, hand, drops?.[i] ?? 0);
     const a1 = nearest(h, -1);
     const a2 = nearest(f, a1);
     lines.push({ x1: from[a1].x, y1: from[a1].y, x2: h.x, y2: h.y }, { x1: from[a2].x, y1: from[a2].y, x2: f.x, y2: f.y });

@@ -171,4 +171,16 @@ describe('strings', () => {
   test('only the six zombies drawn get strings', () => {
     expect(stringsAt(0, 9, arena)).toHaveLength(12);
   });
+
+  test("a zombie that is dropping in has its strings on it: they end above where they end at rest", () => {
+    const rest = stringsAt(0, 3, arena);
+    const dropping = stringsAt(0, 3, arena, 0, [0, 0, -60]);
+    // The first two zombies' strings are as they were; the third's two strings end 60 units (before the zombie's scale) higher.
+    expect(dropping.slice(0, 4)).toEqual(rest.slice(0, 4));
+    expect(dropping[4].y2).toBeLessThan(rest[4].y2 - 30);
+    expect(dropping[5].y2).toBeLessThan(rest[5].y2 - 30);
+    // They start from the same places on the necromancer.
+    expect(dropping[4].x1).toBe(rest[4].x1);
+    expect(dropping[4].y1).toBe(rest[4].y1);
+  });
 });
