@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
@@ -36,11 +36,14 @@ import {
 } from '@/killy/arena';
 import { killyBob, necroFloat, necroWork, puppet, stringsAt } from '@/killy/idle';
 import {
+  BUBBLE_POP_MS,
+  bubblePop,
   DEFEAT_FROM,
   defeatRows,
   ENTER_FROM,
   flashOpacity,
   killyDash,
+  killyFidget,
   killyHop,
   necromancer as necromancerPose,
   NEXT_IN_MS,
@@ -375,16 +378,48 @@ export function StrikeEffects({ size, motion }: { size: Size; motion: StrikeMoti
   );
 }
 
-/** Killy's bubble: just above the head, reaching left, its tail dropping from the lower right onto the head (the mock's `.bubble`). */
-function SpeechBubble({ bubble }: { bubble: Bubble | null }) {
-  if (bubble === null) {
+/**
+ * Killy's bubble: just above the head, reaching left, its tail dropping from the lower right onto the head (the mock's `.bubble`).
+ * It pops in and out over 180 ms (scale from 0.4, opacity over the first 120 ms, around its lower right); with reduce motion it
+ * comes and goes at once. While it pops out it still shows the symbol it had.
+ */
+function SpeechBubble({ bubble, instant }: { bubble: Bubble | null; instant: boolean }) {
+  // The last bubble stays while it pops out. Set while rendering, as React allows, rather than in an effect.
+  const [last, setLast] = useState<Bubble | null>(bubble);
+  if (bubble !== null && bubble !== last) {
+    setLast(bubble);
+  }
+  const pop = useSharedValue(instant && bubble !== null ? 1 : 0);
+  const visible = bubble !== null;
+  useEffect(() => {
+    if (instant) {
+      pop.set(visible ? 1 : 0);
+      return;
+    }
+    pop.set(withTiming(visible ? 1 : 0, { duration: BUBBLE_POP_MS, easing: Easing.bezier(0.2, 1.6, 0.4, 1), reduceMotion: ReduceMotion.Never }));
+    if (visible) {
+      return;
+    }
+    const id = setTimeout(() => setLast(null), BUBBLE_POP_MS);
+    return () => clearTimeout(id);
+  }, [visible, instant, pop]);
+  const shown = instant ? bubble : last;
+  const style = useAnimatedStyle(() => {
+    const { scale, opacity } = bubblePop(pop.value);
+    return { opacity, transform: [{ scale: Math.max(0, scale) }] };
+  });
+  if (shown === null) {
     return null;
   }
   return (
-    <View style={styles.bubble} testID="killy-bubble" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <KText style={styles.bubbleText}>{bubble.symbol}</KText>
+    <Animated.View
+      style={[styles.bubble, style]}
+      testID="killy-bubble"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants">
+      <KText style={styles.bubbleText}>{shown.symbol}</KText>
       <View style={styles.bubbleTail} />
-    </View>
+    </Animated.View>
   );
 }
 
@@ -398,12 +433,18 @@ export function KillyOnStage({
   lean,
   motion,
   bubble = null,
+  fidget,
+  instant = false,
 }: {
   clock: SharedValue<number>;
   charge?: SharedValue<number>;
   lean?: SharedValue<number>;
   motion?: StrikeMotion;
   bubble?: Bubble | null;
+  /** Killy's fidget clock (useFidget): ms since it began, REST when Killy stands still. */
+  fidget?: SharedValue<number>;
+  /** Reduce motion: the bubble comes and goes at once. */
+  instant?: boolean;
 }) {
   const bob = useAnimatedStyle(() => {
     // The hops take the place of the bob while they last (the mock's `.killy.hop` animation).
@@ -414,13 +455,13 @@ export function KillyOnStage({
     return { transform: [{ translateY: hop ?? killyBob(clock.value) }] };
   });
   // The dash moves the drawing, not the bubble (the mock's `.killy.dash .art`).
-  const dash = useAnimatedStyle(() => ({ transform: [{ translateX: motion ? killyDash(motion.elapsed.value) : 0 }] }));
+  const dash = useAnimatedStyle(() => ({ transform: [{ translateX: (motion ? killyDash(motion.elapsed.value) : 0) + (fidget ? killyFidget(fidget.value) : 0) }] }));
   return (
     <Animated.View style={[styles.killy, bob]} pointerEvents="none" testID="killy">
       <Animated.View style={dash} testID="killy-dash">
         <Killy width={KILLY_WIDTH} clock={clock} charge={charge} lean={lean} strike={motion?.elapsed} bow={motion?.bow} />
       </Animated.View>
-      <SpeechBubble bubble={bubble} />
+      <SpeechBubble bubble={bubble} instant={instant} />
     </Animated.View>
   );
 }
@@ -482,6 +523,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     borderRadius: 12,
     backgroundColor: colors.text,
+    // The mock's transform-origin 85% 130%: the bubble grows from near its tail.
+    transformOrigin: '85% 130%',
   },
   bubbleText: { color: '#000', fontSize: 13 },
   // A right-angled triangle under the bubble's right end, as the mock's border trick draws it.

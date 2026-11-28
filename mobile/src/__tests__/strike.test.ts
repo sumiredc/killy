@@ -1,9 +1,13 @@
 import { DRAW } from '../art/Killy';
 import { apply, BOW, ghostMatrix, ghostOrigin, rotateAbout, scytheMatrix, WIND_UP } from '../killy/pose';
 import {
+  BUBBLE_MS,
+  bubblePop,
   defeatRows,
+  FIDGET_TOTAL,
   flashOpacity,
   killyDash,
+  killyFidget,
   killyHop,
   necromancer,
   recoilEnd,
@@ -237,4 +241,31 @@ test('wound up and through the whole swing, the scythe stays inside the area Kil
   // It still covers the mock's 200 × 150 box, which the screen lays out.
   expect(DRAW.x).toBeLessThanOrEqual(0);
   expect(DRAW.y + DRAW.height).toBeGreaterThanOrEqual(150);
+});
+
+// DESIGN: Killy's reactions. The mock's `orooro` is 450 ms, ease-in-out, three times; its bubble
+// pops over 180 ms, with the opacity done in the first 120.
+describe("Killy's fidget and the bubble's pop", () => {
+  test('the fidget is three shuffles of 450 ms: 6px left at a quarter, 6px right at three quarters', () => {
+    expect(FIDGET_TOTAL).toBe(1350);
+    for (const start of [0, 450, 900]) {
+      expect(killyFidget(start)).toBeCloseTo(0);
+      expect(killyFidget(start + 112.5)).toBeCloseTo(-6);
+      expect(killyFidget(start + 337.5)).toBeCloseTo(6);
+    }
+    expect(killyFidget(-1)).toBe(0);
+    expect(killyFidget(1350)).toBe(0);
+    expect(killyFidget(5000)).toBe(0);
+  });
+
+  test('the bubble grows from 0.4 to 1 and shows fully by 120 ms of its 180', () => {
+    expect(bubblePop(0)).toEqual({ scale: 0.4, opacity: 0 });
+    expect(bubblePop(1)).toEqual({ scale: 1, opacity: 1 });
+    expect(bubblePop(120 / 180).opacity).toBe(1);
+    expect(bubblePop(60 / 180).opacity).toBeCloseTo(0.5);
+  });
+
+  test('a notice stays 1.4 s, as the recoil does', () => {
+    expect(BUBBLE_MS.notice).toBe(1400);
+  });
 });

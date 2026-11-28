@@ -96,7 +96,15 @@ async function hold(ms: number) {
 
 /** Lets the kill sequence run to its end: a defeat of up to six zombies, then All clear, takes under 7 s. */
 const sequence = () => act(() => jest.advanceTimersByTimeAsync(10_000));
-const ms = (n: number) => act(() => jest.advanceTimersByTimeAsync(n));
+/**
+ * Advances the clock, drawing every 100 ms: a bubble's pop out is started by an effect, which runs
+ * once React has drawn that the bubble is over, so one long step would run its timers before that.
+ */
+async function ms(n: number) {
+  for (let left = n; left > 0; left -= 100) {
+    await act(() => jest.advanceTimersByTimeAsync(Math.min(100, left)));
+  }
+}
 
 /** Holds the kill button until the kill starts and lets go, leaving the clock at the end of the hold. */
 async function fire() {
@@ -109,11 +117,18 @@ const t1 = '2026-11-13T00:00:01Z';
 const t2 = '2026-11-13T00:00:02Z';
 const t3 = '2026-11-13T00:00:03Z';
 
-async function battleWith(servers: ServerState[]) {
+/**
+ * The app with `servers` on screen. Opening the battle with a parent makes Killy react (DESIGN:
+ * Killy's reactions), so unless the test is about that reaction, the reaction is let pass first.
+ */
+async function battleWith(servers: ServerState[], { greeting = false }: { greeting?: boolean } = {}) {
   const s = new FakeServer();
   const stream = s.stream();
   await startApp(s);
   await sendState(stream, servers);
+  if (!greeting) {
+    await ms(2500);
+  }
   return { s, stream };
 }
 
@@ -357,6 +372,105 @@ describe('All clear', () => {
   });
 });
 
+// DESIGN: Killy's reactions to what comes on to the battle: `……！` with a fidget (the gesture is
+// in motion.test.tsx). Not while a kill is under way or All clear is open.
+describe("Killy's reactions to the battle", () => {
+  const bubble = () => screen.queryByTestId('killy-bubble', { includeHiddenElements: true });
+  const settingsTab = () => screen.getByLabelText('Settings');
+  const battleTab = () => screen.getByLabelText('Battle');
+
+  test('opening the battle with a parent to fight: ……！, which goes after 1.4 s', async () => {
+    await battleWith([server('a', 'web-01', [parent(3801, [3802], t1)])], { greeting: true });
+    expect(bubble()).toHaveTextContent('……！');
+    await ms(1400 + 300);
+    expect(bubble()).toBeNull();
+  });
+
+  test('with nothing to fight, Killy does not react', async () => {
+    await battleWith([], { greeting: true });
+    expect(bubble()).toBeNull();
+  });
+
+  test('a new parent appears: ……！', async () => {
+    const { stream } = await battleWith([server('a', 'web-01', [parent(3801, [3802], t1)])]);
+    expect(bubble()).toBeNull();
+    await sendState(stream, [server('a', 'web-01', [parent(3801, [3802], t1), parent(4100, [4101], t2)])]);
+    expect(bubble()).toHaveTextContent('……！');
+  });
+
+  test('a new zombie for the current parent: ……！; the same state again, or a zombie of a parent that waits, is not', async () => {
+    const { stream } = await battleWith([server('a', 'web-01', [parent(3801, [3802], t1), parent(4100, [4101], t2)])]);
+    await sendState(stream, [server('a', 'web-01', [parent(3801, [3802], t1), parent(4100, [4101], t2)])]);
+    expect(bubble()).toBeNull();
+    await sendState(stream, [server('a', 'web-01', [parent(3801, [3802], t1), parent(4100, [4101, 4102], t2)])]);
+    expect(bubble()).toBeNull();
+    await sendState(stream, [server('a', 'web-01', [parent(3801, [3802, 3803], t1), parent(4100, [4101, 4102], t2)])]);
+    expect(bubble()).toHaveTextContent('……！');
+  });
+
+  test('the Battle tab coming to the front again: ……！', async () => {
+    await battleWith([server('a', 'web-01', [parent(3801, [3802], t1)])]);
+    await fireEvent.press(settingsTab());
+    await ms(2000);
+    expect(bubble()).toBeNull();
+    await fireEvent.press(battleTab());
+    expect(bubble()).toHaveTextContent('……！');
+  });
+
+  test('what comes during a kill does not make Killy react: the kill\'s ……！！ stays', async () => {
+    const { s, stream } = await battleWith([server('a', 'web-01', [parent(3801, [3802], t1)])]);
+    s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 1 });
+    await fire();
+    expect(bubble()).toHaveTextContent('……！！');
+    await sendState(stream, [server('a', 'web-01', [parent(3801, [3802, 3803], t1), parent(4100, [4101], t2)])]);
+    expect(bubble()).toHaveTextContent('……！！');
+  });
+
+  // killy-character.md: Killy shows only ……！ ……？ ……！！ and the marks 💜 💡, never words.
+  test('whatever Killy shows is one of the symbols and marks of the character rules', async () => {
+    const allowed = new Set(['……！', '……？', '……！！', '💜', '💡']);
+    const seenSymbols = new Set<string>();
+    const watch = () => {
+      const b = bubble();
+      if (b) {
+        seenSymbols.add(String(within(b).getByText(/……|💜|💡/, { includeHiddenElements: true }).props.children));
+      }
+    };
+    const step = async (n: number) => {
+      for (let t = 0; t < n; t += 100) {
+        await ms(100);
+        watch();
+      }
+    };
+    const { s, stream } = await battleWith([server('a', 'web-01', [parent(3801, [3802], t1), parent(4100, [4101], t2)])], { greeting: true });
+    watch();
+    await step(2000);
+    await sendState(stream, [server('a', 'web-01', [parent(3801, [3802, 3803], t1), parent(4100, [4101], t2)])]);
+    watch();
+    await step(2000);
+    // A kill that is refused (……？), then two that are killed (……！！, ……！, and 💜 at the end).
+    s.respond('POST /app/v1/kills', 200, { outcome: 'refused', reason: 'protected' });
+    await fireEvent(killButton(), 'pressIn');
+    await ms(1000);
+    await fireEvent(killButton(), 'pressOut');
+    await step(6000);
+    s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 2 });
+    await fireEvent(killButton(), 'pressIn');
+    await ms(1000);
+    await fireEvent(killButton(), 'pressOut');
+    await step(9000);
+    s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 1 });
+    await fireEvent(killButton(), 'pressIn');
+    await ms(1000);
+    await fireEvent(killButton(), 'pressOut');
+    await step(9000);
+    expect([...seenSymbols].sort()).toEqual(['……！', '……！！', '……？', '💜'].sort());
+    for (const symbol of seenSymbols) {
+      expect(allowed.has(symbol)).toBe(true);
+    }
+  });
+});
+
 // DESIGN: Kill sequence, Kill outcomes other than killed, Killy's reactions. Times are from the end
 // of the hold. With the result in at once, the defeat goes on at 670 ms; for n zombies the result
 // shows at 670 + (380 + 70n) + 600 + (1300 + 130n) + 900 and the battle moves on 1300 ms later.
@@ -378,10 +492,11 @@ describe('the kill sequence', () => {
     expect(bubble()).toHaveTextContent('……！！');
     await ms(750);
     expect(bubble()).toHaveTextContent('……！！');
-    await ms(100);
+    // The bubble goes at 800 ms and pops out over 180 ms (the clock is drawn every 100 ms in the test).
+    await ms(350);
     expect(bubble()).toBeNull();
     // n = 1: the result at 4050.
-    await ms(4050 - 850 - 50);
+    await ms(4050 - 1100 - 50);
     expect(bubble()).toBeNull();
     await ms(100);
     expect(bubble()).toHaveTextContent('……！');

@@ -49,6 +49,8 @@ type BattleView = {
   /** Zombies waiting in the queue, for the Battle tab's badge. */
   waiting: number;
   bubble: Bubble | null;
+  /** How many times Killy has fidgeted: a new value starts the gesture again. */
+  fidget: number;
   /** Killy bows from the end of the last parent's sequence until All clear is closed. */
   bowing: boolean;
   /** The last kill ended in a defeat that played: the parent that comes next comes in from above. */
@@ -60,6 +62,8 @@ type BattleView = {
    */
   kill: (key: string, instant: boolean) => number | null;
   closeAllClear: () => void;
+  /** The Battle tab came to the front: Killy fidgets with `……！` if there is a parent to fight and no kill or All clear is on (DESIGN: Killy's reactions). */
+  greet: () => void;
 };
 
 const BattleContext = createContext<BattleView | null>(null);
@@ -85,6 +89,7 @@ export function BattleProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<KillErrorKind | null>(null);
   const [bubble, setBubble] = useState<Bubble | null>(null);
   const [bowing, setBowing] = useState(false);
+  const [fidget, setFidget] = useState(0);
   const [afterDefeat, setAfterDefeat] = useState(false);
   // The outcome is applied to the state current when it arrives, not the one the kill started from.
   const latest = useRef<State>(empty);
@@ -119,13 +124,45 @@ export function BattleProvider({ children }: { children: ReactNode }) {
     }, ms);
   };
 
+  // Killy's reaction to what comes on to the battle: `……！` and a fidget. Not while a kill is under way or All clear is open.
+  const notice = () => {
+    if (strike$.current !== null || current$.current.allClear !== null) {
+      return;
+    }
+    setFidget((n) => n + 1);
+    say('……！', BUBBLE_MS.notice);
+  };
+
   useEffect(() => {
     latest.current = state ?? empty;
     setBattle(onState(current$.current, state ?? empty));
   }, [state]);
 
   const queue = useMemo(() => buildQueue(state ?? empty, battle.hidden), [state, battle.hidden]);
+  // Read by greet, which the Battle screen keeps from when its tab first came to the front.
+  const queued = useRef(0);
+  useEffect(() => {
+    queued.current = queue.length;
+  }, [queue]);
   const waiting = queue.reduce((sum, i) => sum + i.parent.zombies.length, 0);
+
+  // The zombies each parent held the last time the queue changed: a parent not in it is new, and a
+  // front parent holding more is getting a new zombie. What arrives during a kill or All clear is
+  // counted as seen without a reaction.
+  const seen = useRef(new Map<string, number>());
+  useEffect(() => {
+    const before = seen.current;
+    const now = new Map(queue.map((i) => [parentKey(i.server.id, i.parent), i.parent.zombies.length]));
+    const front = queue[0] && parentKey(queue[0].server.id, queue[0].parent);
+    const isNew = [...now.keys()].some((k) => !before.has(k));
+    const moreZombies = front !== undefined && (now.get(front) ?? 0) > (before.get(front) ?? Infinity);
+    seen.current = now;
+    if (isNew || moreZombies) {
+      notice();
+    }
+    // `notice` only reads refs and state setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queue]);
 
   function kill(key: string, instant: boolean): number | null {
     const front = queue[0];
@@ -236,9 +273,15 @@ export function BattleProvider({ children }: { children: ReactNode }) {
         counter,
         waiting,
         bubble,
+        fidget,
         bowing,
         afterDefeat,
         kill,
+        greet: () => {
+          if (queued.current > 0) {
+            notice();
+          }
+        },
         closeAllClear: () => {
           setBowing(false);
           setAfterDefeat(false);

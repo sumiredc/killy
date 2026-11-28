@@ -27,6 +27,9 @@ const PID_MS = 400;
 const GONE_MS = 900;
 const HOP_MS = 450;
 const BOW_MS = 250;
+const FIDGET_MS = 450;
+const FIDGET_TIMES = 3;
+const POP_MS = 180;
 /** How long the next parent takes to come in, and how long after Killy's bow the All clear card appears. */
 export const NEXT_IN_MS = 600;
 export const CLEAR_AFTER_BOW_MS = 600;
@@ -166,7 +169,42 @@ export function killyHop(t: number, from: number): number | null {
 export const BOW_FOR = BOW_MS;
 
 /** How long each of Killy's bubbles stays (the mock's react() calls in kill()). */
-export const BUBBLE_MS = { start: 800, killed: 1000, recoil: 1400, allClear: 3000 } as const;
+export const BUBBLE_MS = { start: 800, killed: 1000, recoil: 1400, allClear: 3000, notice: 1400 } as const;
+
+/** How long Killy's fidget lasts: three left-right shuffles of 450 ms (the mock's `orooro`, `.45s ease-in-out 3`). */
+export const FIDGET_TOTAL = FIDGET_MS * FIDGET_TIMES;
+
+const easeInOut = (x: number) => {
+  'worklet';
+  return cubicBezier(0.42, 0, 0.58, 1, x);
+};
+
+/** Killy's sideways offset, in px, t ms into the fidget: 6px left at a quarter of each shuffle, 6px right at three quarters. */
+export function killyFidget(t: number): number {
+  'worklet';
+  if (t < 0 || t >= FIDGET_TOTAL) {
+    return 0;
+  }
+  return keyframes(
+    [
+      [0, 0],
+      [0.25, -6],
+      [0.75, 6],
+      [1, 0],
+    ],
+    easeInOut,
+    (t % FIDGET_MS) / FIDGET_MS,
+  );
+}
+
+/** How long a bubble takes to pop in or out (the mock's `.bubble` transition, .18s). */
+export const BUBBLE_POP_MS = POP_MS;
+
+/** The bubble at pop progress `p` (0 hidden, 1 shown): grows from 0.4 and fades in over the first 120 ms of the 180. */
+export function bubblePop(p: number): { scale: number; opacity: number } {
+  'worklet';
+  return { scale: 0.4 + 0.6 * p, opacity: clamp((p * POP_MS) / 120) };
+}
 
 // ---------- The arena ----------
 
