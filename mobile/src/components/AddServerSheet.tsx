@@ -1,7 +1,10 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { cancelAnimation, Easing, ReduceMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
+import { Killy } from '@/art/Killy';
+import { BottomSheet } from '@/components/BottomSheet';
 import { buildDemoEnabled } from '@/config';
 import { useServerURL } from '@/config-context';
 import type { Key } from '@/i18n';
@@ -9,8 +12,10 @@ import { useI18n } from '@/i18n/context';
 import { ClaimError } from '@/killy/client';
 import { claimMessages } from '@/killy/claim-messages';
 import { useKilly } from '@/killy/context';
+import { useReduceMotion } from '@/killy/motion';
 import type { PairLink } from '@/killy/pair-link';
 import { type PairCheck, parsePairURL } from '@/killy/pair-url';
+import { BOW_FOR } from '@/killy/strike';
 import { frameWidth } from '@/components/PhoneFrame';
 import { KText } from '@/theme/KText';
 import { colors, fonts, radii } from '@/theme/tokens';
@@ -41,6 +46,29 @@ export function cleanCode(text: string): string {
  * Adding a server is one path whatever the code came from (typed, a scanned QR code, a killy://pair
  * link): it goes into the code field and Add sends the claim, so a display name can still be given.
  */
+/**
+ * Killy without the scythe, bowing, with 💜 at its top right: what shows once the server is added
+ * (the mock's `.paired-killy`, 120px wide). With reduce motion it is bowed at once.
+ */
+function PairedKilly() {
+  const reduce = useReduceMotion();
+  const bow = useSharedValue(0);
+  useEffect(() => {
+    if (reduce === null) {
+      return;
+    }
+    cancelAnimation(bow);
+    bow.set(reduce ? 1 : withTiming(1, { duration: BOW_FOR, easing: Easing.bezier(0.25, 0.1, 0.25, 1), reduceMotion: ReduceMotion.Never }));
+    return () => cancelAnimation(bow);
+  }, [reduce, bow]);
+  return (
+    <View style={styles.paired} testID="paired-killy">
+      <Killy width={120} bow={bow} scythe={false} />
+      <KText style={styles.heart}>💜</KText>
+    </View>
+  );
+}
+
 export function AddServerSheet({ onClose, link }: { onClose: () => void; link?: PairLink | null }) {
   const { t } = useI18n();
   const { client, registration } = useKilly();
@@ -136,9 +164,7 @@ export function AddServerSheet({ onClose, link }: { onClose: () => void; link?: 
   }
 
   return (
-    <Modal transparent animationType="slide" onRequestClose={onClose} visible>
-      {/* padding on both: the Modal's window is not resized on Android, so the keyboard would cover Add. */}
-      <KeyboardAvoidingView style={styles.backdrop} behavior="padding">
+    <BottomSheet onRequestClose={onClose}>
         <View style={[styles.sheet, Platform.OS === 'web' && styles.webSheet]} testID="add-server-sheet">
           <View style={styles.grabber} />
           <KText kind="monoSemiBold" style={styles.title}>
@@ -261,18 +287,19 @@ export function AddServerSheet({ onClose, link }: { onClose: () => void; link?: 
                   <KText style={styles.statusText}>{t('pairing')}</KText>
                 </>
               ) : (
-                <KText style={styles.statusText}>{t('paired', { name: phase.name })}</KText>
+                <>
+                  <PairedKilly />
+                  <KText style={styles.statusText}>{t('paired', { name: phase.name })}</KText>
+                </>
               )}
             </View>
           )}
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
   // On a wide browser the sheet is as wide as the app's frame, not the page.
   webSheet: { width: '100%', maxWidth: frameWidth, alignSelf: 'center' },
   sheet: {
@@ -321,5 +348,7 @@ const styles = StyleSheet.create({
   primaryDisabled: { backgroundColor: colors.elev3 },
   primaryLabel: { color: '#FFFFFF', fontSize: 15 },
   status: { alignItems: 'center', gap: 14, paddingTop: 26, paddingBottom: 16 },
+  paired: { width: 120, height: 90 },
+  heart: { position: 'absolute', top: -4, right: 18, fontSize: 18 },
   statusText: { color: '#CFCAD6', fontSize: 14, textAlign: 'center' },
 });

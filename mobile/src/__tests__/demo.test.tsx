@@ -1,4 +1,4 @@
-import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
+import { act, fireEvent, renderRouter, screen, waitFor, within } from 'expo-router/testing-library';
 import * as Localization from 'expo-localization';
 
 import * as config from '../config';
@@ -68,6 +68,9 @@ describe('Try the demo server', () => {
     expect(server.requests.at(-1)).toEqual(expect.objectContaining({ route: demoRoute, authorization: 'Bearer dev-token' }));
     await act(() => held.resolve(200, demo));
     expect(await screen.findByText('Added demo-linux-01')).toBeOnTheScreen();
+    // The same Killy as for a code (DESIGN: Killy's reactions, server added): no scythe, with 💜.
+    expect(screen.getByTestId('paired-killy')).toBeOnTheScreen();
+    expect(within(screen.getByTestId('paired-killy')).queryByTestId('killy-scythe')).toBeNull();
     await waitFor(() => expect(screen.queryByTestId('add-server-sheet')).toBeNull(), { timeout: 3000 });
   });
 

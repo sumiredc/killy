@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Switch, TextInput, View } from 'react-native';
 
+import { BottomSheet } from '@/components/BottomSheet';
 import type { Key } from '@/i18n';
 import { useI18n } from '@/i18n/context';
 import { type CheckResult, ServerError } from '@/killy/client';
@@ -129,8 +130,7 @@ export function ServerSheet({ server, onClose }: { server: ServerState; onClose:
   }
 
   return (
-    <Modal transparent animationType="slide" onRequestClose={close} visible testID="server-sheet-modal">
-      <KeyboardAvoidingView style={styles.backdrop} behavior="padding">
+    <BottomSheet onRequestClose={close} modalTestID="server-sheet-modal">
         <View style={[styles.sheet, Platform.OS === 'web' && styles.webSheet]} testID="server-sheet">
           <View style={styles.grabber} />
           <KText kind="monoSemiBold" style={styles.title}>
@@ -222,8 +222,7 @@ export function ServerSheet({ server, onClose }: { server: ServerState; onClose:
             </Pressable>
           </View>
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+    </BottomSheet>
   );
 }
 
@@ -250,7 +249,6 @@ function ErrorLine({ text, testID }: { text: string; testID: string }) {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
   // On a wide browser the sheet is as wide as the app's frame, not the page.
   webSheet: { width: '100%', maxWidth: frameWidth, alignSelf: 'center' },
   sheet: {

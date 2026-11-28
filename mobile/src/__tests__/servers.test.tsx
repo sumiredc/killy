@@ -233,6 +233,22 @@ describe('Add server sheet', () => {
     await waitFor(() => expect(screen.queryByTestId('add-server-sheet')).toBeNull(), { timeout: 3000 });
   });
 
+  test('once added, Killy shows without the scythe, bowing, with 💜 over the name (DESIGN: Killy\'s reactions, server added)', async () => {
+    const server = new FakeServer();
+    await startApp(server, registered(server));
+    server.respond('POST /app/v1/pairings/claim', 200, { id: 'a1', name: 'my box', hostname: 'ip-10-0-0-1', notify: true });
+    await openAddSheet();
+    await fireEvent.changeText(screen.getByLabelText('Pairing code'), 'K7Q4XP');
+    await fireEvent.press(screen.getByText('Add'));
+    expect(await screen.findByText('Added my box')).toBeOnTheScreen();
+    const killy = within(screen.getByTestId('paired-killy'));
+    expect(killy.getByTestId('killy-art')).toBeOnTheScreen();
+    expect(killy.queryByTestId('killy-scythe')).toBeNull();
+    expect(killy.getByText('💜')).toBeOnTheScreen();
+    // No bubble and no words from Killy: the name is the system's line below.
+    expect(killy.queryByTestId('killy-bubble')).toBeNull();
+  });
+
   test('the display name takes at most 100 characters, as the Killy server accepts', async () => {
     const server = new FakeServer();
     await startApp(server, registered(server));
