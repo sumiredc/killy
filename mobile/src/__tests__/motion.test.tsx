@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 
-import { act, render, screen } from '@testing-library/react-native';
-import { AccessibilityInfo } from 'react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { AccessibilityInfo, Animated, StyleSheet, View } from 'react-native';
 import { getAnimatedStyle } from 'react-native-reanimated';
 
 import { Enemies, KillyOnStage, StrikeEffects } from '../components/Arena';
+import { BottomSheet } from '../components/BottomSheet';
 import { ServerChip } from '../components/ServerChip';
 import { useFidget } from '../killy/fidget';
 import type { Strike } from '../killy/battle-context';
@@ -413,5 +414,60 @@ describe('a new zombie and the server chip', () => {
     await ms(200);
     expect(scale()).toBe(1);
     expect(screen.getByTestId('battle-server')).toHaveTextContent('db-01');
+  });
+});
+
+// DESIGN: Other motion. The sheet rises over 300 ms, the backdrop fades over 200 ms; with reduce motion they are there at once.
+// BottomSheet uses React Native's Animated, which starts once the Modal says it is shown and the sheet has been laid out.
+describe('a sheet coming in', () => {
+  const style = (testID: string) => StyleSheet.flatten(screen.getByTestId(testID).props.style) as { opacity?: number; transform?: { translateY?: number }[] };
+  const lift = () => Number(style('sheet-rise').transform?.find((x) => 'translateY' in x)?.translateY ?? 0);
+  const backdrop = () => style('sheet-backdrop').opacity;
+  const Sheet = () => (
+    <BottomSheet onRequestClose={() => {}} modalTestID="sheet-modal">
+      <View testID="sheet-content" />
+    </BottomSheet>
+  );
+  // The sheet is moved by pixels, from its height once it has been laid out; it starts when the Modal is shown.
+  const ready = async () => {
+    await fireEvent(screen.getByTestId('sheet-rise'), 'layout', { nativeEvent: { layout: { height: 400, width: 358, x: 0, y: 0 } } });
+    await fireEvent(screen.getByTestId('sheet-modal'), 'show');
+  };
+
+  // On the phone the motion runs on the native side, so what a test can see is what it is asked to do.
+  const timings = () => jest.spyOn(Animated, 'timing');
+
+  test('it rises over 300 ms with the mock\'s easing while the backdrop fades over 200 ms', async () => {
+    const timing = timings();
+    await render(<Sheet />);
+    await ready();
+    expect(timing).toHaveBeenCalledTimes(2);
+    const [rise, fade] = timing.mock.calls.map(([, config]) => config);
+    expect(rise).toEqual(expect.objectContaining({ toValue: 1, duration: 300, useNativeDriver: true }));
+    expect(fade).toEqual(expect.objectContaining({ toValue: 1, duration: 200, useNativeDriver: true }));
+    // Before it starts, the sheet is 40% of its height below its place and the backdrop is not there.
+    expect(lift()).toBe(160);
+    expect(backdrop()).toBe(0);
+  });
+
+  test('it waits for the Modal to be shown, and starts anyway after half a second', async () => {
+    const timing = timings();
+    await render(<Sheet />);
+    await fireEvent(screen.getByTestId('sheet-rise'), 'layout', { nativeEvent: { layout: { height: 400, width: 358, x: 0, y: 0 } } });
+    await ms(400);
+    expect(timing).not.toHaveBeenCalled();
+    await ms(200);
+    expect(timing).toHaveBeenCalledTimes(2);
+  });
+
+  test('with reduce motion the sheet and the backdrop are there at once', async () => {
+    reduceMotion(true);
+    const timing = timings();
+    await render(<Sheet />);
+    await ready();
+    await ms(32);
+    expect(timing).not.toHaveBeenCalled();
+    expect(lift()).toBe(0);
+    expect(backdrop()).toBe(1);
   });
 });
