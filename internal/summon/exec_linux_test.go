@@ -86,9 +86,20 @@ func TestARealParentShowsItsCommandLineHoldsZombiesAndIsCollectedWhenKilled(t *t
 	}
 	// A parent never exits by itself; one left by a failed check would run on.
 	t.Cleanup(func() { _ = syscall.Kill(pid, syscall.SIGKILL) })
-	cmdline, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "cmdline"))
-	if err != nil || string(cmdline) != "node\x00evil_daemon.js\x00" {
-		t.Errorf("cmdline %q (%v), want node evil_daemon.js", cmdline, err)
+	// Start returns while the kernel is still in exec: the parent is alive and runnable, but its
+	// cmdline reads empty until exec has set it. Wait for that; a parent that has ended (a zombie,
+	// or gone) is a real failure and is not waited for.
+	const want = "node\x00evil_daemon.js\x00"
+	var cmdline []byte
+	eventually(t, "the parent shows its command line", func() bool {
+		if st, _, ok := stat(pid); !ok || st == 'Z' {
+			t.Fatalf("the parent ended before showing its command line (state %c, in /proc %v)", st, ok)
+		}
+		cmdline, _ = os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "cmdline"))
+		return len(cmdline) > 0
+	})
+	if string(cmdline) != want {
+		t.Errorf("cmdline %q, want %q", cmdline, want)
 	}
 	eventually(t, "the parent holds its first zombies", func() bool { return zombiesOf(pid) >= FirstZombies })
 	if st, pp, _ := stat(pid); st == 'Z' || pp != os.Getpid() {
