@@ -68,5 +68,8 @@
       "./jest.setup-after-env.js"
     ],
     "testTimeout": 30000
+  },
+  "overrides": {
+    "test-exclude": "^8.0.0"
   }
 }
