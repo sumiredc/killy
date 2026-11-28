@@ -292,6 +292,22 @@ describe('a kill request that fails', () => {
 });
 
 describe('All clear', () => {
+  test('the overlay is outside the tabs, so it covers the tab bar, with a blurred backdrop and Killy without the scythe, bowing, and 💜', async () => {
+    const { s } = await battleWith([server('a', 'web-01', [parent(3801, [3802], t1)])]);
+    s.respond('POST /app/v1/kills', 200, { outcome: 'killed', reaped: 1 });
+    await hold(1000);
+    await sequence();
+    const overlay = screen.getByTestId('all-clear');
+    // Not inside the battle screen (which the tab bar is drawn over), and drawn after the tabs.
+    expect(within(screen.getByTestId('battle-screen', { includeHiddenElements: true })).queryByTestId('all-clear')).toBeNull();
+    expect(within(overlay).getByTestId('all-clear-blur')).toBeOnTheScreen();
+    const killy = within(within(overlay).getByTestId('all-clear-killy'));
+    expect(killy.getByTestId('killy-art')).toBeOnTheScreen();
+    expect(killy.queryByTestId('killy-scythe')).toBeNull();
+    expect(killy.getByText('💜')).toBeOnTheScreen();
+    expect(within(overlay).getByText('Every zombie on every server is at rest')).toBeOnTheScreen();
+  });
+
   test('counts the zombies shown when the kill started, and applies the outcome to the state current when it arrives', async () => {
     const { s, stream } = await battleWith([server('a', 'web-01', [parent(3801, [3802, 3803], t1)])]);
     const answer = s.hold('POST /app/v1/kills');

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Backdrop, Enemies, Ground, KillyOnStage, ParentCounter, StrikeEffects } from '@/components/Arena';
@@ -46,8 +46,8 @@ function Result({ shown }: { shown: { lines: string[]; ok: boolean } }) {
   );
 }
 
-// The battle screen: the arena (DESIGN: Battle tab), the kill button and the All clear card.
-// The kill sequence is #101; Killy's other reactions come with #83 and the All clear overlay with #84.
+// The battle screen: the arena (DESIGN: Battle tab), the kill button.
+// The kill sequence is #101; Killy's other reactions come with #83. The All clear overlay is AllClearOverlay, at the root.
 export default function BattleScreen() {
   const { t } = useI18n();
   const { registration, state } = useKilly();
@@ -209,35 +209,6 @@ export default function BattleScreen() {
         </KText>
       )}
 
-      {battle.allClear && (
-        <View style={styles.overlay} testID="all-clear">
-          <View style={styles.card}>
-            <KText kind="monoSemiBold" style={styles.clearTitle}>
-              {t('clearTitle')}
-            </KText>
-            <KText style={styles.text}>{t('clearText')}</KText>
-            <View style={styles.stats}>
-              <View style={styles.stat}>
-                <KText kind="monoSemiBold" style={styles.statValue} testID="stat-parents">
-                  {battle.allClear.parents}
-                </KText>
-                <KText style={styles.statLabel}>{t('statParents')}</KText>
-              </View>
-              <View style={styles.stat}>
-                <KText kind="monoSemiBold" style={styles.statValue} testID="stat-zombies">
-                  {battle.allClear.zombies}
-                </KText>
-                <KText style={styles.statLabel}>{t('statZombies')}</KText>
-              </View>
-            </View>
-            <Pressable accessibilityRole="button" style={styles.close} onPress={battle.closeAllClear}>
-              <KText kind="monoSemiBold" style={styles.closeLabel}>
-                {t('close')}
-              </KText>
-            </Pressable>
-          </View>
-        </View>
-      )}
     </SafeAreaView>
   );
 }
@@ -278,13 +249,4 @@ const styles = StyleSheet.create({
   // The arena's own colour behind a red reason, so it reads over the moon and the robe.
   resultBox: { alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 8, marginLeft: -8, borderRadius: radii.input, backgroundColor: 'rgba(25,22,31,0.85)' },
   error: { color: colors.red, fontSize: 13, marginTop: 8, textAlign: 'center' },
-  overlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 24 },
-  card: { backgroundColor: colors.elev1, borderRadius: radii.card, borderWidth: 1, borderColor: colors.line, padding: 24, gap: 12 },
-  clearTitle: { color: colors.text, fontSize: 24 },
-  stats: { flexDirection: 'row', gap: 12 },
-  stat: { flex: 1, backgroundColor: colors.elev2, borderRadius: radii.input, padding: 14, gap: 4 },
-  statValue: { color: colors.text, fontSize: 28 },
-  statLabel: { color: colors.muted, fontSize: 12 },
-  closeLabel: { color: '#FFFFFF', fontSize: 16 },
-  close: { minHeight: 52, borderRadius: radii.button, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center' },
 });
