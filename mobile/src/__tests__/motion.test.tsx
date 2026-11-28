@@ -5,6 +5,7 @@ import { AccessibilityInfo } from 'react-native';
 import { getAnimatedStyle } from 'react-native-reanimated';
 
 import { Enemies, KillyOnStage, StrikeEffects } from '../components/Arena';
+import { useFidget } from '../killy/fidget';
 import type { Strike } from '../killy/battle-context';
 import { killyBob, necroFloat, necroWork, puppet } from '../killy/idle';
 import { useIdleClock, useIdleMotion } from '../killy/motion';
@@ -287,5 +288,60 @@ describe('the kill sequence in the arena', () => {
     await ms(600);
     expect(translateY('necromancer')).toBeCloseTo(0);
     expect(opacity('necromancer')).toBe(1);
+  });
+});
+
+// DESIGN: Killy's reactions and Motion. A new `id` starts the fidget; with reduce motion Killy
+// stands still and the bubble comes at once.
+describe("Killy's fidget and bubble", () => {
+  const symbol = '……！' as const;
+  function Reacting({ id, bubble, reduce }: { id: number; bubble: { symbol: typeof symbol; id: number } | null; reduce: boolean }) {
+    const clock = useIdleClock(false);
+    const fidget = useFidget(id, reduce);
+    return <KillyOnStage clock={clock} bubble={bubble} fidget={fidget} instant={reduce} />;
+  }
+  const dashX = () => Number(transform('killy-dash').find((x) => 'translateX' in x)?.translateX ?? 0);
+  const bubbleStyle = () => animatedStyle(screen.getByTestId('killy-bubble', { includeHiddenElements: true })) as { opacity?: number; transform?: { scale?: number }[] };
+  const scale = () => bubbleStyle().transform?.find((x) => 'scale' in x)?.scale ?? 0;
+
+  test('Killy shuffles 6px left and right three times, then stands still', async () => {
+    await render(<Reacting id={1} bubble={{ symbol, id: 1 }} reduce={false} />);
+    await ms(112.5);
+    expect(dashX()).toBeCloseTo(-6, 0);
+    await ms(225);
+    expect(dashX()).toBeCloseTo(6, 0);
+    await ms(450 * 3);
+    expect(dashX()).toBe(0);
+  });
+
+  test('a new fidget starts again from the beginning', async () => {
+    await render(<Reacting id={1} bubble={null} reduce={false} />);
+    await ms(1400);
+    expect(dashX()).toBe(0);
+    await screen.rerender(<Reacting id={2} bubble={null} reduce={false} />);
+    await ms(113);
+    expect(dashX()).toBeCloseTo(-6, 0);
+  });
+
+  test('the bubble pops in over 180 ms', async () => {
+    await render(<Reacting id={0} bubble={null} reduce={false} />);
+    await screen.rerender(<Reacting id={0} bubble={{ symbol, id: 1 }} reduce={false} />);
+    expect(bubbleStyle().opacity ?? 0).toBeLessThan(0.5);
+    await ms(200);
+    expect(bubbleStyle().opacity).toBe(1);
+    expect(scale()).toBeCloseTo(1, 1);
+  });
+
+  test('with reduce motion Killy does not fidget and the bubble is there at once, and goes at once', async () => {
+    await render(<Reacting id={1} bubble={null} reduce />);
+    await screen.rerender(<Reacting id={1} bubble={{ symbol, id: 1 }} reduce />);
+    // One frame: there is no 180 ms pop to wait for.
+    await ms(16);
+    expect(bubbleStyle().opacity).toBe(1);
+    expect(scale()).toBe(1);
+    await ms(112);
+    expect(dashX()).toBe(0);
+    await screen.rerender(<Reacting id={1} bubble={null} reduce />);
+    expect(screen.queryByTestId('killy-bubble', { includeHiddenElements: true })).toBeNull();
   });
 });

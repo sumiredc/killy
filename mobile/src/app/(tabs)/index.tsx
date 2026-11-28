@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -11,6 +12,7 @@ import { parentKey, type Shown } from '@/killy/battle';
 import { useBattle } from '@/killy/battle-context';
 import type { KillErrorKind } from '@/killy/client';
 import { useKilly } from '@/killy/context';
+import { useFidget } from '@/killy/fidget';
 import { useIdleClock, useReduceMotion } from '@/killy/motion';
 import { useWebDemo } from '@/killy/web-demo';
 import { useHoldToKill } from '@/killy/hold';
@@ -82,6 +84,16 @@ export default function BattleScreen() {
   const reduceMotion = useReduceMotion();
   const clock = useIdleClock(reduceMotion === false);
   const instant = reduceMotion !== false;
+  const fidget = useFidget(battle.fidget, instant);
+  // The Battle tab coming to the front (launch, a switch of tabs, a tap on a notification): Killy reacts.
+  const { greet } = battle;
+  useFocusEffect(
+    useCallback(() => {
+      greet();
+      // Only when the tab comes to the front, not whenever the battle changes.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
+  );
   const motion = useStrikeMotion(battle.strike, battle.bowing, instant);
   const canKill = current !== undefined && !battle.busy && battle.allClear === null;
   // The sequence's clock starts as the hold ends, so the swing takes over from the wind-up at once.
@@ -190,7 +202,7 @@ export default function BattleScreen() {
             entering={battle.afterDefeat && !instant}
           />
         )}
-        <KillyOnStage clock={clock} charge={press.windUp} lean={press.lean} motion={motion} bubble={battle.bubble} />
+        <KillyOnStage clock={clock} charge={press.windUp} lean={press.lean} motion={motion} bubble={battle.bubble} fidget={fidget} instant={instant} />
         {size && <StrikeEffects size={size} motion={motion} />}
         </View>
       </View>
